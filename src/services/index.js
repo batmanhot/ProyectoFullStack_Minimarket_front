@@ -1,0 +1,402 @@
+/**
+ * CAPA DE SERVICIOS
+ * VITE_USE_API=false  → localStorage / Zustand (modo demo)
+ * VITE_USE_API=true   → API REST backend (modo producción)
+ *
+ * IMPORTANTE: se usa useStore.getState() — NO window.__MM_STORE__
+ * Eso garantiza estado siempre fresco y elimina race conditions.
+ */
+import axios from 'axios'
+import { useStore } from '../store/index'
+import { formatNumber } from '../shared/utils/helpers'
+import { APP_CONFIG } from '../config/app'
+
+const USE_API = APP_CONFIG.useApi
+
+// ─── AXIOS ────────────────────────────────────────────────────────────────────
+export const api = axios.create({ baseURL: APP_CONFIG.apiUrl })
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('mm_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('mm_token')
+      useStore.getState().logout()
+    }
+    return Promise.reject(err)
+  }
+)
+
+// ─── HELPERS INTERNOS ─────────────────────────────────────────────────────────
+const ok   = (data, total) => ({ data, meta: { total: total ?? (Array.isArray(data) ? data.length : 1) }, error: null })
+const fail = (msg)         => ({ data: null, meta: null, error: msg })
+const gs   = ()            => useStore.getState() // siempre fresco
+const delay = (ms = 260)   => new Promise(r => setTimeout(r, ms))
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AUTH SERVICE
+// ═════════════════════════════════════════════════════════════════════════════
+export const authService = {
+  async login(role) {
+    await delay(350)
+    if (USE_API) {
+      const { data } = await api.post('/auth/login', { role })
+      localStorage.setItem('mm_token', data.token)
+      return ok(data.user)
+    }
+    const user = gs().users.find(u => u.role === role && u.isActive)
+    return user ? ok(user) : fail('Usuario no encontrado')
+  },
+
+  async loginWithCredentials(username) {
+    await delay(350)
+    const user = gs().users.find(u => u.username === username && u.isActive)
+    return user ? ok(user) : fail('Usuario o contraseña incorrectos')
+  },
+
+  async logout() {
+    localStorage.removeItem('mm_token')
+    if (USE_API) await api.post('/auth/logout').catch(() => {})
+    return ok(null)
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PRODUCT SERVICE
+// ═════════════════════════════════════════════════════════════════════════════
+export const productService = {
+  async getAll(filters = {}) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.get('/products', { params: filters })
+      return ok(data.data, data.meta?.total)
+    }
+    let products = gs().products.filter(p => p.isActive)
+    if (filters.categoryId) products = products.filter(p => p.categoryId === filters.categoryId)
+    if (filters.search) {
+      const q = filters.search.toLowerCase()
+      products = products.filter(p =>
+        p.name.toLowerCase().includes(q) || p.barcode.includes(q) ||
+        p.sku?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q)
+      )
+    }
+    if (filters.lowStock)    products = products.filter(p => p.stock <= p.stockMin)
+    if (filters.nearExpiry)  products = products.filter(p => {
+      if (!p.expiryDate) return false
+      return Math.ceil((new Date(p.expiryDate) - new Date()) / 86400000) <= 30
+    })
+    if (filters.noMovement)  products = products.filter(p => {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - (filters.noMovementDays || 30))
+      const movements = gs().stockMovements.filter(m => m.productId === p.id && new Date(m.createdAt) >= cutoff)
+      return movements.length === 0
+    })
+    return ok(products, products.length)
+  },
+
+  async getByBarcode(barcode) {
+    await delay(100)
+    if (USE_API) {
+      const { data } = await api.get(`/products/barcode/${barcode}`)
+      return ok(data.data)
+    }
+    const product = gs().products.find(p => p.barcode === barcode && p.isActive)
+    return product ? ok(product) : fail('Producto no encontrado')
+  },
+
+  async create(payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post('/products', payload); return ok(data.data) }
+    const product = { ...payload, id: crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+    gs().addProduct(product)
+    return ok(product)
+  },
+
+  async update(id, payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.put(`/products/${id}`, payload); return ok(data.data) }
+    gs().updateProduct(id, payload)
+    return ok({ id, ...payload })
+  },
+
+  async adjustStock(id, quantity, type, reason, userId) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.post(`/products/${id}/stock`, { quantity, type, reason })
+      return ok(data.data)
+    }
+    const state   = gs()
+    const product = state.products.find(p => p.id === id)
+    if (!product) return fail('Producto no encontrado')
+
+    const prevStock = product.stock
+    const delta     = type === 'entrada' ? quantity : -quantity
+    const newStock  = Math.max(0, prevStock + delta)
+
+    state.updateProduct(id, { stock: newStock })
+    state.addStockMovement({
+      id: crypto.randomUUID(), productId: id, productName: product.name,
+      type, quantity, previousStock: prevStock, newStock, reason, userId,
+      createdAt: new Date().toISOString(),
+    })
+    return ok({ id, newStock })
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SALE SERVICE
+// ═════════════════════════════════════════════════════════════════════════════
+export const saleService = {
+  async getAll(filters = {}) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.get('/sales', { params: filters })
+      return ok(data.data, data.meta?.total)
+    }
+    let sales = gs().sales
+    if (filters.status)   sales = sales.filter(s => s.status === filters.status)
+    if (filters.dateFrom) sales = sales.filter(s => new Date(s.createdAt) >= new Date(filters.dateFrom))
+    if (filters.dateTo)   sales = sales.filter(s => new Date(s.createdAt) <= new Date(filters.dateTo))
+    if (filters.clientId) sales = sales.filter(s => s.clientId === filters.clientId)
+    return ok(sales.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), sales.length)
+  },
+
+  async create(payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post('/sales', payload); return ok(data.data) }
+
+    const state = gs()
+    // Descontar stock de CADA producto — leemos siempre estado fresco dentro del loop
+    for (const item of payload.items) {
+      const freshState  = useStore.getState()
+      const product     = freshState.products.find(p => p.id === item.productId)
+      if (!product) continue
+      const prevStock   = product.stock
+      const newStock    = Math.max(0, prevStock - item.quantity)
+      freshState.updateProduct(item.productId, { stock: newStock })
+      freshState.addStockMovement({
+        id: crypto.randomUUID(), productId: item.productId, productName: product.name,
+        type: 'salida', quantity: item.quantity, previousStock: prevStock, newStock,
+        reason: `Venta ${payload.invoiceNumber}`, userId: payload.userId,
+        createdAt: payload.createdAt || new Date().toISOString(),
+      })
+    }
+
+    // Registrar deuda si hay pago a crédito
+    if (payload.clientId) {
+      const creditPayment = payload.payments?.find(p => p.method === 'credito')
+      if (creditPayment) {
+        const freshState = useStore.getState()
+        const client = freshState.clients.find(c => c.id === payload.clientId)
+        if (client) {
+          freshState.updateClient(payload.clientId, {
+            currentDebt: formatNumber((client.currentDebt || 0) + creditPayment.amount)
+          })
+        }
+      }
+    }
+
+    const sale = { ...payload, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
+    useStore.getState().addSale(sale)
+    useStore.getState().clearCart()
+    return ok(sale)
+  },
+
+  async cancel(id, reason, userId) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
+      return ok(data.data)
+    }
+    const state = gs()
+    const sale  = state.sales.find(s => s.id === id)
+    if (!sale) return fail('Venta no encontrada')
+    if (sale.status !== 'completada') return fail('Solo se pueden cancelar ventas completadas')
+
+    for (const item of sale.items) {
+      const freshState = useStore.getState()
+      const product    = freshState.products.find(p => p.id === item.productId)
+      if (!product) continue
+      freshState.updateProduct(item.productId, { stock: product.stock + item.quantity })
+      freshState.addStockMovement({
+        id: crypto.randomUUID(), productId: item.productId, productName: product.name,
+        type: 'entrada', quantity: item.quantity,
+        previousStock: product.stock, newStock: product.stock + item.quantity,
+        reason: `Cancelación ${sale.invoiceNumber}`, userId,
+        createdAt: new Date().toISOString(),
+      })
+    }
+
+    // Revertir deuda de crédito
+    if (sale.clientId) {
+      const creditPayment = sale.payments?.find(p => p.method === 'credito')
+      if (creditPayment) {
+        const freshState = useStore.getState()
+        const client = freshState.clients.find(c => c.id === sale.clientId)
+        if (client) {
+          freshState.updateClient(sale.clientId, {
+            currentDebt: formatNumber(Math.max(0, (client.currentDebt || 0) - creditPayment.amount))
+          })
+        }
+      }
+    }
+
+    useStore.getState().updateSale(id, { status: 'cancelada', cancelReason: reason, cancelledAt: new Date().toISOString() })
+    return ok({ id, status: 'cancelada' })
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CASH SERVICE
+// ═════════════════════════════════════════════════════════════════════════════
+export const cashService = {
+  async open(payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post('/cash/open', payload); return ok(data.data) }
+    const state = gs()
+    if (state.activeCashSession) return fail('Ya existe una caja abierta')
+    const session = { ...payload, id: crypto.randomUUID(), status: 'abierta', openedAt: new Date().toISOString() }
+    state.openCashSession(session)
+    return ok(session)
+  },
+
+  async close(id, payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post(`/cash/${id}/close`, payload); return ok(data.data) }
+    const state = gs()
+    if (!state.activeCashSession) return fail('No hay caja abierta')
+    const session = state.activeCashSession
+
+    const sessionSales = state.sales.filter(s =>
+      s.status === 'completada' && new Date(s.createdAt) >= new Date(session.openedAt)
+    )
+    const cashTotal = sessionSales.reduce((acc, s) => {
+      const cashAmt = s.payments?.filter(p => p.method === 'efectivo').reduce((a, p) => a + p.amount, 0) || s.total
+      return acc + cashAmt
+    }, 0)
+
+    const expectedAmount = formatNumber(session.openingAmount + cashTotal)
+    const difference     = formatNumber(payload.countedAmount - expectedAmount)
+
+    const closedSession = {
+      ...session, closingAmount: payload.countedAmount, expectedAmount, difference,
+      status: 'cerrada', notes: payload.notes || '', closedAt: new Date().toISOString(),
+      salesCount: sessionSales.length,
+      totalSales: formatNumber(sessionSales.reduce((a, s) => a + s.total, 0)),
+    }
+    state.closeCashSession(closedSession)
+    return ok(closedSession)
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLIENT SERVICE
+// ═════════════════════════════════════════════════════════════════════════════
+export const clientService = {
+  async getAll(search = '') {
+    await delay(180)
+    if (USE_API) { const { data } = await api.get('/clients', { params: { search } }); return ok(data.data) }
+    let clients = gs().clients.filter(c => c.isActive)
+    if (search) {
+      const q = search.toLowerCase()
+      clients = clients.filter(c => c.name.toLowerCase().includes(q) || c.documentNumber.includes(q))
+    }
+    return ok(clients, clients.length)
+  },
+
+  async create(payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post('/clients', payload); return ok(data.data) }
+    const client = { ...payload, id: crypto.randomUUID(), currentDebt: 0, isActive: true, createdAt: new Date().toISOString() }
+    gs().addClient(client)
+    return ok(client)
+  },
+
+  async update(id, payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.put(`/clients/${id}`, payload); return ok(data.data) }
+    gs().updateClient(id, payload)
+    return ok({ id, ...payload })
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUPPLIER SERVICE
+// ═════════════════════════════════════════════════════════════════════════════
+export const supplierService = {
+  async getAll(search = '') {
+    await delay(180)
+    if (USE_API) { const { data } = await api.get('/suppliers', { params: { search } }); return ok(data.data) }
+    let suppliers = gs().suppliers.filter(s => s.isActive !== false)
+    if (search) {
+      const q = search.toLowerCase()
+      suppliers = suppliers.filter(s => s.name.toLowerCase().includes(q))
+    }
+    return ok(suppliers, suppliers.length)
+  },
+
+  async create(payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post('/suppliers', payload); return ok(data.data) }
+    const supplier = { ...payload, id: crypto.randomUUID(), isActive: true, createdAt: new Date().toISOString() }
+    gs().addSupplier(supplier)
+    return ok(supplier)
+  },
+
+  async update(id, payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.put(`/suppliers/${id}`, payload); return ok(data.data) }
+    gs().updateSupplier(id, payload)
+    return ok({ id, ...payload })
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PURCHASE SERVICE (Compras a proveedor)
+// ═════════════════════════════════════════════════════════════════════════════
+export const purchaseService = {
+  async getAll() {
+    if (USE_API) { const { data } = await api.get('/purchases'); return ok(data.data) }
+    return ok(gs().purchases, gs().purchases.length)
+  },
+
+  async create(payload) {
+    await delay()
+    if (USE_API) { const { data } = await api.post('/purchases', payload); return ok(data.data) }
+
+    const state   = gs()
+    const purchase = {
+      ...payload, id: crypto.randomUUID(), status: 'confirmada',
+      createdAt: new Date().toISOString(),
+      total: formatNumber(payload.items.reduce((a, i) => a + i.quantity * i.priceBuy, 0)),
+    }
+
+    // Actualizar stock y priceBuy de cada producto
+    for (const item of payload.items) {
+      const freshState = useStore.getState()
+      const product    = freshState.products.find(p => p.id === item.productId)
+      if (!product) continue
+      const prevStock  = product.stock
+      const newStock   = prevStock + item.quantity
+      freshState.updateProduct(item.productId, {
+        stock: newStock,
+        priceBuy: item.priceBuy, // actualiza costo real
+      })
+      freshState.addStockMovement({
+        id: crypto.randomUUID(), productId: item.productId, productName: product.name,
+        type: 'entrada', quantity: item.quantity,
+        previousStock: prevStock, newStock,
+        reason: `Compra proveedor: ${payload.supplierName || ''}`,
+        userId: payload.userId, createdAt: new Date().toISOString(),
+      })
+    }
+
+    useStore.getState().addPurchase(purchase)
+    return ok(purchase)
+  },
+}

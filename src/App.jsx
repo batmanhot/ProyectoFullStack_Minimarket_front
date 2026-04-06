@@ -1,176 +1,89 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { lazy, Suspense, useState } from 'react'
+import { Toaster } from 'react-hot-toast'
+import { useStore } from './store/index'
+import { canAccess } from './config/app'
+import Sidebar from './shared/components/ui/Sidebar'
+import Login from './features/auth/Login'
+import toast from 'react-hot-toast'
 
-// Pages
-import LoginPage from './pages/auth/LoginPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import UsersPage from './pages/users/UsersPage';
-import ProductsPage from './pages/inventory/ProductsPage';
-import CategoriesPage from './pages/inventory/CategoriesPage';
-import SuppliersPage from './pages/inventory/SuppliersPage';
-import POSPage from './pages/pos/POSPage';
-import CashPage from './pages/cash/CashPage';
-import ClientsPage from './pages/clients/ClientsPage';
-import ReportsPage from './pages/reports/ReportsPage';
-import InvoicesPage from './pages/invoices/InvoicesPage';
+// ── Lazy loading — solo POS y Dashboard cargan en el bundle inicial ───────────
+import Dashboard from './features/dashboard/Dashboard'
+import POS       from './features/pos/POS'
 
-// Components
-import ProtectedRoute from './components/auth/ProtectedRoute';
+const Inventory  = lazy(() => import('./features/inventory/Inventory'))
+const Cash       = lazy(() => import('./features/cash/Cash'))
+const Clients    = lazy(() => import('./features/clients/Clients'))
+const Suppliers  = lazy(() => import('./features/suppliers/Suppliers'))
+const Purchases  = lazy(() => import('./features/purchases/Purchases'))
+const Reports    = lazy(() => import('./features/reports/Reports'))
+const Users      = lazy(() => import('./features/users/Users'))
 
-// Store
-import useAuthStore from './store/authStore';
+const PAGES = {
+  dashboard: Dashboard,
+  pos:       POS,
+  inventory: Inventory,
+  cash:      Cash,
+  clients:   Clients,
+  suppliers: Suppliers,
+  purchases: Purchases,
+  reports:   Reports,
+  users:     Users,
+}
 
-function App() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="flex flex-col items-center gap-3 text-gray-300">
+        <svg className="animate-spin w-8 h-8" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        </svg>
+        <span className="text-sm">Cargando módulo...</span>
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  const { currentUser } = useStore()
+  const [currentPage, setCurrentPage] = useState('dashboard')
+
+  // ── Guard de navegación por rol ───────────────────────────────────────────
+  const handleNavigate = (page) => {
+    if (!canAccess(currentUser?.role, page)) {
+      toast.error('Sin permisos para esta sección')
+      return
+    }
+    setCurrentPage(page)
+  }
+
+  if (!currentUser) {
+    return (
+      <>
+        <Login />
+        <Toaster position="top-right" toastOptions={{ style: { fontSize: '13px', borderRadius: '8px' } }}/>
+      </>
+    )
+  }
+
+  const Page = PAGES[currentPage] || PAGES.dashboard
 
   return (
-    <BrowserRouter>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      <Sidebar currentPage={currentPage} onNavigate={handleNavigate}/>
+      <main className="flex-1 overflow-y-auto">
+        <Suspense fallback={<PageFallback/>}>
+          <Page/>
+        </Suspense>
+      </main>
       <Toaster
         position="top-right"
         toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#fff',
-            color: '#363636',
-          },
-          success: {
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
+          style: { fontSize: '13px', borderRadius: '8px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' },
+          success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+          error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
         }}
       />
-
-      <Routes>
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-
-        <Route path="/login" element={<LoginPage />} />
-
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/users"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <UsersPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/inventory"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor']}>
-              <ProductsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inventory/categories"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor']}>
-              <CategoriesPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/inventory/suppliers"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor']}>
-              <SuppliersPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/pos"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor', 'cajero']}>
-              <POSPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/clients"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor']}>
-              <ClientsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/cash"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor', 'cajero']}>
-              <CashPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor']}>
-              <ReportsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/invoices"
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'gerente', 'supervisor']}>
-              <InvoicesPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="*"
-          element={
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>
-                <p className="text-xl text-gray-600 mb-8">Página no encontrada</p>
-                <a
-                  href="/"
-                  className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  Volver al inicio
-                </a>
-              </div>
-            </div>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
-  );
+    </div>
+  )
 }
-
-export default App;
