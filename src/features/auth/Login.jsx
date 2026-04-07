@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../../store/index'
 import { authService } from '../../services/index'
 import { ROLES } from '../../config/app'
+import logo from '../../assets/logo.png'
 import toast from 'react-hot-toast'
 
 const DEMO_ROLES = [
@@ -307,11 +308,13 @@ export default function Login() {
                 <div style={{ marginBottom: '22px' }}>
                   <div style={{
                     width: '50px', height: '50px', borderRadius: '13px',
-                    background: 'linear-gradient(135deg,#2563eb,#4f46e5)',
+                    background: 'rgba(255,255,255,0.08)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '22px', marginBottom: '14px',
-                    boxShadow: '0 8px 24px rgba(37,99,235,0.40)',
-                  }}>🛒</div>
+                    overflow: 'hidden', marginBottom: '14px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                  }}>
+                    <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
                   <h3 style={{ fontSize: '21px', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Iniciar sesión</h3>
                   <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.38)', margin: 0 }}>Selecciona un rol o ingresa tu usuario</p>
                 </div>

@@ -15,14 +15,14 @@
     <meta name="apple-mobile-web-app-title" content="POS Minimarket" />
     
     <!-- Apple Touch Icons -->
-    <link rel="apple-touch-icon" sizes="72x72" href="/icons/icon-72x72.png" />
-    <link rel="apple-touch-icon" sizes="96x96" href="/icons/icon-96x96.png" />
-    <link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128x128.png" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
-    <link rel="apple-touch-icon" sizes="384x384" href="/icons/icon-384x384.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/src/assets/icons-apple/icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="96x96" href="/src/assets/icons-apple/icon-96x96.png" />
+    <link rel="apple-touch-icon" sizes="128x128" href="/src/assets/icons-apple/icon-128x128.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/src/assets/icons-apple/icon-144x144.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/src/assets/icons-apple/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/src/assets/icons-apple/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="384x384" href="/src/assets/icons-apple/icon-384x384.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/src/assets/icons-apple/icon-512x512.png" />
     
     <!-- Apple Splash Screens -->
     <link rel="apple-touch-startup-image" href="/splash/iphone5_splash.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" />
@@ -37,8 +37,11 @@
     <link rel="apple-touch-startup-image" href="/splash/ipadpro2_splash.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <!-- <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" /> -->
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/src/assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/src/assets/favicon-16x16.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     
     <!-- Manifest -->
@@ -46,7 +49,7 @@
     
     <!-- Microsoft Tiles -->
     <meta name="msapplication-TileColor" content="#0ea5e9" />
-    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+    <meta name="msapplication-TileImage" content="/src/assets/favicon-144x144.png"/>
     <meta name="msapplication-config" content="/browserconfig.xml" />
     
     <!-- Open Graph -->
@@ -132,8 +135,8 @@
     <!-- Loading inicial -->
     <div id="app-loading">
       <div style="text-align: center;">
-        <div class="spinner"></div>
-        <p class="loading-text">Cargando Sistema POS...</p>
+        <div class="spinner"><p class="loading-text">Cargando Sistema POS...</p></div>
+        <!-- <p class="loading-text">Cargando Sistema POS...</p> -->
       </div>
     </div>
 
