@@ -1,15 +1,11 @@
-import { lazy, Suspense, useState, useEffect  } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { useStore } from './store/index'
 import { canAccess } from './config/app'
+import { useTheme } from './shared/hooks/useTheme'
 import Sidebar from './shared/components/ui/Sidebar'
 import Login from './features/auth/Login'
 import toast from 'react-hot-toast'
-
-import { useServiceWorker } from './shared/hooks/useServiceWorker.jsx'
-import InstallPWA from './shared/components/InstallPWA'
-import { Wifi, WifiOff } from 'lucide-react'
-
 
 import Dashboard from './features/dashboard/Dashboard'
 import POS       from './features/pos/POS'
@@ -48,37 +44,10 @@ function PageFallback() {
   )
 }
 
-// Componente para mostrar indicador de reconexión
-function OnlineIndicator() {
-  const [justReconnected, setJustReconnected] = useState(false)
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setJustReconnected(true)
-      setTimeout(() => setJustReconnected(false), 3000)
-    }
-
-    window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [])
-
-  if (!justReconnected) return null
-
-  return (
-    <div className="fixed top-0 left-0 right-0 bg-green-500 text-white py-2 px-4 text-center text-sm font-medium z-50 animate-slide-down flex items-center justify-center gap-2">
-      <Wifi className="w-4 h-4" />
-      <span>Conexión restaurada - Sincronizando datos...</span>
-    </div>
-  )
-}
-
-
 export default function App() {
-  // const { currentUser } = useStore()
-  const currentUser = useStore((state) => state.currentUser)
-  const { isOnline } = useServiceWorker()
-
+  const { currentUser } = useStore()
   const [currentPage, setCurrentPage] = useState('dashboard')
+  const { theme, toggle, setDirect }  = useTheme()
 
   const handleNavigate = (page) => {
     if (!canAccess(currentUser?.role, page)) { toast.error('Sin permisos para esta sección'); return }
@@ -88,20 +57,6 @@ export default function App() {
   if (!currentUser) {
     return (
       <>
-        {/* Indicador de conexión (solo cuando está offline) */}
-          {!isOnline && (
-            <div className="fixed top-0 left-0 right-0 bg-amber-500 text-white py-2 px-4 text-center text-sm font-medium z-50 flex items-center justify-center gap-2">
-              <WifiOff className="w-4 h-4" />
-              <span>Modo Offline - Los cambios se sincronizarán cuando vuelvas a estar online</span>
-            </div>
-          )}
-
-          {/* Indicador de reconexión (muestra brevemente cuando vuelve online) */}
-          <OnlineIndicator />
-
-          {/* Banner de instalación PWA */}
-          <InstallPWA />
-
         <Login/>
         <Toaster position="top-right" toastOptions={{ style: { fontSize: '13px', borderRadius: '8px' } }}/>
       </>
@@ -111,14 +66,21 @@ export default function App() {
   const Page = PAGES[currentPage] || PAGES.dashboard
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar currentPage={currentPage} onNavigate={handleNavigate}/>
-      <main className="flex-1 overflow-y-auto">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} theme={theme} onThemeToggle={toggle} onThemeSet={setDirect}/>
+      <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
         <Suspense fallback={<PageFallback/>}>
           <Page/>
         </Suspense>
       </main>
-      <Toaster position="top-right" toastOptions={{ style: { fontSize: '13px', borderRadius: '8px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }, success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } }, error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } } }}/>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: { fontSize: '13px', borderRadius: '8px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' },
+          success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+          error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+        }}
+      />
     </div>
   )
 }
