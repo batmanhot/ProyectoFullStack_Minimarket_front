@@ -3,225 +3,217 @@ import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { getInitialDemoState } from '../data/seedData'
 import { formatInvoice, formatNumber } from '../shared/utils/helpers'
 
-// ─── STORE PRINCIPAL ──────────────────────────────────────────────────────────
 export const useStore = create(
   subscribeWithSelector(
     persist(
       (set, get) => ({
-
         ...getInitialDemoState(),
 
-        // ── AUTH ────────────────────────────────────────────────────────────
+        // AUTH
         setCurrentUser: (user) => set({ currentUser: user }),
-        logout: () => set({ currentUser: null, activeCashSession: null, cart: [] }),
+        logout: () => {
+          get().addAuditLog({ action: 'LOGOUT', module: 'Auth', detail: 'Sesión cerrada' })
+          set({ currentUser: null, activeCashSession: null, cart: [] })
+        },
 
-        // ── CONFIGURACIÓN DEL NEGOCIO ────────────────────────────────────────
-        updateBusinessConfig: (updates) =>
-          set((s) => ({ businessConfig: { ...s.businessConfig, ...updates } })),
+        // CONFIGURACIÓN NEGOCIO
+        updateBusinessConfig: (updates) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Configuración', detail: `Campos: ${Object.keys(updates).join(', ')}` })
+          set((s) => ({ businessConfig: { ...s.businessConfig, ...updates } }))
+        },
 
-        // ── CONTADOR DE FACTURAS (atómico — fix del parseInt frágil) ─────────
+        // CONFIGURACIÓN DEL SISTEMA
+        systemConfig: {
+          igvRate: 0.18, stockAlertEnabled: true, expiryAlertDays: 30,
+          lowStockDefault: 5, currencySymbol: 'S/', timeZone: 'America/Lima',
+          allowNegativeStock: false, requireCashToSell: true,
+          allowDiscounts: true, maxDiscountPct: 50,
+          ticketFooter: '¡Gracias por su compra!', invoicePrefix: 'B001',
+          printAutomatically: false, auditEnabled: true,
+        },
+        updateSystemConfig: (updates) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Config Sistema', detail: `Parámetros: ${Object.keys(updates).join(', ')}` })
+          set((s) => ({ systemConfig: { ...s.systemConfig, ...updates } }))
+        },
+
+        // ALERTAS
+        alertRules: [],
+        addAlertRule:    (rule)    => set((s) => ({ alertRules: [{ ...rule, id: crypto.randomUUID(), isActive: true, createdAt: new Date().toISOString() }, ...s.alertRules] })),
+        updateAlertRule: (id, upd) => set((s) => ({ alertRules: s.alertRules.map(r => r.id === id ? { ...r, ...upd } : r) })),
+        deleteAlertRule: (id)      => set((s) => ({ alertRules: s.alertRules.filter(r => r.id !== id) })),
+
+        notifications: [],
+        addNotification:   (n)  => set((s) => ({ notifications: [{ ...n, id: crypto.randomUUID(), createdAt: new Date().toISOString(), read: false }, ...s.notifications].slice(0, 200) })),
+        markNotifRead:     (id) => set((s) => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) })),
+        markAllNotifsRead: ()   => set((s) => ({ notifications: s.notifications.map(n => ({ ...n, read: true })) })),
+
+        // AUDIT LOG
+        auditLog: [],
+        addAuditLog: ({ action, module, detail, entityId = null }) => {
+          const state = get()
+          if (!state.systemConfig?.auditEnabled) return
+          const entry = {
+            id: crypto.randomUUID(), timestamp: new Date().toISOString(),
+            userId: state.currentUser?.id || 'system',
+            userName: state.currentUser?.fullName || state.currentUser?.username || 'Sistema',
+            userRole: state.currentUser?.role || 'system',
+            action, module, detail, entityId,
+          }
+          set((s) => ({ auditLog: [entry, ...s.auditLog].slice(0, 2000) }))
+        },
+
+        // CONTADOR FACTURAS
         getNextInvoice: () => {
           const n = get().nextInvoice
           set({ nextInvoice: n + 1 })
           return formatInvoice(n)
         },
 
-        // ── PRODUCTOS ───────────────────────────────────────────────────────
-        addProduct: (product) =>
-          set((s) => ({ products: [product, ...s.products] })),
-
-        updateProduct: (id, updates) =>
-          set((s) => ({
-            products: s.products.map((p) =>
-              p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-            ),
-          })),
-
-        deleteProduct: (id) =>
-          set((s) => ({
-            products: s.products.map((p) => (p.id === id ? { ...p, isActive: false } : p)),
-          })),
-
-        // ── VARIANTES ───────────────────────────────────────────────────────
-        productVariants: [],
-        addVariant: (variant) =>
-          set((s) => ({ productVariants: [variant, ...s.productVariants] })),
-
-        updateVariant: (id, updates) =>
-          set((s) => ({
-            productVariants: s.productVariants.map((v) =>
-              v.id === id ? { ...v, ...updates } : v
-            ),
-          })),
-
-        // ── MOVIMIENTOS DE STOCK ─────────────────────────────────────────────
-        addStockMovement: (movement) =>
-          set((s) => ({
-            stockMovements: [movement, ...s.stockMovements].slice(0, 1000),
-          })),
-
-        // ── CARRITO POS ──────────────────────────────────────────────────────
-        addToCart: (product, quantity = 1, variantId = null) => {
-          const cart = get().cart
-          const key = variantId ? `${product.id}_${variantId}` : product.id
-          const existing = cart.find((i) => i._key === key)
-          if (existing) {
-            set((s) => ({
-              cart: s.cart.map((i) =>
-                i._key === key
-                  ? { ...i, quantity: i.quantity + quantity, subtotal: formatNumber((i.quantity + quantity) * i.unitPrice) }
-                  : i
-              ),
-            }))
-          } else {
-            set((s) => ({
-              cart: [
-                ...s.cart,
-                {
-                  _key: key,
-                  id: crypto.randomUUID(),
-                  productId: product.id,
-                  variantId: variantId || null,
-                  productName: product.name,
-                  barcode: product.barcode,
-                  quantity,
-                  unitPrice: product.priceSell,
-                  discount: 0,
-                  subtotal: formatNumber(quantity * product.priceSell),
-                  unit: product.unit || 'unidad',
-                },
-              ],
-            }))
-          }
+        // PRODUCTOS
+        addProduct: (product) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Catálogo', detail: `Producto creado: ${product.name}`, entityId: product.id })
+          set((s) => ({ products: [product, ...s.products] }))
+        },
+        updateProduct: (id, updates) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Catálogo', detail: `Producto actualizado: ${updates.name || id}`, entityId: id })
+          set((s) => ({ products: s.products.map((p) => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p) }))
+        },
+        deleteProduct: (id) => {
+          const p = get().products.find(p => p.id === id)
+          get().addAuditLog({ action: 'DELETE', module: 'Catálogo', detail: `Producto desactivado: ${p?.name || id}`, entityId: id })
+          set((s) => ({ products: s.products.map((p) => (p.id === id ? { ...p, isActive: false } : p)) }))
         },
 
+        // VARIANTES
+        productVariants: [],
+        addVariant:    (v)       => set((s) => ({ productVariants: [v, ...s.productVariants] })),
+        updateVariant: (id, upd) => set((s) => ({ productVariants: s.productVariants.map(v => v.id === id ? { ...v, ...upd } : v) })),
+
+        // MOVIMIENTOS STOCK
+        addStockMovement: (movement) =>
+          set((s) => ({ stockMovements: [movement, ...s.stockMovements].slice(0, 1000) })),
+
+        // CARRITO
+        addToCart: (product, quantity = 1, variantId = null) => {
+          const cart = get().cart
+          const key  = variantId ? `${product.id}_${variantId}` : product.id
+          const existing = cart.find((i) => i._key === key)
+          if (existing) {
+            set((s) => ({ cart: s.cart.map((i) => i._key === key ? { ...i, quantity: i.quantity + quantity, subtotal: formatNumber((i.quantity + quantity) * i.unitPrice) } : i) }))
+          } else {
+            set((s) => ({ cart: [...s.cart, { _key: key, id: crypto.randomUUID(), productId: product.id, variantId: variantId || null, productName: product.name, barcode: product.barcode, quantity, unitPrice: product.priceSell, discount: 0, subtotal: formatNumber(quantity * product.priceSell), unit: product.unit || 'unidad' }] }))
+          }
+        },
         updateCartItem: (key, updates) =>
-          set((s) => ({
-            cart: s.cart.map((i) => {
-              if (i._key !== key && i.productId !== key) return i
-              const updated = { ...i, ...updates }
-              updated.subtotal = formatNumber((updated.quantity * updated.unitPrice) - (updated.discount || 0))
-              return updated
-            }),
-          })),
+          set((s) => ({ cart: s.cart.map((i) => { if (i._key !== key && i.productId !== key) return i; const u = { ...i, ...updates }; u.subtotal = formatNumber((u.quantity * u.unitPrice) - (u.discount || 0)); return u }) })),
+        removeFromCart: (key) => set((s) => ({ cart: s.cart.filter((i) => i._key !== key && i.productId !== key) })),
+        clearCart:      ()    => set({ cart: [] }),
 
-        removeFromCart: (key) =>
-          set((s) => ({ cart: s.cart.filter((i) => i._key !== key && i.productId !== key) })),
+        // VENTAS
+        addSale: (sale) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Ventas', detail: `Venta: ${sale.invoiceNumber} · S/${sale.total}`, entityId: sale.id })
+          set((s) => ({ sales: [sale, ...s.sales] }))
+        },
+        updateSale: (id, updates) => {
+          const status = updates.status ? ` · ${updates.status}` : ''
+          get().addAuditLog({ action: 'UPDATE', module: 'Ventas', detail: `Venta actualizada${status}`, entityId: id })
+          set((s) => ({ sales: s.sales.map((sale) => (sale.id === id ? { ...sale, ...updates } : sale)) }))
+        },
 
-        clearCart: () => set({ cart: [] }),
+        // PAGOS DE DEUDA (cobranza)
+        debtPayments: [],
+        addDebtPayment: (payment) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Cobranza', detail: `Pago deuda: ${payment.receiptNumber} · ${payment.clientName} · S/${payment.amount}`, entityId: payment.id })
+          set((s) => ({ debtPayments: [payment, ...s.debtPayments] }))
+        },
 
-        // ── VENTAS ───────────────────────────────────────────────────────────
-        addSale: (sale) => set((s) => ({ sales: [sale, ...s.sales] })),
+        // CAJA
+        openCashSession: (session) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Caja', detail: `Caja aperturada · Inicial: S/${session.openingAmount}`, entityId: session.id })
+          set({ activeCashSession: session })
+        },
+        closeCashSession: (closedSession) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Caja', detail: `Caja cerrada · Ventas: S/${closedSession.totalSales} · Dif: S/${closedSession.difference}`, entityId: closedSession.id })
+          set((s) => ({ activeCashSession: null, cashSessions: [closedSession, ...s.cashSessions] }))
+        },
 
-        updateSale: (id, updates) =>
-          set((s) => ({
-            sales: s.sales.map((sale) => (sale.id === id ? { ...sale, ...updates } : sale)),
-          })),
-
-        // ── CAJA ─────────────────────────────────────────────────────────────
-        openCashSession:  (session)       => set({ activeCashSession: session }),
-        closeCashSession: (closedSession) =>
-          set((s) => ({
-            activeCashSession: null,
-            cashSessions: [closedSession, ...s.cashSessions],
-          })),
-
-        // ── CLIENTES ─────────────────────────────────────────────────────────
-        addClient: (client) =>
-          set((s) => ({ clients: [client, ...s.clients] })),
-
+        // CLIENTES
+        addClient: (client) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Clientes', detail: `Cliente creado: ${client.name}`, entityId: client.id })
+          set((s) => ({ clients: [client, ...s.clients] }))
+        },
         updateClient: (id, updates) =>
-          set((s) => ({
-            clients: s.clients.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-          })),
+          set((s) => ({ clients: s.clients.map((c) => (c.id === id ? { ...c, ...updates } : c)) })),
 
-        // ── PROVEEDORES ──────────────────────────────────────────────────────
-        addSupplier: (supplier) =>
-          set((s) => ({ suppliers: [supplier, ...s.suppliers] })),
+        // PROVEEDORES
+        addSupplier: (supplier) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Proveedores', detail: `Proveedor creado: ${supplier.name}`, entityId: supplier.id })
+          set((s) => ({ suppliers: [supplier, ...s.suppliers] }))
+        },
+        updateSupplier: (id, updates) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Proveedores', detail: `Proveedor actualizado: ID ${id}`, entityId: id })
+          set((s) => ({ suppliers: s.suppliers.map((s2) => (s2.id === id ? { ...s2, ...updates } : s2)) }))
+        },
 
-        updateSupplier: (id, updates) =>
-          set((s) => ({
-            suppliers: s.suppliers.map((s2) => (s2.id === id ? { ...s2, ...updates } : s2)),
-          })),
+        // COMPRAS
+        addPurchase: (purchase) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Compras', detail: `Compra: ${purchase.supplierName} · S/${purchase.total} · ${purchase.items?.length} prods`, entityId: purchase.id })
+          set((s) => ({ purchases: [purchase, ...s.purchases] }))
+        },
+        updatePurchase: (id, updates) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Compras', detail: `Compra actualizada: ID ${id}`, entityId: id })
+          set((s) => ({ purchases: s.purchases.map((p) => (p.id === id ? { ...p, ...updates } : p)) }))
+        },
 
-        // ── COMPRAS A PROVEEDOR ──────────────────────────────────────────────
-        addPurchase: (purchase) =>
-          set((s) => ({ purchases: [purchase, ...s.purchases] })),
+        // USUARIOS
+        addUser: (user) => {
+          get().addAuditLog({ action: 'CREATE', module: 'Usuarios', detail: `Usuario creado: ${user.username} · Rol: ${user.role}`, entityId: user.id })
+          set((s) => ({ users: [user, ...s.users] }))
+        },
+        updateUser: (id, updates) => {
+          get().addAuditLog({ action: 'UPDATE', module: 'Usuarios', detail: `Usuario actualizado: ID ${id}`, entityId: id })
+          set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...updates } : u)) }))
+        },
 
-        updatePurchase: (id, updates) =>
-          set((s) => ({
-            purchases: s.purchases.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-          })),
-
-        // ── USUARIOS ─────────────────────────────────────────────────────────
-        addUser: (user) =>
-          set((s) => ({ users: [user, ...s.users] })),
-
-        updateUser: (id, updates) =>
-          set((s) => ({
-            users: s.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
-          })),
-
-        // ── RESET DEMO ────────────────────────────────────────────────────────
+        // RESET
         resetDemo: (sector) => {
           const initial = getInitialDemoState()
           if (sector) initial.businessConfig.sector = sector
           set({ ...initial, currentUser: get().currentUser })
         },
-
       }),
       {
-        name: 'mm_store_v2',
+        name: 'mm_store_v3',
         partialize: (s) => ({
-          products:          s.products,
-          productVariants:   s.productVariants,
-          stockMovements:    s.stockMovements,
-          sales:             s.sales,
-          clients:           s.clients,
-          suppliers:         s.suppliers,
-          categories:        s.categories,
-          users:             s.users,
-          cashSessions:      s.cashSessions,
-          activeCashSession: s.activeCashSession,
-          purchases:         s.purchases,
-          cart:              s.cart,
-          currentUser:       s.currentUser,
-          businessConfig:    s.businessConfig,
-          nextInvoice:       s.nextInvoice,
+          products: s.products, productVariants: s.productVariants,
+          stockMovements: s.stockMovements, sales: s.sales,
+          clients: s.clients, suppliers: s.suppliers, categories: s.categories,
+          users: s.users, cashSessions: s.cashSessions,
+          activeCashSession: s.activeCashSession, purchases: s.purchases,
+          debtPayments: s.debtPayments, cart: s.cart, currentUser: s.currentUser,
+          businessConfig: s.businessConfig, systemConfig: s.systemConfig,
+          alertRules: s.alertRules, notifications: s.notifications,
+          auditLog: s.auditLog, nextInvoice: s.nextInvoice,
         }),
       }
     )
   )
 )
 
-// ─── FIX: usar getState() en lugar de window.__MM_STORE__ ────────────────────
-// Los servicios llaman useStore.getState() directamente — sin window, sin snapshot
-
-// ─── SELECTORES ───────────────────────────────────────────────────────────────
-export const selectLowStockProducts = (s) =>
-  s.products.filter((p) => p.isActive && p.stock <= p.stockMin)
-
-export const selectActiveProducts = (s) =>
-  s.products.filter((p) => p.isActive)
-
+export const selectLowStockProducts    = (s) => s.products.filter((p) => p.isActive && p.stock <= p.stockMin)
+export const selectActiveProducts      = (s) => s.products.filter((p) => p.isActive)
+export const selectCartTotal           = (s) => parseFloat(s.cart.reduce((acc, i) => acc + i.subtotal, 0).toFixed(2))
+export const selectCartCount           = (s) => s.cart.reduce((acc, i) => acc + i.quantity, 0)
+export const selectUnreadNotifications = (s) => (s.notifications || []).filter(n => !n.read).length
+export const selectNearExpiryProducts  = (s) => s.products.filter(p => {
+  if (!p.isActive || !p.expiryDate) return false
+  const days = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
+  return days >= 0 && days <= 30
+})
 export const selectTodaySales = (s) => {
   const now = new Date()
   return s.sales.filter((sale) => {
     const d = new Date(sale.createdAt)
-    return sale.status === 'completada' &&
-      d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    return sale.status === 'completada' && d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   })
 }
-
-export const selectCartTotal = (s) =>
-  parseFloat(s.cart.reduce((acc, i) => acc + i.subtotal, 0).toFixed(2))
-
-export const selectCartCount = (s) =>
-  s.cart.reduce((acc, i) => acc + i.quantity, 0)
-
-export const selectNearExpiryProducts = (s) =>
-  s.products.filter(p => {
-    if (!p.isActive || !p.expiryDate) return false
-    const days = Math.ceil((new Date(p.expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
-    return days >= 0 && days <= 30
-  })

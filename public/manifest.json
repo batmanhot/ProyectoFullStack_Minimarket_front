@@ -1,0 +1,124 @@
+{
+  "name": "Sistema POS Minimarket",
+  "short_name": "POS Minimarket",
+  "description": "Sistema de Punto de Venta para minimarkets y tiendas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-1.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Vista del POS en escritorio"
+    },
+    {
+      "src": "/screenshots/mobile-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Vista del POS en móvil"
+    }
+  ],
+  "categories": [
+    "business",
+    "finance",
+    "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Punto de Venta",
+      "short_name": "POS",
+      "description": "Abrir el módulo de ventas",
+      "url": "/pos",
+      "icons": [
+        {
+          "src": "/icons/pos-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Inventario",
+      "short_name": "Inventario",
+      "description": "Gestionar productos",
+      "url": "/inventory",
+      "icons": [
+        {
+          "src": "/icons/inventory-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Reportes",
+      "short_name": "Reportes",
+      "description": "Ver reportes y estadísticas",
+      "url": "/reports",
+      "icons": [
+        {
+          "src": "/icons/reports-shortcut.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "iarc_rating_id": "",
+  "dir": "ltr",
+  "lang": "es-PE"
+}
