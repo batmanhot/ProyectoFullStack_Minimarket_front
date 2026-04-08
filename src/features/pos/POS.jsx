@@ -9,10 +9,11 @@ import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
+import { evaluateDiscounts, isCampaignActive } from '../../shared/utils/discountEngine'
 
 export default function POS() {
   const {
-    products, cart, clients, currentUser, activeCashSession, systemConfig,
+    products, cart, clients, discountCampaigns, currentUser, activeCashSession, systemConfig,
     addToCart, updateCartItem, removeFromCart, clearCart,
   } = useStore()
 
@@ -37,6 +38,15 @@ export default function POS() {
   // Aplicar descuento global encima
   const globalDiscAmt = parseFloat(globalDiscount) || 0
   const finalTotal    = Math.max(0, parseFloat((totals.total - globalDiscAmt).toFixed(2)))
+
+  // ── Motor de descuentos automáticos ─────────────────────────────────────────
+  const cartSubtotalRaw = totals.subtotal
+  const { appliedDiscounts, modifiedCart: autoDiscountCart, totalSaving } = (() => {
+    try {
+      return evaluateDiscounts(cart, products, discountCampaigns || [], cartSubtotalRaw)
+    } catch { return { appliedDiscounts: [], modifiedCart: cart, totalSaving: 0 } }
+  })()
+  const hasAutoDiscounts = appliedDiscounts.length > 0
 
   const activeProducts = products.filter(p => p.isActive)
   const searchResults  = debouncedQ.trim()
@@ -291,6 +301,25 @@ export default function POS() {
             <span>TOTAL</span><span>{formatCurrency(finalTotal)}</span>
           </div>
         </div>
+
+        {/* Descuentos automáticos aplicados */}
+        {hasAutoDiscounts && (
+          <div className="px-4 py-3 border-b border-green-100 bg-green-50">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-xs font-semibold text-green-700">🏷️ Descuentos automáticos activos</span>
+            </div>
+            {appliedDiscounts.map((d, i) => (
+              <div key={i} className="flex justify-between text-xs text-green-700 mb-1">
+                <span className="flex items-center gap-1"><span>{d.icon}</span><span className="truncate max-w-[140px]">{d.name}</span></span>
+                <span className="font-semibold text-green-600 whitespace-nowrap">-{formatCurrency(d.saving)}</span>
+              </div>
+            ))}
+            <div className="border-t border-green-200 pt-1.5 mt-1.5 flex justify-between text-xs font-bold text-green-700">
+              <span>Ahorro total</span>
+              <span>-{formatCurrency(totalSaving)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Historial turno */}
         <div className="border-b border-gray-100">
