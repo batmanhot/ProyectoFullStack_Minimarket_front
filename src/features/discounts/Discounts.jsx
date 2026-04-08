@@ -17,7 +17,7 @@ function StatusBadge({ campaign }) {
   const to   = campaign.dateTo   ? new Date(campaign.dateTo + 'T23:59:59') : null
   const active = isCampaignActive(campaign)
 
-  if (!campaign.isActive) return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-500">Inactiva</span>
+  if (!campaign.isActive) return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400">Inactiva</span>
   if (from && now < from)  return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-600">Programada</span>
   if (to   && now > to)    return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-500">Vencida</span>
   if (active)              return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 flex items-center gap-1 w-fit"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block"/>Activa</span>
@@ -92,8 +92,8 @@ function CampaignForm({ campaign, categories, products, onClose }) {
     onClose()
   }
 
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-  const labelCls = "block text-xs font-medium text-gray-600 mb-1"
+  const inputCls = "w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const labelCls = "block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1"
 
   return (
     <div className="space-y-5">
@@ -104,11 +104,11 @@ function CampaignForm({ campaign, categories, products, onClose }) {
         <div className="grid grid-cols-2 gap-2">
           {CAMPAIGN_TYPES.map(t => (
             <button key={t.value} type="button" onClick={() => setType(t.value)}
-              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${type===t.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${type===t.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700'}`}>
               <span className="text-2xl flex-shrink-0">{t.icon}</span>
               <div>
                 <div className={`text-xs font-semibold ${type===t.value?'text-blue-700':'text-gray-700'}`}>{t.label}</div>
-                <div className="text-xs text-gray-400 leading-tight mt-0.5">{t.desc}</div>
+                <div className="text-xs text-gray-400 dark:text-slate-500 leading-tight mt-0.5">{t.desc}</div>
               </div>
             </button>
           ))}
@@ -138,7 +138,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
           <label className={labelCls}>Porcentaje de descuento *</label>
           <div className="relative w-40">
             <input type="number" min="0.1" max="100" step="0.5" value={discountPct} onChange={e => setDiscountPct(e.target.value)} className={inputCls + ' pr-8'} placeholder="10"/>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-bold">%</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500 font-bold">%</span>
           </div>
         </div>
       )}
@@ -148,7 +148,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
           <div>
             <label className={labelCls}>Monto mínimo de compra *</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">S/</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500">S/</span>
               <input type="number" min="1" step="10" value={minAmount} onChange={e => setMinAmount(e.target.value)} className={inputCls + ' pl-8'} placeholder="300"/>
             </div>
           </div>
@@ -156,7 +156,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
             <label className={labelCls}>Descuento a aplicar *</label>
             <div className="relative">
               <input type="number" min="0.1" max="100" step="0.5" value={discountPct} onChange={e => setDiscountPct(e.target.value)} className={inputCls + ' pr-8'} placeholder="5"/>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-bold">%</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500 font-bold">%</span>
             </div>
           </div>
         </div>
@@ -167,12 +167,12 @@ function CampaignForm({ campaign, categories, products, onClose }) {
           <div>
             <label className={labelCls}>El cliente lleva (unidades) *</label>
             <input type="number" min="2" step="1" value={buyQty} onChange={e => setBuyQty(e.target.value)} className={inputCls} placeholder="2"/>
-            <p className="text-xs text-gray-400 mt-1">Ej: 2 (para 2x1) o 3 (para 3x2)</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Ej: 2 (para 2x1) o 3 (para 3x2)</p>
           </div>
           <div>
             <label className={labelCls}>El cliente paga (unidades) *</label>
             <input type="number" min="1" step="1" value={payQty} onChange={e => setPayQty(e.target.value)} className={inputCls} placeholder="1"/>
-            <p className="text-xs text-gray-400 mt-1">Ej: 1 (para 2x1) o 2 (para 3x2)</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Ej: 1 (para 2x1) o 2 (para 3x2)</p>
           </div>
           <div className="col-span-2 bg-blue-50 rounded-xl p-3">
             <p className="text-sm text-blue-700 font-medium">Vista previa: {buyQty}x{payQty} — por cada {buyQty} unidades, el cliente paga solo {payQty} ({buyQty-payQty} gratis)</p>
@@ -186,7 +186,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
         <div className="grid grid-cols-2 gap-2 mb-3">
           {SCOPE_OPTIONS.map(s => (
             <button key={s.value} type="button" onClick={() => setScope(s.value)}
-              className={`py-2 px-3 rounded-lg border text-xs font-medium text-left transition-all ${scope===s.value?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+              className={`py-2 px-3 rounded-lg border text-xs font-medium text-left transition-all ${scope===s.value?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700'}`}>
               {s.label}
             </button>
           ))}
@@ -194,11 +194,11 @@ function CampaignForm({ campaign, categories, products, onClose }) {
 
         {scope === 'categories' && (
           <div>
-            <p className="text-xs text-gray-500 mb-2">Selecciona las categorías:</p>
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border border-gray-200 rounded-lg">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Selecciona las categorías:</p>
+            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border border-gray-200 dark:border-slate-600 rounded-lg">
               {categories.map(c => (
                 <button key={c.id} type="button" onClick={() => toggleCat(c.id)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${categoryIds.includes(c.id)?'bg-blue-500 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${categoryIds.includes(c.id)?'bg-blue-500 text-white':'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200'}`}>
                   {c.name}
                 </button>
               ))}
@@ -208,13 +208,13 @@ function CampaignForm({ campaign, categories, products, onClose }) {
 
         {scope === 'products' && (
           <div>
-            <p className="text-xs text-gray-500 mb-2">Selecciona los productos ({productIds.length} seleccionados):</p>
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Selecciona los productos ({productIds.length} seleccionados):</p>
+            <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded-lg">
               {products.filter(p=>p.isActive).map(p => (
-                <label key={p.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 border-b border-gray-50 last:border-0 ${productIds.includes(p.id)?'bg-blue-50':''}`}>
+                <label key={p.id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 border-b border-gray-50 last:border-0 ${productIds.includes(p.id)?'bg-blue-50':''}`}>
                   <input type="checkbox" checked={productIds.includes(p.id)} onChange={() => toggleProd(p.id)} className="rounded"/>
-                  <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">{p.name}</span>
-                  <span className="text-xs text-gray-400">{formatCurrency(p.priceSell)}</span>
+                  <span className="text-sm text-gray-800 dark:text-slate-100 flex-1 min-w-0 truncate">{p.name}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">{formatCurrency(p.priceSell)}</span>
                 </label>
               ))}
             </div>
@@ -223,7 +223,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
 
         {scope === 'brand' && (
           <div>
-            <p className="text-xs text-gray-500 mb-2">Marcas disponibles: {brandList.join(', ') || 'Ninguna registrada'}</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Marcas disponibles: {brandList.join(', ') || 'Ninguna registrada'}</p>
             <input value={brands} onChange={e => setBrands(e.target.value)} className={inputCls} placeholder="Ej: Nike, Adidas, Alicorp (separadas por coma)"/>
           </div>
         )}
@@ -247,20 +247,20 @@ function CampaignForm({ campaign, categories, products, onClose }) {
         <div className="flex gap-2 flex-wrap">
           {DAYS_OF_WEEK.map(d => (
             <button key={d.value} type="button" onClick={() => toggleDay(d.value)}
-              className={`w-12 h-10 rounded-lg text-xs font-semibold transition-all ${daysOfWeek.includes(d.value)?'bg-blue-500 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              className={`w-12 h-10 rounded-lg text-xs font-semibold transition-all ${daysOfWeek.includes(d.value)?'bg-blue-500 text-white':'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200'}`}>
               {d.label}
             </button>
           ))}
         </div>
         {daysOfWeek.length > 0 && (
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
             Solo aplica los: {daysOfWeek.map(d => DAYS_OF_WEEK.find(x=>x.value===d)?.label).join(', ')}
           </p>
         )}
       </div>
 
       {/* Estado */}
-      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl">
         <button type="button" onClick={() => setIsActive(!isActive)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive?'bg-blue-600':'bg-gray-300'}`}>
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive?'translate-x-6':'translate-x-1'}`}/>
@@ -269,7 +269,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">Cancelar</button>
+        <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
         <button type="button" onClick={handleSave} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
           {editing ? 'Guardar cambios' : 'Crear campaña'}
         </button>
@@ -314,22 +314,22 @@ function CampaignCard({ campaign, categories, onEdit, onToggle, onDelete }) {
           ) : campaign.type === 'volume' ? (
             <div>
               <span className="text-3xl font-black text-teal-600">{campaign.discountPct}%</span>
-              <span className="text-xs text-gray-500 block">en compras &gt; {formatCurrency(campaign.minAmount)}</span>
+              <span className="text-xs text-gray-500 dark:text-slate-400 block">en compras &gt; {formatCurrency(campaign.minAmount)}</span>
             </div>
           ) : (
             <span className="text-3xl font-black text-blue-600">{campaign.discountPct}%</span>
           )}
-          <div className="text-xs text-gray-500 mt-1">de descuento</div>
+          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">de descuento</div>
         </div>
 
         {/* Detalles */}
-        <div className="space-y-1 text-xs text-gray-600">
+        <div className="space-y-1 text-xs text-gray-600 dark:text-slate-300">
           <div className="flex justify-between">
-            <span className="text-gray-400">Vigencia</span>
+            <span className="text-gray-400 dark:text-slate-500">Vigencia</span>
             <span>{formatDate(campaign.dateFrom)} — {formatDate(campaign.dateTo)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Aplica a</span>
+            <span className="text-gray-400 dark:text-slate-500">Aplica a</span>
             <span className="text-right max-w-[60%] truncate">
               {campaign.scope === 'all'        ? 'Todos los productos' :
                campaign.scope === 'categories' ? catNames.join(', ') || 'Categorías sel.' :
@@ -339,17 +339,17 @@ function CampaignCard({ campaign, categories, onEdit, onToggle, onDelete }) {
           </div>
           {campaign.daysOfWeek?.length > 0 && (
             <div className="flex justify-between">
-              <span className="text-gray-400">Días</span>
+              <span className="text-gray-400 dark:text-slate-500">Días</span>
               <span>{campaign.daysOfWeek.map(d => DAYS_OF_WEEK.find(x=>x.value===d)?.label).join(', ')}</span>
             </div>
           )}
-          {campaign.description && <p className="text-gray-400 italic">{campaign.description}</p>}
+          {campaign.description && <p className="text-gray-400 dark:text-slate-500 italic">{campaign.description}</p>}
         </div>
 
         {/* Acciones */}
-        <div className="flex gap-2 pt-2 border-t border-gray-100">
+        <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
           <button onClick={() => onToggle(campaign)}
-            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${campaign.isActive ? 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${campaign.isActive ? 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-red-50 hover:text-red-600' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
             {campaign.isActive ? 'Desactivar' : 'Activar'}
           </button>
           <button onClick={() => onEdit(campaign)}
@@ -419,12 +419,12 @@ export default function Discounts() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-medium text-gray-800">Gestión de Descuentos</h1>
-          <p className="text-sm text-gray-400">Campañas, promociones y descuentos automáticos</p>
+          <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Gestión de Descuentos</h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500">Campañas, promociones y descuentos automáticos</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowTemplates(true)}
-            className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
+            className="px-4 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 flex items-center gap-2">
             ⚡ Usar plantilla
           </button>
           <button onClick={() => setModal({ type: 'form', data: null })}
@@ -437,9 +437,9 @@ export default function Discounts() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-xs text-gray-500 mb-1">Total campañas</p>
-          <p className="text-2xl font-bold text-gray-800">{kpis.total}</p>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Total campañas</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{kpis.total}</p>
         </div>
         <div className="bg-green-50 rounded-xl p-4">
           <p className="text-xs text-green-600 mb-1">🟢 Activas ahora</p>
@@ -449,9 +449,9 @@ export default function Discounts() {
           <p className="text-xs text-blue-600 mb-1">📅 Programadas</p>
           <p className="text-2xl font-bold text-blue-700">{kpis.scheduled}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-4">
-          <p className="text-xs text-gray-500 mb-1">⏰ Vencidas</p>
-          <p className="text-2xl font-bold text-gray-500">{kpis.expired}</p>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">⏰ Vencidas</p>
+          <p className="text-2xl font-bold text-gray-500 dark:text-slate-400">{kpis.expired}</p>
         </div>
       </div>
 
@@ -466,13 +466,13 @@ export default function Discounts() {
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
           <button onClick={()=>setFilterType('all')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterType==='all'?'bg-white shadow text-blue-600':'text-gray-500'}`}>Todos</button>
           {CAMPAIGN_TYPES.map(t => (
             <button key={t.value} onClick={()=>setFilterType(t.value)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterType===t.value?'bg-white shadow text-blue-600':'text-gray-500'}`}>{t.icon} {t.label}</button>
           ))}
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
           {[{k:'all',l:'Todos'},{k:'active',l:'Activas'},{k:'inactive',l:'Inactivas'}].map(f => (
             <button key={f.k} onClick={()=>setFilterStatus(f.k)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterStatus===f.k?'bg-white shadow text-blue-600':'text-gray-500'}`}>{f.l}</button>
           ))}
@@ -505,25 +505,25 @@ export default function Discounts() {
       {/* Modal plantillas */}
       {showTemplates && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-800">⚡ Plantillas de campañas</h2>
-              <button onClick={() => setShowTemplates(false)} className="text-gray-400 hover:text-gray-600">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h2 className="font-semibold text-gray-800 dark:text-slate-100">⚡ Plantillas de campañas</h2>
+              <button onClick={() => setShowTemplates(false)} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
             <div className="overflow-y-auto p-5">
-              <p className="text-sm text-gray-500 mb-4">Selecciona una plantilla y personaliza las fechas y el alcance.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Selecciona una plantilla y personaliza las fechas y el alcance.</p>
               <div className="grid grid-cols-2 gap-3">
                 {CAMPAIGN_TEMPLATES.map((tpl, i) => {
                   const typeCfg = CAMPAIGN_TYPES.find(t => t.value === tpl.type)
                   return (
                     <button key={i} onClick={() => handleTemplate(tpl)}
-                      className="flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 text-left transition-all">
+                      className="flex items-start gap-3 p-4 border border-gray-200 dark:border-slate-600 rounded-xl hover:border-blue-300 hover:bg-blue-50 text-left transition-all">
                       <span className="text-2xl">{tpl.icon}</span>
                       <div>
-                        <div className="text-sm font-semibold text-gray-800">{tpl.name}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{typeCfg?.label} · {tpl.type !== 'promotion' ? `${tpl.discountPct}% descuento` : `${tpl.buyQty}×${tpl.payQty}`}</div>
+                        <div className="text-sm font-semibold text-gray-800 dark:text-slate-100">{tpl.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{typeCfg?.label} · {tpl.type !== 'promotion' ? `${tpl.discountPct}% descuento` : `${tpl.buyQty}×${tpl.payQty}`}</div>
                       </div>
                     </button>
                   )

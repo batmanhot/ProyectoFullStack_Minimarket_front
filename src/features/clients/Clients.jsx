@@ -23,16 +23,16 @@ function ClientForm({ client, onClose }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Nombre / Razón social *</label><input {...register('name')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}</div>
-        <div><label className="block text-xs font-medium text-gray-600 mb-1">Tipo documento</label><select {...register('documentType')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{['DNI','RUC','CE','Pasaporte'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-        <div><label className="block text-xs font-medium text-gray-600 mb-1">Número *</label><input {...register('documentNumber')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.documentNumber && <p className="text-xs text-red-500 mt-1">{errors.documentNumber.message}</p>}</div>
-        <div><label className="block text-xs font-medium text-gray-600 mb-1">Teléfono</label><input {...register('phone')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
-        <div><label className="block text-xs font-medium text-gray-600 mb-1">Email</label><input {...register('email')} type="email" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}</div>
-        <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Dirección</label><input {...register('address')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
-        <div><label className="block text-xs font-medium text-gray-600 mb-1">Límite de crédito (S/)</label><input type="number" step="50" {...register('creditLimit')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
+        <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Nombre / Razón social *</label><input {...register('name')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}</div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Tipo documento</label><select {...register('documentType')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{['DNI','RUC','CE','Pasaporte'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Número *</label><input {...register('documentNumber')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.documentNumber && <p className="text-xs text-red-500 mt-1">{errors.documentNumber.message}</p>}</div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Teléfono</label><input {...register('phone')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Email</label><input {...register('email')} type="email" className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}</div>
+        <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Dirección</label><input {...register('address')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Límite de crédito (S/)</label><input type="number" step="50" {...register('creditLimit')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
       </div>
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+        <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
         <button type="submit" className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">{client ? 'Guardar' : 'Registrar cliente'}</button>
       </div>
     </form>
@@ -124,16 +124,16 @@ ${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ D
           <p className="font-semibold text-green-700">Pago registrado correctamente</p>
           <p className="text-sm text-green-600 mt-1">Recibo: {receipt.receiptNumber}</p>
         </div>
-        <div className="border border-gray-100 rounded-xl p-4 space-y-2 text-sm">
-          <div className="flex justify-between"><span className="text-gray-500">Cliente</span><span className="font-medium">{receipt.clientName}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500">Monto pagado</span><span className="font-semibold text-green-600">{formatCurrency(receipt.amount)}</span></div>
-          <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Deuda anterior</span><span>{formatCurrency(receipt.previousDebt)}</span></div>
+        <div className="border border-gray-100 dark:border-slate-700 rounded-xl p-4 space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-gray-500 dark:text-slate-400">Cliente</span><span className="font-medium">{receipt.clientName}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500 dark:text-slate-400">Monto pagado</span><span className="font-semibold text-green-600">{formatCurrency(receipt.amount)}</span></div>
+          <div className="flex justify-between border-t border-gray-100 dark:border-slate-700 pt-2"><span className="text-gray-500 dark:text-slate-400">Deuda anterior</span><span>{formatCurrency(receipt.previousDebt)}</span></div>
           <div className="flex justify-between font-semibold text-base"><span>Deuda restante</span><span className={receipt.newDebt === 0 ? 'text-green-600' : 'text-red-500'}>{formatCurrency(receipt.newDebt)}</span></div>
           {receipt.newDebt === 0 && <p className="text-center text-green-600 text-xs font-medium">✓ Deuda saldada completamente</p>}
         </div>
         <div className="flex gap-3">
           <button onClick={handlePrint} className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">🖨️ Imprimir recibo</button>
-          <button onClick={onClose}    className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cerrar</button>
+          <button onClick={onClose}    className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cerrar</button>
         </div>
       </div>
     )
@@ -146,35 +146,35 @@ ${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ D
         <p className="text-2xl font-bold text-red-600">{formatCurrency(deuda)}</p>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Monto a pagar (S/) *</label>
-        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">S/</span>
-        <input type="number" min="0.01" step="0.01" max={deuda} value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={deuda.toFixed(2)}/></div>
+        <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto a pagar (S/) *</label>
+        <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500">S/</span>
+        <input type="number" min="0.01" step="0.01" max={deuda} value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-8 pr-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={deuda.toFixed(2)}/></div>
         <div className="flex gap-2 mt-2">
           <button onClick={() => setAmount(deuda.toFixed(2))} className="text-xs px-3 py-1 bg-green-50 text-green-600 rounded-lg hover:bg-green-100">Pagar total ({formatCurrency(deuda)})</button>
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-2">Método de pago</label>
+        <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-2">Método de pago</label>
         <div className="grid grid-cols-4 gap-2">
           {creditMethods.slice(0,4).map(m => (
-            <button key={m.value} onClick={() => setMethod(m.value)} className={`flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all ${method===m.value?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+            <button key={m.value} onClick={() => setMethod(m.value)} className={`flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all ${method===m.value?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:border-gray-300'}`}>
               <span className="text-base">{m.icon}</span>{m.label}
             </button>
           ))}
         </div>
       </div>
       {methodConfig?.requiresRef && (
-        <div><label className="block text-xs font-medium text-gray-600 mb-1">{methodConfig.refLabel}</label><input value={reference} onChange={e => setRef(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">{methodConfig.refLabel}</label><input value={reference} onChange={e => setRef(e.target.value)} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
       )}
       {parsedAmount > 0 && parsedAmount <= deuda && (
-        <div className="bg-gray-50 rounded-lg p-3 text-sm flex justify-between">
-          <span className="text-gray-500">Deuda restante después del pago</span>
-          <span className="font-semibold text-gray-800">{formatCurrency(deuda - parsedAmount)}</span>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-3 text-sm flex justify-between">
+          <span className="text-gray-500 dark:text-slate-400">Deuda restante después del pago</span>
+          <span className="font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(deuda - parsedAmount)}</span>
         </div>
       )}
-      <div><label className="block text-xs font-medium text-gray-600 mb-1">Observaciones</label><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/></div>
+      <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Observaciones</label><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/></div>
       <div className="flex gap-3 pt-2">
-        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
         <button onClick={handleConfirm} disabled={parsedAmount <= 0 || parsedAmount > deuda} className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-40">Registrar pago y generar recibo</button>
       </div>
     </div>
@@ -188,22 +188,22 @@ function ClientDetail({ client, sales, onClose }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-gray-50 rounded-xl p-3"><p className="text-xs text-gray-500 mb-1">Total comprado</p><p className="text-lg font-semibold text-gray-800">{formatCurrency(totalComprado)}</p></div>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3"><p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Total comprado</p><p className="text-lg font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(totalComprado)}</p></div>
         <div className="bg-blue-50 rounded-xl p-3"><p className="text-xs text-blue-600 mb-1">N° compras</p><p className="text-lg font-semibold text-blue-700">{clientSales.length}</p></div>
         <div className={`rounded-xl p-3 ${client.currentDebt>0?'bg-red-50':'bg-green-50'}`}>
           <p className={`text-xs mb-1 ${client.currentDebt>0?'text-red-600':'text-green-600'}`}>Deuda actual</p>
           <p className={`text-lg font-semibold ${client.currentDebt>0?'text-red-700':'text-green-700'}`}>{formatCurrency(client.currentDebt||0)}</p>
-          {client.creditLimit>0 && <p className="text-xs text-gray-500">Límite: {formatCurrency(client.creditLimit)} · Disp: {formatCurrency(creditAvailable)}</p>}
+          {client.creditLimit>0 && <p className="text-xs text-gray-500 dark:text-slate-400">Límite: {formatCurrency(client.creditLimit)} · Disp: {formatCurrency(creditAvailable)}</p>}
         </div>
       </div>
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Historial de compras</h3>
-        {clientSales.length===0 ? <p className="text-sm text-gray-400 text-center py-4">Sin compras registradas</p> : (
+        {clientSales.length===0 ? <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-4">Sin compras registradas</p> : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {clientSales.map(s => (
               <div key={s.id} className="flex items-center justify-between py-2 border-b border-gray-50 text-sm">
-                <div><span className="font-mono text-xs text-gray-500">{s.invoiceNumber}</span><span className="text-gray-400 text-xs ml-2">{formatDate(s.createdAt)}</span></div>
-                <span className="font-medium text-gray-800">{formatCurrency(s.total)}</span>
+                <div><span className="font-mono text-xs text-gray-500 dark:text-slate-400">{s.invoiceNumber}</span><span className="text-gray-400 dark:text-slate-500 text-xs ml-2">{formatDate(s.createdAt)}</span></div>
+                <span className="font-medium text-gray-800 dark:text-slate-100">{formatCurrency(s.total)}</span>
               </div>
             ))}
           </div>
@@ -240,39 +240,39 @@ export default function Clients() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div><h1 className="text-xl font-medium text-gray-800">Clientes</h1><p className="text-sm text-gray-400">{filtered.length} registros{debtTotal>0 && <span className="ml-2 text-red-400">· Por cobrar: {formatCurrency(debtTotal)}</span>}</p></div>
+        <div><h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Clientes</h1><p className="text-sm text-gray-400 dark:text-slate-500">{filtered.length} registros{debtTotal>0 && <span className="ml-2 text-red-400">· Por cobrar: {formatCurrency(debtTotal)}</span>}</p></div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📊 Excel</button>
-          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📄 PDF</button>
+          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
+          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
           <button onClick={() => setModal({ type: 'form', data: null })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>Nuevo cliente
           </button>
         </div>
       </div>
 
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, documento o teléfono..." className="w-full max-w-md px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, documento o teléfono..." className="w-full max-w-md px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
 
       {filtered.length === 0 ? (
         <EmptyState icon="👥" title="No hay clientes" message="Registra tu primer cliente." action={{ label: 'Nuevo cliente', onClick: () => setModal({ type: 'form', data: null }) }}/>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
           <table className="w-full">
-            <thead><tr className="bg-gray-50 border-b border-gray-100">{['Cliente','Documento','Contacto','Crédito disp.','Deuda','Acciones'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 px-4 py-3 ${['Crédito disp.','Deuda'].includes(h)?'text-right':h==='Acciones'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-gray-50">
+            <thead><tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">{['Cliente','Documento','Contacto','Crédito disp.','Deuda','Acciones'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-3 ${['Crédito disp.','Deuda'].includes(h)?'text-right':h==='Acciones'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {filtered.map(c => {
                 const cnt   = sales.filter(s => s.clientId===c.id && s.status==='completada').length
                 const avail = (c.creditLimit||0)-(c.currentDebt||0)
                 return (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3"><div className="flex items-center gap-2.5"><div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-semibold text-blue-600">{c.name[0]}</div><div><div className="text-sm font-medium text-gray-800">{c.name}</div><div className="text-xs text-gray-400">{cnt} compras</div></div></div></td>
-                    <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{c.documentType}</span><span className="text-xs text-gray-600 ml-1">{c.documentNumber}</span></td>
-                    <td className="px-4 py-3"><div className="text-xs text-gray-600">{c.phone||'—'}</div><div className="text-xs text-gray-400">{c.email||''}</div></td>
-                    <td className="px-4 py-3 text-right">{c.creditLimit>0 ? <span className={`text-sm font-medium ${avail>0?'text-green-600':'text-red-500'}`}>{formatCurrency(avail)}</span> : <span className="text-xs text-gray-400">—</span>}</td>
+                  <tr key={c.id} className="hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">
+                    <td className="px-4 py-3"><div className="flex items-center gap-2.5"><div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-semibold text-blue-600">{c.name[0]}</div><div><div className="text-sm font-medium text-gray-800 dark:text-slate-100">{c.name}</div><div className="text-xs text-gray-400 dark:text-slate-500">{cnt} compras</div></div></div></td>
+                    <td className="px-4 py-3"><span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2 py-0.5 rounded-full">{c.documentType}</span><span className="text-xs text-gray-600 dark:text-slate-300 ml-1">{c.documentNumber}</span></td>
+                    <td className="px-4 py-3"><div className="text-xs text-gray-600 dark:text-slate-300">{c.phone||'—'}</div><div className="text-xs text-gray-400 dark:text-slate-500">{c.email||''}</div></td>
+                    <td className="px-4 py-3 text-right">{c.creditLimit>0 ? <span className={`text-sm font-medium ${avail>0?'text-green-600':'text-red-500'}`}>{formatCurrency(avail)}</span> : <span className="text-xs text-gray-400 dark:text-slate-500">—</span>}</td>
                     <td className="px-4 py-3 text-right"><span className={`text-sm font-medium ${(c.currentDebt||0)>0?'text-red-500':'text-green-600'}`}>{formatCurrency(c.currentDebt||0)}</span></td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setModal({ type: 'detail', data: c })} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Ver historial"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
-                        <button onClick={() => setModal({ type: 'form', data: c })} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Editar"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                        <button onClick={() => setModal({ type: 'detail', data: c })} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Ver historial"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+                        <button onClick={() => setModal({ type: 'form', data: c })} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Editar"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
                         {(c.currentDebt||0) > 0 && (
                           <button onClick={() => setModal({ type: 'debt', data: c })} className="p-1.5 text-red-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Registrar pago de deuda"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg></button>
                         )}

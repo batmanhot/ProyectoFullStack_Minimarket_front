@@ -46,21 +46,21 @@ function NewPurchaseForm({ onClose }) {
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Proveedor *</label>
-        <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Proveedor *</label>
+        <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Seleccionar proveedor...</option>
           {suppliers.filter(s => s.isActive !== false).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Agregar productos</label>
+        <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Agregar productos</label>
         <div className="relative">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, código o SKU..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, código o SKU..." className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           {searchResults.length > 0 && (
-            <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
+            <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-lg z-20 overflow-hidden">
               {searchResults.map(p => (
                 <button key={p.id} onClick={() => addItem(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 text-left border-b border-gray-50 last:border-0">
-                  <div className="flex-1 min-w-0"><div className="text-sm font-medium text-gray-800 truncate">{p.name}</div><div className="text-xs text-gray-400">{p.barcode} · Stock: {p.stock} · Costo: {formatCurrency(p.priceBuy)}</div></div>
+                  <div className="flex-1 min-w-0"><div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{p.name}</div><div className="text-xs text-gray-400 dark:text-slate-500">{p.barcode} · Stock: {p.stock} · Costo: {formatCurrency(p.priceBuy)}</div></div>
                   <span className="text-blue-600 text-xs font-medium">+ Agregar</span>
                 </button>
               ))}
@@ -69,31 +69,31 @@ function NewPurchaseForm({ onClose }) {
         </div>
       </div>
       {items.length > 0 && (
-        <div className="border border-gray-100 rounded-xl overflow-hidden">
+        <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
           <table className="w-full">
-            <thead><tr className="bg-gray-50 border-b border-gray-100">{['Producto','Stock act.','Cantidad','Precio costo','Subtotal',''].map(h => <th key={h} className="text-xs font-medium text-gray-500 px-3 py-2 text-left">{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-gray-50">
+            <thead><tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">{['Producto','Stock act.','Cantidad','Precio costo','Subtotal',''].map(h => <th key={h} className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-left">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {items.map(item => (
                 <tr key={item.productId}>
-                  <td className="px-3 py-2.5"><div className="text-sm font-medium text-gray-800">{item.productName}</div><div className="text-xs text-gray-400">{item.barcode}</div></td>
-                  <td className="px-3 py-2.5 text-center text-xs text-gray-500">{item.currentStock}</td>
-                  <td className="px-3 py-2.5"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(item.productId,'quantity',e.target.value)} className="w-20 text-center px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"/></td>
-                  <td className="px-3 py-2.5"><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">S/</span><input type="number" min="0.01" step="0.01" value={item.priceBuy} onChange={e => updateItem(item.productId,'priceBuy',e.target.value)} className="w-full pl-7 pr-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"/></div></td>
-                  <td className="px-3 py-2.5 text-sm font-medium text-gray-800">{formatCurrency(item.quantity * item.priceBuy)}</td>
+                  <td className="px-3 py-2.5"><div className="text-sm font-medium text-gray-800 dark:text-slate-100">{item.productName}</div><div className="text-xs text-gray-400 dark:text-slate-500">{item.barcode}</div></td>
+                  <td className="px-3 py-2.5 text-center text-xs text-gray-500 dark:text-slate-400">{item.currentStock}</td>
+                  <td className="px-3 py-2.5"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(item.productId,'quantity',e.target.value)} className="w-20 text-center px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"/></td>
+                  <td className="px-3 py-2.5"><div className="relative w-28"><span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-slate-500">S/</span><input type="number" min="0.01" step="0.01" value={item.priceBuy} onChange={e => updateItem(item.productId,'priceBuy',e.target.value)} className="w-full pl-7 pr-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"/></div></td>
+                  <td className="px-3 py-2.5 text-sm font-medium text-gray-800 dark:text-slate-100">{formatCurrency(item.quantity * item.priceBuy)}</td>
                   <td className="px-3 py-2.5"><button onClick={() => removeItem(item.productId)} className="text-gray-300 hover:text-red-400"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="flex justify-between px-4 py-3 bg-gray-50 border-t border-gray-100"><span className="text-sm font-medium text-gray-600">TOTAL COMPRA</span><span className="text-base font-semibold text-gray-800">{formatCurrency(total)}</span></div>
+          <div className="flex justify-between px-4 py-3 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-700"><span className="text-sm font-medium text-gray-600 dark:text-slate-300">TOTAL COMPRA</span><span className="text-base font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(total)}</span></div>
         </div>
       )}
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Notas / N° de remisión</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="N° de factura del proveedor, observaciones..."/>
+        <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Notas / N° de remisión</label>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="N° de factura del proveedor, observaciones..."/>
       </div>
       <div className="flex gap-3 pt-2">
-        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
         <button onClick={handleConfirm} disabled={items.length === 0 || !supplierId} className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40">Confirmar entrada</button>
       </div>
     </div>
@@ -104,27 +104,27 @@ function PurchaseDetail({ purchase }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <div><p className="text-xs text-gray-400">Proveedor</p><p className="font-medium text-gray-800">{purchase.supplierName}</p></div>
-        <div><p className="text-xs text-gray-400">Fecha</p><p className="text-gray-700">{formatDateTime(purchase.createdAt)}</p></div>
-        <div><p className="text-xs text-gray-400">Registrado por</p><p className="text-gray-700">{purchase.userName || '—'}</p></div>
-        <div><p className="text-xs text-gray-400">Estado</p><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${purchase.status === 'anulada' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{purchase.status}</span></div>
-        {purchase.notes && <div className="col-span-2"><p className="text-xs text-gray-400">Notas</p><p className="text-gray-700">{purchase.notes}</p></div>}
+        <div><p className="text-xs text-gray-400 dark:text-slate-500">Proveedor</p><p className="font-medium text-gray-800 dark:text-slate-100">{purchase.supplierName}</p></div>
+        <div><p className="text-xs text-gray-400 dark:text-slate-500">Fecha</p><p className="text-gray-700">{formatDateTime(purchase.createdAt)}</p></div>
+        <div><p className="text-xs text-gray-400 dark:text-slate-500">Registrado por</p><p className="text-gray-700">{purchase.userName || '—'}</p></div>
+        <div><p className="text-xs text-gray-400 dark:text-slate-500">Estado</p><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${purchase.status === 'anulada' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{purchase.status}</span></div>
+        {purchase.notes && <div className="col-span-2"><p className="text-xs text-gray-400 dark:text-slate-500">Notas</p><p className="text-gray-700">{purchase.notes}</p></div>}
       </div>
-      <div className="border border-gray-100 rounded-xl overflow-hidden">
+      <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
         <table className="w-full">
-          <thead><tr className="bg-gray-50"><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Producto</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Cant.</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">P. Costo</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Subtotal</th></tr></thead>
-          <tbody className="divide-y divide-gray-50">
+          <thead><tr className="bg-gray-50 dark:bg-slate-800/50"><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Producto</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Cant.</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">P. Costo</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Subtotal</th></tr></thead>
+          <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
             {purchase.items?.map((item, i) => (
               <tr key={i}>
-                <td className="px-4 py-2.5"><div className="text-sm text-gray-800">{item.productName}</div><div className="text-xs text-gray-400">{item.barcode}</div></td>
-                <td className="px-4 py-2.5 text-right text-sm text-gray-600">{item.quantity}</td>
-                <td className="px-4 py-2.5 text-right text-sm text-gray-600">{formatCurrency(item.priceBuy)}</td>
-                <td className="px-4 py-2.5 text-right text-sm font-medium text-gray-800">{formatCurrency(item.quantity * item.priceBuy)}</td>
+                <td className="px-4 py-2.5"><div className="text-sm text-gray-800 dark:text-slate-100">{item.productName}</div><div className="text-xs text-gray-400 dark:text-slate-500">{item.barcode}</div></td>
+                <td className="px-4 py-2.5 text-right text-sm text-gray-600 dark:text-slate-300">{item.quantity}</td>
+                <td className="px-4 py-2.5 text-right text-sm text-gray-600 dark:text-slate-300">{formatCurrency(item.priceBuy)}</td>
+                <td className="px-4 py-2.5 text-right text-sm font-medium text-gray-800 dark:text-slate-100">{formatCurrency(item.quantity * item.priceBuy)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="flex justify-between px-4 py-3 bg-gray-50 border-t border-gray-100"><span className="text-sm font-semibold text-gray-700">TOTAL</span><span className="text-base font-semibold text-gray-800">{formatCurrency(purchase.total || 0)}</span></div>
+        <div className="flex justify-between px-4 py-3 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-700"><span className="text-sm font-semibold text-gray-700">TOTAL</span><span className="text-base font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(purchase.total || 0)}</span></div>
       </div>
     </div>
   )
@@ -165,10 +165,10 @@ export default function Purchases() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div><h1 className="text-xl font-medium text-gray-800">Compras a proveedor</h1><p className="text-sm text-gray-400">{enriched.length} registros</p></div>
+        <div><h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Compras a proveedor</h1><p className="text-sm text-gray-400 dark:text-slate-500">{enriched.length} registros</p></div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📊 Excel</button>
-          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📄 PDF</button>
+          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
+          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
           <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
             Nueva entrada
@@ -176,31 +176,31 @@ export default function Purchases() {
         </div>
       </div>
 
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por proveedor o notas..." className="w-full max-w-md px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por proveedor o notas..." className="w-full max-w-md px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
 
       {enriched.length === 0 ? (
         <EmptyState icon="📦" title="Sin registros de compras" message="Registra la primera entrada de mercadería." action={{ label: 'Registrar entrada', onClick: () => setShowForm(true) }}/>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
           <table className="w-full">
-            <thead><tr className="bg-gray-50 border-b border-gray-100">{['Fecha','Proveedor','Por','N° Prods','Total','Estado','Notas','Acciones'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 px-4 py-3 ${['N° Prods','Total'].includes(h)?'text-right':h==='Acciones'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-gray-50">
+            <thead><tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">{['Fecha','Proveedor','Por','N° Prods','Total','Estado','Notas','Acciones'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-3 ${['N° Prods','Total'].includes(h)?'text-right':h==='Acciones'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {enriched.map(p => (
-                <tr key={p.id} className={`hover:bg-gray-50 ${p.status==='anulada'?'opacity-50':''}`}>
-                  <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{formatDate(p.createdAt)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-800">{p.supplierName}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{p.userName || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-600">{p.items?.length || 0}</td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-gray-800">{formatCurrency(p.total || 0)}</td>
+                <tr key={p.id} className={`hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 ${p.status==='anulada'?'opacity-50':''}`}>
+                  <td className="px-4 py-3 text-xs text-gray-600 dark:text-slate-300 whitespace-nowrap">{formatDate(p.createdAt)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-slate-100">{p.supplierName}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">{p.userName || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-slate-300">{p.items?.length || 0}</td>
+                  <td className="px-4 py-3 text-sm text-right font-medium text-gray-800 dark:text-slate-100">{formatCurrency(p.total || 0)}</td>
                   <td className="px-4 py-3"><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${p.status==='anulada'?'bg-red-100 text-red-600':'bg-green-100 text-green-700'}`}>{p.status}</span></td>
-                  <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate">{p.notes||'—'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400 max-w-[140px] truncate">{p.notes||'—'}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => setModal({ type: 'detail', data: p })} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Ver detalle">
+                      <button onClick={() => setModal({ type: 'detail', data: p })} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Ver detalle">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                       </button>
                       {p.status !== 'anulada' && (
-                        <button onClick={() => setCancelTarget(p)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Anular">
+                        <button onClick={() => setCancelTarget(p)} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Anular">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </button>
                       )}
@@ -215,10 +215,10 @@ export default function Purchases() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-              <h2 className="font-semibold text-gray-800">Nueva entrada de mercadería</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+              <h2 className="font-semibold text-gray-800 dark:text-slate-100">Nueva entrada de mercadería</h2>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div className="overflow-y-auto p-6"><NewPurchaseForm onClose={() => setShowForm(false)}/></div>
           </div>

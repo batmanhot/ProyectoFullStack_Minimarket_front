@@ -165,21 +165,21 @@ export default function SaleTicket({ sale, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-800 text-base">Comprobante de venta</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{sale.invoiceNumber} · {formatDateTime(sale.createdAt)}</p>
+            <h2 className="font-bold text-gray-800 dark:text-slate-100 text-base">Comprobante de venta</h2>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sale.invoiceNumber} · {formatDateTime(sale.createdAt)}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+          <button onClick={onClose} className="p-2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         {/* ── Vista previa del ticket ── */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-slate-900">
           <div className="flex justify-center">
             <div style={{
               fontFamily: "'Courier New', monospace",
@@ -286,9 +286,9 @@ export default function SaleTicket({ sale, onClose }) {
 
         {/* ── Panel WhatsApp: pedir número ── */}
         {showPhone && (
-          <div className="px-5 py-4 border-t border-blue-100 bg-green-50 flex-shrink-0">
-            <p className="text-sm font-semibold text-gray-700 mb-2">📱 Enviar comprobante por WhatsApp</p>
-            <p className="text-xs text-gray-500 mb-3">Ingresa el número de celular del cliente para enviar el comprobante</p>
+          <div className="px-5 py-4 border-t border-green-100 dark:border-green-900/40 bg-green-50 dark:bg-green-950/30 flex-shrink-0">
+            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">📱 Enviar comprobante por WhatsApp</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">Ingresa el número de celular del cliente para enviar el comprobante</p>
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">+51</span>
@@ -315,7 +315,7 @@ export default function SaleTicket({ sale, onClose }) {
         )}
 
         {/* ── Botones de acción ── */}
-        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-slate-700 flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
           <div className="grid grid-cols-3 gap-2">
             {/* WhatsApp */}
             <button

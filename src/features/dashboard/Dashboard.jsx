@@ -9,9 +9,9 @@ import {
 const COLORS = ['#378ADD', '#5DCAA5', '#EF9F27', '#D85A30', '#7F77DD', '#D4537E']
 
 const KPICard = ({ label, value, sub, color = 'text-gray-800', icon, trend }) => (
-  <div className="bg-gray-50 rounded-xl p-4">
+  <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
     <div className="flex items-start justify-between mb-1">
-      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xs text-gray-500 dark:text-slate-400">{label}</p>
       {icon && <span className="text-xl opacity-50">{icon}</span>}
     </div>
     <p className={`text-2xl font-medium ${color}`}>{value}</p>
@@ -22,7 +22,7 @@ const KPICard = ({ label, value, sub, color = 'text-gray-800', icon, trend }) =>
             {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}% vs ayer
           </span>
         )}
-        {sub && <p className="text-xs text-gray-400">{sub}</p>}
+        {sub && <p className="text-xs text-gray-400 dark:text-slate-500">{sub}</p>}
       </div>
     )}
   </div>
@@ -48,8 +48,8 @@ export default function Dashboard() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-medium text-gray-800">Dashboard</h1>
-        <p className="text-sm text-gray-400">
+        <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Dashboard</h1>
+        <p className="text-sm text-gray-400 dark:text-slate-500">
           {new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
@@ -72,7 +72,7 @@ export default function Dashboard() {
 
       {/* Gráficos fila 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-4">Ventas — últimos 7 días</h3>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={kpis.ventasUltimos7} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -91,7 +91,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-4">Top 5 productos más vendidos</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={top5Data} layout="vertical" margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -107,7 +107,7 @@ export default function Dashboard() {
 
       {/* Gráficos fila 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white border border-gray-100 rounded-xl p-4 lg:col-span-2">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 lg:col-span-2">
           <h3 className="text-sm font-medium text-gray-700 mb-4">Ventas por hora — hoy</h3>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={kpis.ventasPorHora} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -120,7 +120,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Métodos de pago</h3>
           {paymentData.length > 0 ? (
             <>
@@ -137,7 +137,7 @@ export default function Dashboard() {
                   <div key={i} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ background: COLORS[i % COLORS.length] }}/>
-                      <span className="text-gray-600">{d.name}</span>
+                      <span className="text-gray-600 dark:text-slate-300">{d.name}</span>
                     </div>
                     <span className="font-medium text-gray-700">{formatCurrency(d.value)}</span>
                   </div>
@@ -162,7 +162,7 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             {products.filter(p => p.isActive && p.stock <= p.stockMin).slice(0, 6).map(p => (
-              <div key={p.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-sm">
+              <div key={p.id} className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg px-3 py-2 text-sm">
                 <span className="text-gray-700 truncate max-w-[60%]">{p.name}</span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${p.stock === 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
                   {p.stock === 0 ? 'Sin stock' : `${p.stock} / min ${p.stockMin}`}
@@ -188,7 +188,7 @@ export default function Dashboard() {
             }).slice(0, 6).map(p => {
               const days = Math.ceil((new Date(p.expiryDate) - new Date()) / 86400000)
               return (
-                <div key={p.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-sm">
+                <div key={p.id} className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg px-3 py-2 text-sm">
                   <span className="text-gray-700 truncate max-w-[60%]">{p.name}</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${days <= 7 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
                     {days === 0 ? 'Vence hoy' : `En ${days} días`}

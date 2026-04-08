@@ -119,8 +119,8 @@ function TrackingForm({ alert, tracking, onSave, onClose }) {
         <div className="flex items-start gap-3">
           <span className="text-2xl">{def?.icon}</span>
           <div className="flex-1">
-            <div className="font-semibold text-gray-800 text-sm">{alert.title}</div>
-            <div className="text-xs text-gray-600 mt-1 leading-relaxed">{alert.message}</div>
+            <div className="font-semibold text-gray-800 dark:text-slate-100 text-sm">{alert.title}</div>
+            <div className="text-xs text-gray-600 dark:text-slate-300 mt-1 leading-relaxed">{alert.message}</div>
           </div>
         </div>
       </div>
@@ -132,15 +132,15 @@ function TrackingForm({ alert, tracking, onSave, onClose }) {
 
       {history.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Historial de seguimiento</p>
+          <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2 uppercase tracking-wide">Historial de seguimiento</p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {history.map((h, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
                 <span>{STATUS_CONFIG[h.status]?.icon || '•'}</span>
                 <div className="flex-1">
                   <span className={`font-medium px-1.5 py-0.5 rounded text-xs ${STATUS_CONFIG[h.status]?.bg}`}>{STATUS_CONFIG[h.status]?.label}</span>
-                  {h.note && <span className="text-gray-600 ml-2">{h.note}</span>}
-                  <div className="text-gray-400 mt-0.5">{formatDateTime(h.timestamp)}</div>
+                  {h.note && <span className="text-gray-600 dark:text-slate-300 ml-2">{h.note}</span>}
+                  <div className="text-gray-400 dark:text-slate-500 mt-0.5">{formatDateTime(h.timestamp)}</div>
                 </div>
               </div>
             ))}
@@ -149,22 +149,22 @@ function TrackingForm({ alert, tracking, onSave, onClose }) {
       )}
 
       <div>
-        <p className="text-xs font-semibold text-gray-600 mb-2">Actualizar estado</p>
+        <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Actualizar estado</p>
         <div className="grid grid-cols-3 gap-2 mb-3">
           {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
             <button key={key} onClick={() => setStatus(key)}
-              className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${status === key ? cfg.bg + ' border-current shadow-sm' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+              className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${status === key ? cfg.bg + ' border-current shadow-sm' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700'}`}>
               {cfg.icon} {cfg.label}
             </button>
           ))}
         </div>
         <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
           placeholder="Nota de seguimiento (opcional)..."
-          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/>
+          className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/>
       </div>
 
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">Cancelar</button>
+        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
         <button onClick={handleSave} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Guardar seguimiento</button>
       </div>
     </div>
@@ -218,10 +218,10 @@ export default function Alerts() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-medium text-gray-800">Alertas automáticas del sistema</h1>
-          <p className="text-sm text-gray-400">Detectadas en tiempo real · {counts.activas} activas · {counts.subsanadas} subsanadas</p>
+          <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Alertas automáticas del sistema</h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500">Detectadas en tiempo real · {counts.activas} activas · {counts.subsanadas} subsanadas</p>
         </div>
-        <button onClick={() => setTracking({})} className="text-xs text-gray-400 hover:text-red-500 px-3 py-1.5 border border-gray-200 rounded-lg hover:border-red-200">
+        <button onClick={() => setTracking({})} className="text-xs text-gray-400 dark:text-slate-500 hover:text-red-500 px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg hover:border-red-200">
           Limpiar seguimientos
         </button>
       </div>
@@ -236,8 +236,8 @@ export default function Alerts() {
           <p className="text-xs text-amber-600 mb-1">🟡 En proceso</p>
           <p className="text-2xl font-bold text-amber-700">{counts.en_proceso}</p>
         </div>
-        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-          <p className="text-xs text-gray-500 mb-1">📋 Total detectadas</p>
+        <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">📋 Total detectadas</p>
           <p className="text-2xl font-bold text-gray-700">{counts.total}</p>
         </div>
         <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
@@ -252,14 +252,14 @@ export default function Alerts() {
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
           {[{k:'todas',l:'Todas'},{k:'activa',l:'Activas'},{k:'en_proceso',l:'En proceso'},{k:'subsanada',l:'Subsanadas'}].map(f => (
             <button key={f.k} onClick={() => setFilterStatus(f.k)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterStatus===f.k?'bg-white shadow text-blue-600':'text-gray-500'}`}>{f.l}</button>
           ))}
         </div>
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="todas">Todos los tipos</option>
           {ALERT_DEFS.map(d => <option key={d.type} value={d.type}>{d.icon} {d.label}</option>)}
         </select>
@@ -269,8 +269,8 @@ export default function Alerts() {
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="text-6xl">🎉</div>
-          <p className="text-lg font-medium text-gray-600">¡Sin alertas activas!</p>
-          <p className="text-sm text-gray-400">El sistema no detectó problemas en este momento</p>
+          <p className="text-lg font-medium text-gray-600 dark:text-slate-300">¡Sin alertas activas!</p>
+          <p className="text-sm text-gray-400 dark:text-slate-500">El sistema no detectó problemas en este momento</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -299,25 +299,25 @@ export default function Alerts() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="font-semibold text-gray-800 text-sm">{alert.title}</div>
+                      <div className="font-semibold text-gray-800 dark:text-slate-100 text-sm">{alert.title}</div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${def?.color.badge}`}>{def?.label}</span>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stat?.bg}`}>{stat?.icon} {stat?.label}</span>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">{alert.message}</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-300 mt-1 leading-relaxed">{alert.message}</p>
 
                     {/* Acción recomendada */}
                     {!isSubsanada && (
                       <div className="flex items-center gap-1.5 mt-2">
                         <span className="text-xs">💡</span>
-                        <p className="text-xs text-gray-500 italic">{alert.action}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 italic">{alert.action}</p>
                       </div>
                     )}
 
                     {/* Último seguimiento */}
                     {alert.history.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-400">
+                      <div className="mt-2 text-xs text-gray-400 dark:text-slate-500">
                         Último seguimiento: {formatDateTime(alert.history[alert.history.length-1].timestamp)}
                         {alert.history[alert.history.length-1].note && ` · "${alert.history[alert.history.length-1].note}"`}
                       </div>
@@ -325,7 +325,7 @@ export default function Alerts() {
                   </div>
 
                   {/* Flecha */}
-                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-gray-400 dark:text-slate-500 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
                   </svg>
                 </div>

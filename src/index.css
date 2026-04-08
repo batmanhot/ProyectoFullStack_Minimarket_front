@@ -18,16 +18,172 @@
   .scrollbar-thin::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
 }
 
-/* ── TEMA OSCURO ─────────────────────────────────────────────────────────────── */
-.dark body { background-color: #0f172a; color: #f1f5f9; }
-.dark .bg-white { background-color: #1e293b !important; }
-.dark .bg-gray-50 { background-color: #0f172a !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TEMA OSCURO — Sistema completo y coherente
+   Paleta base dark:
+     bg-primary   #0f172a  fondo principal (slate-900)
+     bg-surface   #1e293b  cards, modales, sidebar (slate-800)
+     bg-elevated  #253045  inputs, elementos elevados
+     bg-hover     #2d3a50  hover suave sobre superficie
+     border-soft  #2a3649  bordes sutiles
+     border       #334155  bordes normales (slate-700)
+     text-primary #f1f5f9  slate-100
+     text-sec     #94a3b8  slate-400
+     text-muted   #64748b  slate-500
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Raíz ──────────────────────────────────────────────────────────────────── */
+.dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
+
+/* ─── Fondos principales ────────────────────────────────────────────────────── */
+.dark .bg-white    { background-color: #1e293b !important; }
+.dark .bg-gray-50  { background-color: #0f172a !important; }
 .dark .bg-gray-100 { background-color: #1e293b !important; }
-.dark .border-gray-100 { border-color: #334155 !important; }
-.dark .border-gray-200 { border-color: #475569 !important; }
+.dark .bg-gray-200 { background-color: #253045 !important; }
+
+/* ─── Bordes — todos los tonos de gris ─────────────────────────────────────── */
+.dark .border-gray-50  { border-color: #253045 !important; }
+.dark .border-gray-100 { border-color: #2a3649 !important; }
+.dark .border-gray-200 { border-color: #334155 !important; }
+.dark .border-gray-300 { border-color: #475569 !important; }
+.dark .border-gray-700 { border-color: #475569 !important; }
+.dark .border-gray-800 { border-color: #334155 !important; }
+
+/* ─── Textos grises ─────────────────────────────────────────────────────────── */
 .dark .text-gray-800 { color: #f1f5f9 !important; }
-.dark .text-gray-700 { color: #cbd5e1 !important; }
-.dark .text-gray-600 { color: #94a3b8 !important; }
-.dark .text-gray-500 { color: #64748b !important; }
-.dark .text-gray-400 { color: #475569 !important; }
-.dark .text-gray-300 { color: #334155 !important; }
+.dark .text-gray-700 { color: #e2e8f0 !important; }
+.dark .text-gray-600 { color: #cbd5e1 !important; }
+.dark .text-gray-500 { color: #94a3b8 !important; }
+.dark .text-gray-400 { color: #64748b !important; }
+.dark .text-gray-300 { color: #475569 !important; }
+.dark .text-gray-100 { color: #f1f5f9 !important; }
+
+/* ─── CORRECCION a) Inputs, textarea, select ────────────────────────────────── */
+/* Fondo oscuro + texto claro: lo que se escribe siempre es visible              */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.dark textarea,
+.dark select {
+  background-color: #253045 !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+  caret-color: #f1f5f9;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1;
+}
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.25) !important;
+  outline: none;
+}
+/* Variantes de input con fondo explícito de Tailwind */
+.dark input.bg-gray-50,
+.dark input.bg-white {
+  background-color: #253045 !important;
+  color: #f1f5f9 !important;
+}
+
+/* ─── CORRECCION c) Divisores de tabla — nada de blanco ────────────────────── */
+.dark .divide-gray-50  > * + * { border-color: #253045 !important; }
+.dark .divide-gray-100 > * + * { border-color: #2a3649 !important; }
+.dark .divide-gray-200 > * + * { border-color: #334155 !important; }
+.dark .divide-y        > * + * { border-color: #2a3649 !important; }
+
+/* ─── CORRECCION d) Hover en filas de tabla — nunca blanco ─────────────────── */
+/* Se usa un azul-pizarra muy suave que no borra el texto                        */
+.dark .hover\:bg-gray-50:hover  { background-color: #253045 !important; color: inherit !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #2d3a50 !important; color: inherit !important; }
+/* Heredar color en celdas hijas también */
+.dark tr.hover\:bg-gray-50:hover td  { color: inherit !important; }
+.dark tr.hover\:bg-gray-50:hover th  { color: inherit !important; }
+.dark tr.hover\:bg-gray-100:hover td { color: inherit !important; }
+
+/* ─── Hovers de botones y contenedores ─────────────────────────────────────── */
+.dark .hover\:bg-gray-800:hover  { background-color: #0f172a !important; }
+.dark .hover\:bg-blue-50:hover   { background-color: #1e3a5f !important; }
+.dark .hover\:bg-blue-100:hover  { background-color: #1e3a5f !important; }
+.dark .hover\:bg-red-50:hover    { background-color: #3b1f1f !important; }
+.dark .hover\:bg-green-50:hover  { background-color: #0d2b1e !important; }
+.dark .hover\:bg-green-100:hover { background-color: #14291e !important; }
+.dark .hover\:bg-amber-50:hover  { background-color: #261a06 !important; }
+
+/* ─── Fondos de badges/estados — equivalentes oscuros ──────────────────────── */
+.dark .bg-blue-50    { background-color: #172554 !important; }
+.dark .bg-blue-100   { background-color: #1e3a5f !important; }
+.dark .bg-green-50   { background-color: #0d2b1e !important; }
+.dark .bg-green-100  { background-color: #14291e !important; }
+.dark .bg-red-50     { background-color: #2d1515 !important; }
+.dark .bg-red-100    { background-color: #3b1f1f !important; }
+.dark .bg-amber-50   { background-color: #261a06 !important; }
+.dark .bg-amber-100  { background-color: #312208 !important; }
+.dark .bg-teal-50    { background-color: #0d2b2b !important; }
+.dark .bg-purple-50  { background-color: #1e1a3b !important; }
+
+/* ─── Textos de color — aclarados para contraste en oscuro ─────────────────── */
+.dark .text-blue-600  { color: #60a5fa !important; }
+.dark .text-blue-700  { color: #93c5fd !important; }
+.dark .text-blue-400  { color: #60a5fa !important; }
+.dark .text-green-600 { color: #4ade80 !important; }
+.dark .text-green-700 { color: #86efac !important; }
+.dark .text-green-500 { color: #4ade80 !important; }
+.dark .text-red-500   { color: #f87171 !important; }
+.dark .text-red-600   { color: #f87171 !important; }
+.dark .text-red-700   { color: #fca5a5 !important; }
+.dark .text-red-400   { color: #f87171 !important; }
+.dark .text-amber-600 { color: #fbbf24 !important; }
+.dark .text-amber-700 { color: #fcd34d !important; }
+.dark .text-teal-600  { color: #2dd4bf !important; }
+.dark .text-teal-700  { color: #5eead4 !important; }
+.dark .text-purple-600{ color: #a78bfa !important; }
+.dark .text-purple-700{ color: #c4b5fd !important; }
+
+/* ─── Bordes de badges/estados ──────────────────────────────────────────────── */
+.dark .border-blue-200  { border-color: #1e3a5f !important; }
+.dark .border-blue-100  { border-color: #172554 !important; }
+.dark .border-blue-500  { border-color: #3b82f6 !important; }
+.dark .border-green-100 { border-color: #0d2b1e !important; }
+.dark .border-green-200 { border-color: #14291e !important; }
+.dark .border-green-300 { border-color: #166534 !important; }
+.dark .border-red-100   { border-color: #3b1f1f !important; }
+.dark .border-red-300   { border-color: #7f1d1d !important; }
+.dark .border-amber-300 { border-color: #78350f !important; }
+
+/* ─── CORRECCION b) Ticket de venta — modal exterior oscuro ────────────────── */
+/* El paper del ticket (div con style inline background:#fff) se mantiene blanco */
+/* para simular papel físico. Lo que se corrige es el contenedor y el modal.     */
+/* bg-gray-50 ya está corregido (#0f172a) — el área gris alrededor del ticket   */
+/* queda oscura, el ticket en sí sigue siendo blanco (papel de impresora).       */
+
+/* Encabezado y pie del modal del ticket */
+.dark .rounded-2xl > .border-b.border-gray-100 { border-color: #2a3649 !important; }
+.dark .rounded-2xl > .border-t.border-gray-100 { border-color: #2a3649 !important; }
+
+/* Panel de WhatsApp dentro del ticket */
+.dark .bg-green-50.border-t { background-color: #0d2b1e !important; border-color: #14291e !important; }
+.dark .border-blue-100      { border-color: #172554 !important; }
+
+/* ─── Dropdowns de autocompletado (buscar producto, buscar cliente) ─────────── */
+.dark .absolute.bg-white { background-color: #1e293b !important; }
+
+/* ─── Sombras — más sutiles en oscuro ───────────────────────────────────────── */
+.dark .shadow-2xl { box-shadow: 0 25px 50px rgba(0,0,0,0.5) !important; }
+.dark .shadow-xl  { box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important; }
+.dark .shadow-lg  { box-shadow: 0 10px 30px rgba(0,0,0,0.35) !important; }
+
+/* ─── Scrollbar en modo oscuro ───────────────────────────────────────────────── */
+.dark .scrollbar-thin { scrollbar-color: #334155 transparent; }
+.dark .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; }
+
+/* ─── Skeleton loader ────────────────────────────────────────────────────────── */
+.dark .animate-pulse .bg-gray-100,
+.dark .animate-pulse .bg-gray-200 { background-color: #253045 !important; }
+
+/* ─── Focus rings visibles en oscuro ─────────────────────────────────────────── */
+.dark .focus\:ring-blue-500:focus  { --tw-ring-color: rgba(59,130,246,0.35); }
+.dark .focus\:ring-green-500:focus { --tw-ring-color: rgba(34,197,94,0.35); }
+.dark .focus\:ring-amber-400:focus { --tw-ring-color: rgba(251,191,36,0.35); }

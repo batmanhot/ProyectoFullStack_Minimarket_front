@@ -120,8 +120,8 @@ export default function Reports() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div><h1 className="text-xl font-medium text-gray-800">Reportes</h1><p className="text-sm text-gray-400">{metrics.count} ventas en el período</p></div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div><h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Reportes</h1><p className="text-sm text-gray-400 dark:text-slate-500">{metrics.count} ventas en el período</p></div>
+        <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
           {RANGES.map(r => <button key={r.key} onClick={() => setRange(r.key)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${range===r.key?'bg-white shadow text-blue-600':'text-gray-500'}`}>{r.label}</button>)}
         </div>
       </div>
@@ -135,19 +135,19 @@ export default function Reports() {
           { label:'Utilidad neta',   value: formatCurrency(metrics.utilidad),  color:'text-green-600' },
           { label:'IGV generado',    value: formatCurrency(metrics.igv),       color:'text-purple-600' },
         ].map(k => (
-          <div key={k.label} className="bg-gray-50 rounded-xl p-4"><p className="text-xs text-gray-500 mb-1">{k.label}</p><p className={`text-xl font-medium ${k.color}`}>{k.value}</p></div>
+          <div key={k.label} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4"><p className="text-xs text-gray-500 dark:text-slate-400 mb-1">{k.label}</p><p className={`text-xl font-medium ${k.color}`}>{k.value}</p></div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-wrap">
-        {TABS.map(t => <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${activeTab===t.key?'bg-white shadow text-blue-600':'text-gray-500 hover:text-gray-700'}`}>{t.label}</button>)}
+      <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1 flex-wrap">
+        {TABS.map(t => <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${activeTab===t.key?'bg-white shadow text-blue-600':'text-gray-500 dark:text-slate-400 hover:text-gray-700'}`}>{t.label}</button>)}
       </div>
 
       {/* TAB: Ventas por día */}
       {activeTab === 'ventas' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-white border border-gray-100 rounded-xl p-4 lg:col-span-2">
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 lg:col-span-2">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-gray-700">Ventas diarias</h3>
               <div className="flex gap-2"><button onClick={() => handleExportExcel('ventas')} className="text-xs text-blue-600 hover:underline">Excel</button><button onClick={() => handleExportPDF('ventas')} className="text-xs text-blue-600 hover:underline">PDF</button></div>
@@ -164,7 +164,7 @@ export default function Reports() {
               </ResponsiveContainer>
             ) : <div className="flex items-center justify-center h-40 text-gray-300 text-sm">Sin datos en el período</div>}
           </div>
-          <div className="bg-white border border-gray-100 rounded-xl p-4">
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Métodos de pago</h3>
             {paymentData.length > 0 ? (
               <>
@@ -176,7 +176,7 @@ export default function Reports() {
                 <div className="space-y-1 mt-2">
                   {paymentData.map((d,i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{background:COLORS[i%COLORS.length]}}/><span className="text-gray-600">{d.name}</span></div>
+                      <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{background:COLORS[i%COLORS.length]}}/><span className="text-gray-600 dark:text-slate-300">{d.name}</span></div>
                       <span className="font-medium text-gray-700">{formatCurrency(d.value)}</span>
                     </div>
                   ))}
@@ -189,24 +189,24 @@ export default function Reports() {
 
       {/* TAB: Top productos */}
       {activeTab === 'productos' && (
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-700">Top 10 productos más vendidos</h3>
             <div className="flex gap-2"><button onClick={() => handleExportExcel('productos')} className="text-xs text-blue-600 hover:underline">Excel</button><button onClick={() => handleExportPDF('productos')} className="text-xs text-blue-600 hover:underline">PDF</button></div>
           </div>
           <table className="w-full">
-            <thead><tr className="bg-gray-50"><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">#</th><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Producto</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Unidades</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Ingresos</th><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Proporción</th></tr></thead>
-            <tbody className="divide-y divide-gray-50">
+            <thead><tr className="bg-gray-50 dark:bg-slate-800/50"><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">#</th><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Producto</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Unidades</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Ingresos</th><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Proporción</th></tr></thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {metrics.topProducts.length === 0 ? <tr><td colSpan={5} className="text-center py-8 text-sm text-gray-300">Sin datos</td></tr>
               : metrics.topProducts.map((p,i) => {
                 const max = metrics.topProducts[0]?.qty||1
                 return (
-                  <tr key={p.name} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-xs text-gray-400 font-medium">{i+1}</td>
-                    <td className="px-4 py-3 text-sm text-gray-800 max-w-xs truncate">{p.name}</td>
+                  <tr key={p.name} className="hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">
+                    <td className="px-4 py-3 text-xs text-gray-400 dark:text-slate-500 font-medium">{i+1}</td>
+                    <td className="px-4 py-3 text-sm text-gray-800 dark:text-slate-100 max-w-xs truncate">{p.name}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">{p.qty}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(p.revenue)}</td>
-                    <td className="px-4 py-3"><div className="w-24 bg-gray-100 rounded-full h-1.5 overflow-hidden"><div className="h-1.5 rounded-full bg-blue-400" style={{width:`${(p.qty/max*100).toFixed(0)}%`}}/></div></td>
+                    <td className="px-4 py-3"><div className="w-24 bg-gray-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden"><div className="h-1.5 rounded-full bg-blue-400" style={{width:`${(p.qty/max*100).toFixed(0)}%`}}/></div></td>
                   </tr>
                 )
               })}
@@ -217,7 +217,7 @@ export default function Reports() {
 
       {/* TAB: Por categoría */}
       {activeTab === 'categorias' && (
-        <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-4">Ventas por categoría</h3>
           {catData.length > 0 ? (
             <ResponsiveContainer width="100%" height={Math.max(catData.length*44+60,200)}>
@@ -237,57 +237,57 @@ export default function Reports() {
       {activeTab === 'detalle_venta' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">Click en una venta para ver el detalle de productos vendidos</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Click en una venta para ver el detalle de productos vendidos</p>
             <div className="flex gap-2">
-              <button onClick={() => handleExportExcel('detalle_venta')} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📊 Excel detalle</button>
-              <button onClick={() => handleExportPDF('ventas')} className="px-3 py-1.5 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📄 PDF</button>
+              <button onClick={() => handleExportExcel('detalle_venta')} className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel detalle</button>
+              <button onClick={() => handleExportPDF('ventas')} className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
             </div>
           </div>
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
             {filteredSales.length === 0 ? <div className="text-center py-8 text-sm text-gray-300">Sin ventas en el período</div>
             : filteredSales.slice(0, 50).map(s => (
               <div key={s.id}>
                 <button
                   onClick={() => setExpandedSale(expandedSale === s.id ? null : s.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 text-left border-b border-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-mono text-gray-500">{s.invoiceNumber}</span>
-                    <span className="text-xs text-gray-400">{formatDate(s.createdAt)}</span>
-                    <span className="text-xs text-gray-400">{s.items?.length} producto(s)</span>
+                    <span className="text-xs font-mono text-gray-500 dark:text-slate-400">{s.invoiceNumber}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{formatDate(s.createdAt)}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{s.items?.length} producto(s)</span>
                     {s.payments?.map(p=>p.method).filter(Boolean).length > 0 && (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{s.payments.map(p=>p.method).join(' + ')}</span>
+                      <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-2 py-0.5 rounded-full">{s.payments.map(p=>p.method).join(' + ')}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-800">{formatCurrency(s.total)}</span>
-                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandedSale===s.id?'rotate-180':''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
+                    <span className="text-sm font-medium text-gray-800 dark:text-slate-100">{formatCurrency(s.total)}</span>
+                    <svg className={`w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform ${expandedSale===s.id?'rotate-180':''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
                   </div>
                 </button>
                 {expandedSale === s.id && (
-                  <div className="bg-gray-50 border-b border-gray-100 px-4 py-3">
+                  <div className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700 px-4 py-3">
                     <table className="w-full">
-                      <thead><tr>{['Producto','Código','Cant.','P. Unit.','Descuento','Subtotal'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 pb-2 ${h==='Cant.'||h.includes('.')&&'text-right'} ${h==='Producto'?'text-left':'text-right'}`}>{h}</th>)}</tr></thead>
+                      <thead><tr>{['Producto','Código','Cant.','P. Unit.','Descuento','Subtotal'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 pb-2 ${h==='Cant.'||h.includes('.')&&'text-right'} ${h==='Producto'?'text-left':'text-right'}`}>{h}</th>)}</tr></thead>
                       <tbody>
                         {s.items?.map((item, idx) => (
-                          <tr key={idx} className="border-t border-gray-100">
-                            <td className="py-1.5 text-sm text-gray-800">{item.productName}</td>
-                            <td className="py-1.5 text-xs font-mono text-gray-400 text-right">{item.barcode}</td>
-                            <td className="py-1.5 text-sm text-right text-gray-600">{item.quantity} {item.unit||''}</td>
-                            <td className="py-1.5 text-sm text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
+                          <tr key={idx} className="border-t border-gray-100 dark:border-slate-700">
+                            <td className="py-1.5 text-sm text-gray-800 dark:text-slate-100">{item.productName}</td>
+                            <td className="py-1.5 text-xs font-mono text-gray-400 dark:text-slate-500 text-right">{item.barcode}</td>
+                            <td className="py-1.5 text-sm text-right text-gray-600 dark:text-slate-300">{item.quantity} {item.unit||''}</td>
+                            <td className="py-1.5 text-sm text-right text-gray-600 dark:text-slate-300">{formatCurrency(item.unitPrice)}</td>
                             <td className="py-1.5 text-sm text-right text-green-600">{item.discount > 0 ? `-${formatCurrency(item.discount)}` : '—'}</td>
-                            <td className="py-1.5 text-sm text-right font-medium text-gray-800">{formatCurrency(item.subtotal)}</td>
+                            <td className="py-1.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">{formatCurrency(item.subtotal)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    <div className="flex justify-between text-sm font-semibold text-gray-800 pt-2 border-t border-gray-200 mt-2">
+                    <div className="flex justify-between text-sm font-semibold text-gray-800 dark:text-slate-100 pt-2 border-t border-gray-200 dark:border-slate-600 mt-2">
                       <span>Total de la venta</span><span>{formatCurrency(s.total)}</span>
                     </div>
                     {s.payments && s.payments.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {s.payments.map((p, i) => (
-                          <div key={i} className="flex justify-between text-xs text-gray-500">
+                          <div key={i} className="flex justify-between text-xs text-gray-500 dark:text-slate-400">
                             <span>Pago {i+1}: {p.method}{p.reference ? ` (${p.reference})` : ''}</span>
                             <span>{formatCurrency(p.amount)}</span>
                           </div>
@@ -299,27 +299,27 @@ export default function Reports() {
               </div>
             ))}
           </div>
-          {filteredSales.length > 50 && <p className="text-xs text-gray-400 text-center">Mostrando 50 de {filteredSales.length} ventas. Exporta a Excel para ver todas.</p>}
+          {filteredSales.length > 50 && <p className="text-xs text-gray-400 dark:text-slate-500 text-center">Mostrando 50 de {filteredSales.length} ventas. Exporta a Excel para ver todas.</p>}
         </div>
       )}
 
       {/* TAB: Deuda */}
       {activeTab === 'deuda' && (
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-700">Cuentas por cobrar</h3>
             <div className="flex gap-2"><button onClick={() => handleExportExcel('deuda')} className="text-xs text-blue-600 hover:underline">Excel</button><button onClick={() => handleExportPDF('deuda')} className="text-xs text-blue-600 hover:underline">PDF</button></div>
           </div>
           <table className="w-full">
-            <thead><tr className="bg-gray-50"><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Cliente</th><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Documento</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Límite</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Deuda</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Disponible</th></tr></thead>
-            <tbody className="divide-y divide-gray-50">
+            <thead><tr className="bg-gray-50 dark:bg-slate-800/50"><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Cliente</th><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Documento</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Límite</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Deuda</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Disponible</th></tr></thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {clients.filter(c=>c.isActive&&c.currentDebt>0).length===0
                 ? <tr><td colSpan={5} className="text-center py-8 text-sm text-green-500">✓ Sin deudas pendientes</td></tr>
                 : clients.filter(c=>c.isActive&&c.currentDebt>0).sort((a,b)=>b.currentDebt-a.currentDebt).map(c => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-800">{c.name}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{c.documentType} {c.documentNumber}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600">{formatCurrency(c.creditLimit||0)}</td>
+                  <tr key={c.id} className="hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">
+                    <td className="px-4 py-3 text-sm text-gray-800 dark:text-slate-100">{c.name}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">{c.documentType} {c.documentNumber}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-slate-300">{formatCurrency(c.creditLimit||0)}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-red-500">{formatCurrency(c.currentDebt||0)}</td>
                     <td className="px-4 py-3 text-sm text-right text-green-600">{formatCurrency((c.creditLimit||0)-(c.currentDebt||0))}</td>
                   </tr>
@@ -331,24 +331,24 @@ export default function Reports() {
 
       {/* TAB: Sin movimiento */}
       {activeTab === 'inmovilizado' && (
-        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-medium text-gray-700">Productos sin movimiento (últimos 30 días)</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Capital inmovilizado: <span className="font-medium text-amber-600">{formatCurrency(metrics.capitalInmovilizado)}</span></p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Capital inmovilizado: <span className="font-medium text-amber-600">{formatCurrency(metrics.capitalInmovilizado)}</span></p>
             </div>
             <button onClick={() => handleExportExcel('inmovilizado')} className="text-xs text-blue-600 hover:underline">Excel</button>
           </div>
           <table className="w-full">
-            <thead><tr className="bg-gray-50"><th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Producto</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Stock</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Costo unit.</th><th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Valor inmov.</th></tr></thead>
-            <tbody className="divide-y divide-gray-50">
+            <thead><tr className="bg-gray-50 dark:bg-slate-800/50"><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Producto</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Stock</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Costo unit.</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Valor inmov.</th></tr></thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {metrics.sinMovimiento.length===0
                 ? <tr><td colSpan={4} className="text-center py-8 text-sm text-green-500">✓ Todos los productos tuvieron movimiento</td></tr>
                 : metrics.sinMovimiento.sort((a,b)=>b.priceBuy*b.stock-a.priceBuy*a.stock).map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3"><div className="text-sm text-gray-800">{p.name}</div><div className="text-xs text-gray-400">{p.barcode}</div></td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600">{p.stock} {p.unit}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600">{formatCurrency(p.priceBuy)}</td>
+                  <tr key={p.id} className="hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">
+                    <td className="px-4 py-3"><div className="text-sm text-gray-800 dark:text-slate-100">{p.name}</div><div className="text-xs text-gray-400 dark:text-slate-500">{p.barcode}</div></td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-slate-300">{p.stock} {p.unit}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-slate-300">{formatCurrency(p.priceBuy)}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-amber-600">{formatCurrency(p.priceBuy*p.stock)}</td>
                   </tr>
                 ))}

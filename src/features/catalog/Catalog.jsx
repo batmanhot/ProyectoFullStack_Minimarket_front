@@ -26,10 +26,10 @@ function ProductForm({ product, categories, suppliers, onClose }) {
     onClose()
   }
 
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inputCls = "w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
   const field = (label, name, extra = {}) => (
     <div className={extra.col2 ? 'col-span-2' : ''}>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}{extra.required ? ' *' : ''}</label>
+      <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">{label}{extra.required ? ' *' : ''}</label>
       {extra.children || <input type={extra.type||'text'} step={extra.step} {...register(name)} className={inputCls}/>}
       {errors[name] && <p className="text-xs text-red-500 mt-1">{errors[name].message}</p>}
     </div>
@@ -55,7 +55,7 @@ function ProductForm({ product, categories, suppliers, onClose }) {
         {field('Descripción', 'description', { col2: true, children: <textarea {...register('description')} rows={2} className={inputCls + ' resize-none'}/> })}
       </div>
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+        <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
         <button type="submit" className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">{product ? 'Guardar cambios' : 'Crear producto'}</button>
       </div>
     </form>
@@ -114,12 +114,12 @@ export default function Catalog() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-medium text-gray-800">Catálogo de Productos</h1>
-          <p className="text-sm text-gray-400">{filtered.length} productos mostrados</p>
+          <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Catálogo de Productos</h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500">{filtered.length} productos mostrados</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📊 Excel</button>
-          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">📄 PDF</button>
+          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
+          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
           <button onClick={() => setModal({ type: 'form', data: null })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
             Nuevo producto
@@ -129,19 +129,19 @@ export default function Catalog() {
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-gray-50 rounded-xl p-3"><p className="text-xs text-gray-500 mb-1">Valor en almacén (costo)</p><p className="text-lg font-medium text-gray-800">{formatCurrency(inventoryValue)}</p></div>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3"><p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Valor en almacén (costo)</p><p className="text-lg font-medium text-gray-800 dark:text-slate-100">{formatCurrency(inventoryValue)}</p></div>
         <div className="bg-blue-50 rounded-xl p-3"><p className="text-xs text-blue-600 mb-1">Potencial de venta</p><p className="text-lg font-medium text-blue-700">{formatCurrency(saleValue)}</p></div>
         <div className="bg-teal-50 rounded-xl p-3"><p className="text-xs text-teal-600 mb-1">Margen potencial</p><p className="text-lg font-medium text-teal-700">{formatCurrency(saleValue - inventoryValue)}</p></div>
       </div>
 
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, código, SKU o marca..." className="flex-1 min-w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, código, SKU o marca..." className="flex-1 min-w-48 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Todas las categorías</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
           {[{k:'active',l:'Activos'},{k:'inactive',l:'Inactivos'},{k:'all',l:'Todos'}].map(t => (
             <button key={t.k} onClick={() => setStatus(t.k)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${status===t.k?'bg-white shadow text-blue-600':'text-gray-500'}`}>{t.l}</button>
           ))}
@@ -151,42 +151,42 @@ export default function Catalog() {
       {filtered.length === 0 ? (
         <EmptyState icon="📦" title="No hay productos" message="Ajusta los filtros o crea un nuevo producto." action={{ label: 'Nuevo producto', onClick: () => setModal({ type: 'form', data: null }) }}/>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
+              <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
                 {['Producto','Código','Categoría','Proveedor','P. Compra','P. Venta','Margen','Stock','Acciones'].map(h => (
-                  <th key={h} className={`text-xs font-medium text-gray-500 px-3 py-3 ${['P. Compra','P. Venta','Margen'].includes(h)?'text-right':h==='Acciones'?'text-center':'text-left'}`}>{h}</th>
+                  <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-3 ${['P. Compra','P. Venta','Margen'].includes(h)?'text-right':h==='Acciones'?'text-center':'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {filtered.map(p => {
                 const cat    = categories.find(c => c.id === p.categoryId)
                 const sup    = suppliers.find(s => s.id === p.supplierId)
                 const margin = p.priceBuy > 0 ? ((p.priceSell - p.priceBuy) / p.priceBuy * 100).toFixed(1) : 0
                 return (
-                  <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.isActive?'opacity-50':''}`}>
+                  <tr key={p.id} className={`hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 transition-colors ${!p.isActive?'opacity-50':''}`}>
                     <td className="px-3 py-3">
-                      <div className="text-sm font-medium text-gray-800 max-w-[180px] truncate">{p.name}</div>
-                      {p.brand  && <div className="text-xs text-gray-400">{p.brand}</div>}
+                      <div className="text-sm font-medium text-gray-800 dark:text-slate-100 max-w-[180px] truncate">{p.name}</div>
+                      {p.brand  && <div className="text-xs text-gray-400 dark:text-slate-500">{p.brand}</div>}
                       {p.location && <div className="text-xs text-blue-400">📍 {p.location}</div>}
                       <div className="flex gap-1 mt-0.5"><ExpiryBadge product={p}/></div>
                     </td>
-                    <td className="px-3 py-3 text-xs font-mono text-gray-500"><div>{p.barcode}</div>{p.sku && <div className="text-gray-400">SKU: {p.sku}</div>}</td>
-                    <td className="px-3 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{cat?.name||'—'}</span></td>
-                    <td className="px-3 py-3 text-xs text-gray-500 max-w-[120px] truncate">{sup?.name||'—'}</td>
-                    <td className="px-3 py-3 text-sm text-right text-gray-600">{formatCurrency(p.priceBuy)}</td>
-                    <td className="px-3 py-3 text-sm text-right font-medium text-gray-800">{formatCurrency(p.priceSell)}</td>
+                    <td className="px-3 py-3 text-xs font-mono text-gray-500 dark:text-slate-400"><div>{p.barcode}</div>{p.sku && <div className="text-gray-400 dark:text-slate-500">SKU: {p.sku}</div>}</td>
+                    <td className="px-3 py-3"><span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2 py-0.5 rounded-full">{cat?.name||'—'}</span></td>
+                    <td className="px-3 py-3 text-xs text-gray-500 dark:text-slate-400 max-w-[120px] truncate">{sup?.name||'—'}</td>
+                    <td className="px-3 py-3 text-sm text-right text-gray-600 dark:text-slate-300">{formatCurrency(p.priceBuy)}</td>
+                    <td className="px-3 py-3 text-sm text-right font-medium text-gray-800 dark:text-slate-100">{formatCurrency(p.priceSell)}</td>
                     <td className="px-3 py-3 text-right"><span className={`text-xs font-medium ${parseFloat(margin)>=30?'text-green-600':parseFloat(margin)>=15?'text-amber-600':'text-red-500'}`}>{margin}%</span></td>
                     <td className="px-3 py-3 text-center"><StockBadge product={p}/></td>
                     <td className="px-3 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setModal({ type: 'form', data: p })} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Editar">
+                        <button onClick={() => setModal({ type: 'form', data: p })} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Editar">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                         </button>
                         {p.isActive && (
-                          <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Desactivar">
+                          <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg" title="Desactivar">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                           </button>
                         )}
