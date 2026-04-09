@@ -9,181 +9,343 @@
 }
 
 @layer utilities {
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: #e5e7eb transparent;
-  }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #e5e7eb transparent; }
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 2px; }
 }
 
+/* =============================================================================
+   SISTEMA DE TEMAS — 4 variantes: light · dark · ocean · forest
+   ============================================================================= */
 
-/* ══════════════════════════════════════════════════════════════════════════════
-   TEMA OSCURO — Sistema completo y coherente
-   Paleta base dark:
-     bg-primary   #0f172a  fondo principal (slate-900)
-     bg-surface   #1e293b  cards, modales, sidebar (slate-800)
-     bg-elevated  #253045  inputs, elementos elevados
-     bg-hover     #2d3a50  hover suave sobre superficie
-     border-soft  #2a3649  bordes sutiles
-     border       #334155  bordes normales (slate-700)
-     text-primary #f1f5f9  slate-100
-     text-sec     #94a3b8  slate-400
-     text-muted   #64748b  slate-500
-   ══════════════════════════════════════════════════════════════════════════════ */
+/* ── TEMA CLARO (por defecto) ────────────────────────────────────────────────── */
+:root, [data-theme="light"] {
+  --bg-page:      #f8fafc;
+  --bg-surface:   #ffffff;
+  --bg-elevated:  #f1f5f9;
+  --bg-hover:     #f1f5f9;
+  --border:       #e2e8f0;
+  --border-soft:  #f1f5f9;
+  --text-primary: #1e293b;
+  --text-sec:     #475569;
+  --text-muted:   #94a3b8;
+  --accent:       #2563eb;
+  --accent-light: #eff6ff;
+  --accent-text:  #1d4ed8;
+  --logo-bg:      #2563eb;
+}
 
-/* ─── Raíz ──────────────────────────────────────────────────────────────────── */
+/* ── TEMA OSCURO ─────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-page:      #0f172a;
+  --bg-surface:   #1e293b;
+  --bg-elevated:  #253045;
+  --bg-hover:     #2d3a50;
+  --border:       #334155;
+  --border-soft:  #253045;
+  --text-primary: #f1f5f9;
+  --text-sec:     #cbd5e1;
+  --text-muted:   #64748b;
+  --accent:       #3b82f6;
+  --accent-light: #1e3a5f;
+  --accent-text:  #93c5fd;
+  --logo-bg:      #1d4ed8;
+}
+
+/* ── TEMA OCÉANO — Azul marino + cyan eléctrico ──────────────────────────────── */
+[data-theme="ocean"] {
+  --bg-page:      #0a1628;
+  --bg-surface:   #0f2040;
+  --bg-elevated:  #162847;
+  --bg-hover:     #1a3055;
+  --border:       #1e3a5a;
+  --border-soft:  #162847;
+  --text-primary: #e0f2fe;
+  --text-sec:     #7dd3fc;
+  --text-muted:   #38bdf8;
+  --accent:       #06b6d4;
+  --accent-light: #083344;
+  --accent-text:  #22d3ee;
+  --logo-bg:      #0891b2;
+}
+
+/* ── TEMA BOSQUE — Verde esmeralda + crema dorado ────────────────────────────── */
+[data-theme="forest"] {
+  --bg-page:      #0a1f0f;
+  --bg-surface:   #102818;
+  --bg-elevated:  #163320;
+  --bg-hover:     #1c3e28;
+  --border:       #1f4a2e;
+  --border-soft:  #163320;
+  --text-primary: #ecfdf5;
+  --text-sec:     #a7f3d0;
+  --text-muted:   #6ee7b7;
+  --accent:       #10b981;
+  --accent-light: #064e3b;
+  --accent-text:  #34d399;
+  --logo-bg:      #059669;
+}
+
+/* =============================================================================
+   CLASES SEMÁNTICAS DEL SIDEBAR
+   ============================================================================= */
+.sidebar-root         { background-color: var(--bg-surface); color: var(--text-primary); }
+.sidebar-border       { border-color: var(--border) !important; }
+.sidebar-text-primary { color: var(--text-primary) !important; }
+.sidebar-text-sec     { color: var(--text-sec) !important; }
+.sidebar-muted        { color: var(--text-muted) !important; }
+.sidebar-hover:hover  { background-color: var(--bg-hover) !important; color: var(--text-primary) !important; }
+.sidebar-nav-active   { background-color: var(--accent-light) !important; color: var(--accent-text) !important; }
+.sidebar-nav-hover:hover { background-color: var(--bg-hover) !important; color: var(--text-primary) !important; }
+.sidebar-active-icon  { color: var(--accent-text) !important; }
+.sidebar-avatar       { background-color: var(--bg-elevated); color: var(--text-sec); }
+.sidebar-logo-icon    { background-color: var(--logo-bg); }
+.sidebar-dropdown     { background-color: var(--bg-surface); }
+.sidebar-dropdown-item { color: var(--text-primary); }
+.sidebar-dropdown-item:hover { background-color: var(--bg-hover) !important; }
+.sidebar-dropdown-active {
+  background-color: var(--accent-light) !important;
+  color: var(--accent-text) !important;
+}
+
+/* =============================================================================
+   APLICACIÓN AL CONTENIDO PRINCIPAL — override de clases Tailwind
+   ============================================================================= */
+
+/* ── Body ── */
+[data-theme="dark"] body, [data-theme="ocean"] body, [data-theme="forest"] body {
+  background-color: var(--bg-page) !important;
+  color: var(--text-primary) !important;
+}
+/* Mantener clase .dark activa para compatibilidad con dark: prefix en Sidebar */
 .dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
 
-/* ─── Fondos principales ────────────────────────────────────────────────────── */
-.dark .bg-white    { background-color: #1e293b !important; }
-.dark .bg-gray-50  { background-color: #0f172a !important; }
-.dark .bg-gray-100 { background-color: #1e293b !important; }
-.dark .bg-gray-200 { background-color: #253045 !important; }
+/* ── Fondos ── */
+[data-theme="dark"] .bg-white,
+[data-theme="ocean"] .bg-white,
+[data-theme="forest"] .bg-white    { background-color: var(--bg-surface) !important; }
 
-/* ─── Bordes — todos los tonos de gris ─────────────────────────────────────── */
-.dark .border-gray-50  { border-color: #253045 !important; }
-.dark .border-gray-100 { border-color: #2a3649 !important; }
-.dark .border-gray-200 { border-color: #334155 !important; }
-.dark .border-gray-300 { border-color: #475569 !important; }
-.dark .border-gray-700 { border-color: #475569 !important; }
-.dark .border-gray-800 { border-color: #334155 !important; }
+[data-theme="dark"] .bg-gray-50,
+[data-theme="ocean"] .bg-gray-50,
+[data-theme="forest"] .bg-gray-50  { background-color: var(--bg-page) !important; }
 
-/* ─── Textos grises ─────────────────────────────────────────────────────────── */
-.dark .text-gray-800 { color: #f1f5f9 !important; }
-.dark .text-gray-700 { color: #e2e8f0 !important; }
-.dark .text-gray-600 { color: #cbd5e1 !important; }
-.dark .text-gray-500 { color: #94a3b8 !important; }
-.dark .text-gray-400 { color: #64748b !important; }
-.dark .text-gray-300 { color: #475569 !important; }
-.dark .text-gray-100 { color: #f1f5f9 !important; }
+[data-theme="dark"] .bg-gray-100,
+[data-theme="ocean"] .bg-gray-100,
+[data-theme="forest"] .bg-gray-100 { background-color: var(--bg-elevated) !important; }
 
-/* ─── CORRECCION a) Inputs, textarea, select ────────────────────────────────── */
-/* Fondo oscuro + texto claro: lo que se escribe siempre es visible              */
-.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-.dark textarea,
-.dark select {
-  background-color: #253045 !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
-  caret-color: #f1f5f9;
+[data-theme="dark"] .bg-gray-200,
+[data-theme="ocean"] .bg-gray-200,
+[data-theme="forest"] .bg-gray-200 { background-color: var(--bg-hover) !important; }
+
+/* ── Bordes ── */
+[data-theme="dark"] .border-gray-50,
+[data-theme="ocean"] .border-gray-50,
+[data-theme="forest"] .border-gray-50   { border-color: var(--border-soft) !important; }
+
+[data-theme="dark"] .border-gray-100,
+[data-theme="ocean"] .border-gray-100,
+[data-theme="forest"] .border-gray-100  { border-color: var(--border) !important; }
+
+[data-theme="dark"] .border-gray-200,
+[data-theme="ocean"] .border-gray-200,
+[data-theme="forest"] .border-gray-200  { border-color: var(--border) !important; }
+
+[data-theme="dark"] .border-gray-300,
+[data-theme="ocean"] .border-gray-300,
+[data-theme="forest"] .border-gray-300  { border-color: var(--border) !important; }
+
+/* ── Textos ── */
+[data-theme="dark"] .text-gray-800,
+[data-theme="ocean"] .text-gray-800,
+[data-theme="forest"] .text-gray-800   { color: var(--text-primary) !important; }
+
+[data-theme="dark"] .text-gray-700,
+[data-theme="ocean"] .text-gray-700,
+[data-theme="forest"] .text-gray-700   { color: var(--text-primary) !important; }
+
+[data-theme="dark"] .text-gray-600,
+[data-theme="ocean"] .text-gray-600,
+[data-theme="forest"] .text-gray-600   { color: var(--text-sec) !important; }
+
+[data-theme="dark"] .text-gray-500,
+[data-theme="ocean"] .text-gray-500,
+[data-theme="forest"] .text-gray-500   { color: var(--text-muted) !important; }
+
+[data-theme="dark"] .text-gray-400,
+[data-theme="ocean"] .text-gray-400,
+[data-theme="forest"] .text-gray-400   { color: var(--text-muted) !important; }
+
+[data-theme="dark"] .text-gray-300,
+[data-theme="ocean"] .text-gray-300,
+[data-theme="forest"] .text-gray-300   { color: var(--border) !important; }
+
+/* ── DIVISORES DE TABLA ── */
+/* CLARO: divide-gray-50 era #f9fafb invisible sobre blanco */
+.divide-gray-50  > * + * { border-color: #e2e8f0 !important; }
+.divide-gray-100 > * + * { border-color: #e2e8f0 !important; }
+/* Oscuros: divisores sutiles por tema */
+[data-theme="dark"] .divide-gray-50 > * + *,
+[data-theme="dark"] .divide-gray-100 > * + *,
+[data-theme="dark"] .divide-y > * + *,
+[data-theme="ocean"] .divide-gray-50 > * + *,
+[data-theme="ocean"] .divide-gray-100 > * + *,
+[data-theme="ocean"] .divide-y > * + *,
+[data-theme="forest"] .divide-gray-50 > * + *,
+[data-theme="forest"] .divide-gray-100 > * + *,
+[data-theme="forest"] .divide-y > * + * { border-color: var(--border-soft) !important; }
+
+/* ── HOVER EN FILAS DE TABLA ── */
+[data-theme="dark"] .hover\:bg-gray-50:hover,
+[data-theme="ocean"] .hover\:bg-gray-50:hover,
+[data-theme="forest"] .hover\:bg-gray-50:hover,
+[data-theme="dark"] .hover\:bg-gray-100:hover,
+[data-theme="ocean"] .hover\:bg-gray-100:hover,
+[data-theme="forest"] .hover\:bg-gray-100:hover { background-color: var(--bg-hover) !important; }
+
+[data-theme="dark"] tr.hover\:bg-gray-50:hover td,
+[data-theme="ocean"] tr.hover\:bg-gray-50:hover td,
+[data-theme="forest"] tr.hover\:bg-gray-50:hover td { color: inherit !important; }
+
+/* ── INPUTS / TEXTAREA / SELECT ── */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="ocean"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="forest"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-theme="dark"] textarea, [data-theme="ocean"] textarea, [data-theme="forest"] textarea,
+[data-theme="dark"] select, [data-theme="ocean"] select, [data-theme="forest"] select {
+  background-color: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+  caret-color: var(--text-primary);
 }
-.dark input::placeholder,
-.dark textarea::placeholder {
-  color: #64748b !important;
-  opacity: 1;
+[data-theme="dark"] input::placeholder, [data-theme="ocean"] input::placeholder, [data-theme="forest"] input::placeholder,
+[data-theme="dark"] textarea::placeholder, [data-theme="ocean"] textarea::placeholder, [data-theme="forest"] textarea::placeholder {
+  color: var(--text-muted) !important; opacity: 1;
 }
-.dark input:focus,
-.dark textarea:focus,
-.dark select:focus {
-  border-color: #3b82f6 !important;
+[data-theme="dark"] input:focus, [data-theme="ocean"] input:focus, [data-theme="forest"] input:focus,
+[data-theme="dark"] textarea:focus, [data-theme="ocean"] textarea:focus, [data-theme="forest"] textarea:focus,
+[data-theme="dark"] select:focus, [data-theme="ocean"] select:focus, [data-theme="forest"] select:focus {
+  border-color: var(--accent) !important; outline: none;
   box-shadow: 0 0 0 2px rgba(59,130,246,0.25) !important;
-  outline: none;
-}
-/* Variantes de input con fondo explícito de Tailwind */
-.dark input.bg-gray-50,
-.dark input.bg-white {
-  background-color: #253045 !important;
-  color: #f1f5f9 !important;
 }
 
-/* ─── CORRECCION c) Divisores de tabla — nada de blanco ────────────────────── */
-.dark .divide-gray-50  > * + * { border-color: #253045 !important; }
-.dark .divide-gray-100 > * + * { border-color: #2a3649 !important; }
-.dark .divide-gray-200 > * + * { border-color: #334155 !important; }
-.dark .divide-y        > * + * { border-color: #2a3649 !important; }
+/* ── HOVERS BOTONES ── */
+[data-theme="dark"] .hover\:bg-gray-50:hover,
+[data-theme="ocean"] .hover\:bg-gray-50:hover,
+[data-theme="forest"] .hover\:bg-gray-50:hover,
+[data-theme="dark"] .hover\:bg-gray-100:hover,
+[data-theme="ocean"] .hover\:bg-gray-100:hover,
+[data-theme="forest"] .hover\:bg-gray-100:hover  { background-color: var(--bg-hover) !important; }
 
-/* ─── CORRECCION d) Hover en filas de tabla — nunca blanco ─────────────────── */
-/* Se usa un azul-pizarra muy suave que no borra el texto                        */
-.dark .hover\:bg-gray-50:hover  { background-color: #253045 !important; color: inherit !important; }
-.dark .hover\:bg-gray-100:hover { background-color: #2d3a50 !important; color: inherit !important; }
-/* Heredar color en celdas hijas también */
-.dark tr.hover\:bg-gray-50:hover td  { color: inherit !important; }
-.dark tr.hover\:bg-gray-50:hover th  { color: inherit !important; }
-.dark tr.hover\:bg-gray-100:hover td { color: inherit !important; }
+[data-theme="dark"] .hover\:bg-blue-50:hover,
+[data-theme="ocean"] .hover\:bg-blue-50:hover,
+[data-theme="forest"] .hover\:bg-blue-50:hover   { background-color: var(--accent-light) !important; }
 
-/* ─── Hovers de botones y contenedores ─────────────────────────────────────── */
-.dark .hover\:bg-gray-800:hover  { background-color: #0f172a !important; }
-.dark .hover\:bg-blue-50:hover   { background-color: #1e3a5f !important; }
-.dark .hover\:bg-blue-100:hover  { background-color: #1e3a5f !important; }
-.dark .hover\:bg-red-50:hover    { background-color: #3b1f1f !important; }
-.dark .hover\:bg-green-50:hover  { background-color: #0d2b1e !important; }
-.dark .hover\:bg-green-100:hover { background-color: #14291e !important; }
-.dark .hover\:bg-amber-50:hover  { background-color: #261a06 !important; }
+[data-theme="dark"] .hover\:bg-red-50:hover,
+[data-theme="ocean"] .hover\:bg-red-50:hover,
+[data-theme="forest"] .hover\:bg-red-50:hover    { background-color: #3b1f1f !important; }
 
-/* ─── Fondos de badges/estados — equivalentes oscuros ──────────────────────── */
-.dark .bg-blue-50    { background-color: #172554 !important; }
-.dark .bg-blue-100   { background-color: #1e3a5f !important; }
-.dark .bg-green-50   { background-color: #0d2b1e !important; }
-.dark .bg-green-100  { background-color: #14291e !important; }
-.dark .bg-red-50     { background-color: #2d1515 !important; }
-.dark .bg-red-100    { background-color: #3b1f1f !important; }
-.dark .bg-amber-50   { background-color: #261a06 !important; }
-.dark .bg-amber-100  { background-color: #312208 !important; }
-.dark .bg-teal-50    { background-color: #0d2b2b !important; }
-.dark .bg-purple-50  { background-color: #1e1a3b !important; }
+[data-theme="dark"] .hover\:bg-green-50:hover,
+[data-theme="ocean"] .hover\:bg-green-50:hover,
+[data-theme="forest"] .hover\:bg-green-50:hover  { background-color: #0d2b1e !important; }
 
-/* ─── Textos de color — aclarados para contraste en oscuro ─────────────────── */
-.dark .text-blue-600  { color: #60a5fa !important; }
-.dark .text-blue-700  { color: #93c5fd !important; }
-.dark .text-blue-400  { color: #60a5fa !important; }
-.dark .text-green-600 { color: #4ade80 !important; }
-.dark .text-green-700 { color: #86efac !important; }
-.dark .text-green-500 { color: #4ade80 !important; }
-.dark .text-red-500   { color: #f87171 !important; }
-.dark .text-red-600   { color: #f87171 !important; }
-.dark .text-red-700   { color: #fca5a5 !important; }
-.dark .text-red-400   { color: #f87171 !important; }
-.dark .text-amber-600 { color: #fbbf24 !important; }
-.dark .text-amber-700 { color: #fcd34d !important; }
-.dark .text-teal-600  { color: #2dd4bf !important; }
-.dark .text-teal-700  { color: #5eead4 !important; }
-.dark .text-purple-600{ color: #a78bfa !important; }
-.dark .text-purple-700{ color: #c4b5fd !important; }
+[data-theme="dark"] .hover\:bg-amber-50:hover,
+[data-theme="ocean"] .hover\:bg-amber-50:hover,
+[data-theme="forest"] .hover\:bg-amber-50:hover  { background-color: #261a06 !important; }
 
-/* ─── Bordes de badges/estados ──────────────────────────────────────────────── */
-.dark .border-blue-200  { border-color: #1e3a5f !important; }
-.dark .border-blue-100  { border-color: #172554 !important; }
-.dark .border-blue-500  { border-color: #3b82f6 !important; }
-.dark .border-green-100 { border-color: #0d2b1e !important; }
-.dark .border-green-200 { border-color: #14291e !important; }
-.dark .border-green-300 { border-color: #166534 !important; }
-.dark .border-red-100   { border-color: #3b1f1f !important; }
-.dark .border-red-300   { border-color: #7f1d1d !important; }
-.dark .border-amber-300 { border-color: #78350f !important; }
+/* ── FONDOS DE BADGES ── */
+[data-theme="dark"] .bg-blue-50, [data-theme="ocean"] .bg-blue-50, [data-theme="forest"] .bg-blue-50,
+[data-theme="dark"] .bg-blue-100, [data-theme="ocean"] .bg-blue-100, [data-theme="forest"] .bg-blue-100 { background-color: var(--accent-light) !important; }
 
-/* ─── CORRECCION b) Ticket de venta — modal exterior oscuro ────────────────── */
-/* El paper del ticket (div con style inline background:#fff) se mantiene blanco */
-/* para simular papel físico. Lo que se corrige es el contenedor y el modal.     */
-/* bg-gray-50 ya está corregido (#0f172a) — el área gris alrededor del ticket   */
-/* queda oscura, el ticket en sí sigue siendo blanco (papel de impresora).       */
+[data-theme="dark"] .bg-green-50   { background-color: #0d2b1e !important; }
+[data-theme="dark"] .bg-green-100  { background-color: #14291e !important; }
+[data-theme="dark"] .bg-red-50     { background-color: #2d1515 !important; }
+[data-theme="dark"] .bg-red-100    { background-color: #3b1f1f !important; }
+[data-theme="dark"] .bg-amber-50   { background-color: #261a06 !important; }
+[data-theme="dark"] .bg-amber-100  { background-color: #312208 !important; }
+[data-theme="dark"] .bg-teal-50    { background-color: #0d2b2b !important; }
+[data-theme="dark"] .bg-purple-50  { background-color: #1e1a3b !important; }
 
-/* Encabezado y pie del modal del ticket */
-.dark .rounded-2xl > .border-b.border-gray-100 { border-color: #2a3649 !important; }
-.dark .rounded-2xl > .border-t.border-gray-100 { border-color: #2a3649 !important; }
+[data-theme="ocean"] .bg-green-50  { background-color: #083d2a !important; }
+[data-theme="ocean"] .bg-green-100 { background-color: #0d4a33 !important; }
+[data-theme="ocean"] .bg-red-50    { background-color: #3b1515 !important; }
+[data-theme="ocean"] .bg-red-100   { background-color: #4a1e1e !important; }
+[data-theme="ocean"] .bg-amber-50  { background-color: #2d1f06 !important; }
+[data-theme="ocean"] .bg-amber-100 { background-color: #38260a !important; }
+[data-theme="ocean"] .bg-teal-50   { background-color: #073944 !important; }
 
-/* Panel de WhatsApp dentro del ticket */
-.dark .bg-green-50.border-t { background-color: #0d2b1e !important; border-color: #14291e !important; }
-.dark .border-blue-100      { border-color: #172554 !important; }
+[data-theme="forest"] .bg-green-50  { background-color: #062d15 !important; }
+[data-theme="forest"] .bg-green-100 { background-color: #083d1e !important; }
+[data-theme="forest"] .bg-red-50    { background-color: #2d1010 !important; }
+[data-theme="forest"] .bg-red-100   { background-color: #3b1818 !important; }
+[data-theme="forest"] .bg-amber-50  { background-color: #261b04 !important; }
+[data-theme="forest"] .bg-amber-100 { background-color: #302207 !important; }
+[data-theme="forest"] .bg-teal-50   { background-color: #06302a !important; }
 
-/* ─── Dropdowns de autocompletado (buscar producto, buscar cliente) ─────────── */
-.dark .absolute.bg-white { background-color: #1e293b !important; }
+/* ── TEXTOS DE COLOR ── */
+[data-theme="dark"] .text-blue-600, [data-theme="dark"] .text-blue-700   { color: #93c5fd !important; }
+[data-theme="ocean"] .text-blue-600, [data-theme="ocean"] .text-blue-700  { color: #22d3ee !important; }
+[data-theme="forest"] .text-blue-600, [data-theme="forest"] .text-blue-700 { color: #6ee7b7 !important; }
+[data-theme="dark"] .text-blue-400   { color: #60a5fa !important; }
 
-/* ─── Sombras — más sutiles en oscuro ───────────────────────────────────────── */
-.dark .shadow-2xl { box-shadow: 0 25px 50px rgba(0,0,0,0.5) !important; }
-.dark .shadow-xl  { box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important; }
-.dark .shadow-lg  { box-shadow: 0 10px 30px rgba(0,0,0,0.35) !important; }
+[data-theme="dark"] .text-green-600, [data-theme="dark"] .text-green-700, [data-theme="dark"] .text-green-500 { color: #4ade80 !important; }
+[data-theme="ocean"] .text-green-600, [data-theme="ocean"] .text-green-700  { color: #34d399 !important; }
+[data-theme="forest"] .text-green-600, [data-theme="forest"] .text-green-700 { color: #6ee7b7 !important; }
 
-/* ─── Scrollbar en modo oscuro ───────────────────────────────────────────────── */
-.dark .scrollbar-thin { scrollbar-color: #334155 transparent; }
-.dark .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; }
+[data-theme="dark"] .text-red-500, [data-theme="dark"] .text-red-600,
+[data-theme="ocean"] .text-red-500, [data-theme="ocean"] .text-red-600,
+[data-theme="forest"] .text-red-500, [data-theme="forest"] .text-red-600  { color: #f87171 !important; }
 
-/* ─── Skeleton loader ────────────────────────────────────────────────────────── */
-.dark .animate-pulse .bg-gray-100,
-.dark .animate-pulse .bg-gray-200 { background-color: #253045 !important; }
+[data-theme="dark"] .text-amber-600, [data-theme="ocean"] .text-amber-600, [data-theme="forest"] .text-amber-600 { color: #fbbf24 !important; }
+[data-theme="dark"] .text-teal-600,  [data-theme="ocean"] .text-teal-600,  [data-theme="forest"] .text-teal-600  { color: #2dd4bf !important; }
+[data-theme="dark"] .text-purple-600,[data-theme="ocean"] .text-purple-600,[data-theme="forest"] .text-purple-600{ color: #a78bfa !important; }
 
-/* ─── Focus rings visibles en oscuro ─────────────────────────────────────────── */
-.dark .focus\:ring-blue-500:focus  { --tw-ring-color: rgba(59,130,246,0.35); }
-.dark .focus\:ring-green-500:focus { --tw-ring-color: rgba(34,197,94,0.35); }
-.dark .focus\:ring-amber-400:focus { --tw-ring-color: rgba(251,191,36,0.35); }
+/* ── BORDES ESTADO ── */
+[data-theme="dark"] .border-blue-500, [data-theme="ocean"] .border-blue-500, [data-theme="forest"] .border-blue-500 { border-color: var(--accent) !important; }
+[data-theme="dark"] .border-blue-200, [data-theme="ocean"] .border-blue-200, [data-theme="forest"] .border-blue-200 { border-color: var(--accent-light) !important; }
+[data-theme="dark"] .border-green-200,[data-theme="ocean"] .border-green-200,[data-theme="forest"] .border-green-200 { border-color: #14291e !important; }
+[data-theme="dark"] .border-red-100,  [data-theme="ocean"] .border-red-100,  [data-theme="forest"] .border-red-100   { border-color: #3b1f1f !important; }
+[data-theme="dark"] .border-amber-300,[data-theme="ocean"] .border-amber-300,[data-theme="forest"] .border-amber-300 { border-color: #78350f !important; }
+
+/* ── MODALES ── */
+[data-theme="dark"] .rounded-2xl.shadow-2xl,
+[data-theme="ocean"] .rounded-2xl.shadow-2xl,
+[data-theme="forest"] .rounded-2xl.shadow-2xl { background-color: var(--bg-surface) !important; }
+
+[data-theme="dark"] .shadow-2xl, [data-theme="ocean"] .shadow-2xl, [data-theme="forest"] .shadow-2xl {
+  box-shadow: 0 25px 50px rgba(0,0,0,0.55) !important;
+}
+
+/* ── DROPDOWNS ── */
+[data-theme="dark"] .absolute.bg-white, [data-theme="ocean"] .absolute.bg-white, [data-theme="forest"] .absolute.bg-white {
+  background-color: var(--bg-surface) !important;
+}
+
+/* ── SKELETON ── */
+[data-theme="dark"] .animate-pulse .bg-gray-100, [data-theme="dark"] .animate-pulse .bg-gray-200,
+[data-theme="ocean"] .animate-pulse .bg-gray-100, [data-theme="ocean"] .animate-pulse .bg-gray-200,
+[data-theme="forest"] .animate-pulse .bg-gray-100, [data-theme="forest"] .animate-pulse .bg-gray-200 {
+  background-color: var(--bg-elevated) !important;
+}
+
+/* ── BADGE — texto en fondos de color con tema oscuro ── */
+[data-theme="dark"] .bg-red-100.text-red-600,
+[data-theme="ocean"] .bg-red-100.text-red-600,
+[data-theme="forest"] .bg-red-100.text-red-600    { color: #fca5a5 !important; }
+[data-theme="dark"] .bg-green-100.text-green-700,
+[data-theme="ocean"] .bg-green-100.text-green-700,
+[data-theme="forest"] .bg-green-100.text-green-700 { color: #86efac !important; }
+[data-theme="dark"] .bg-amber-100.text-amber-600,
+[data-theme="ocean"] .bg-amber-100.text-amber-600,
+[data-theme="forest"] .bg-amber-100.text-amber-600 { color: #fcd34d !important; }
+[data-theme="dark"] .bg-blue-100.text-blue-700,
+[data-theme="ocean"] .bg-blue-100.text-blue-700,
+[data-theme="forest"] .bg-blue-100.text-blue-700   { color: var(--accent-text) !important; }
+
+/* ── TICKET — papel siempre blanco con tinta negra en cualquier tema ── */
+.ticket-paper, .ticket-paper * { color: #111111 !important; }
+.ticket-paper { background-color: #ffffff !important; }
+.ticket-paper [style*="color:#555"], .ticket-paper [style*="color: #555"] { color: #555555 !important; }
+.ticket-paper [style*="color:#666"], .ticket-paper [style*="color: #666"] { color: #666666 !important; }
+.ticket-paper [style*="color:#888"], .ticket-paper [style*="color: #888"] { color: #888888 !important; }
+.ticket-paper [style*="color:#22c55e"]                                    { color: #16a34a !important; }

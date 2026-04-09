@@ -181,7 +181,7 @@ export default function SaleTicket({ sale, onClose }) {
         {/* ── Vista previa del ticket ── */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-slate-900">
           <div className="flex justify-center">
-            <div style={{
+            <div className="ticket-paper" style={{
               fontFamily: "'Courier New', monospace",
               fontSize: '11px', width: '300px', maxWidth: '100%',
               background: '#fff', padding: '12px',
