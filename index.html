@@ -109,25 +109,64 @@
         pointer-events: none;
       }
 
+      .spinner-container {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        margin: 0 auto;
+      }
+
       .spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid rgba(255, 255, 255, 0.3);
+        position: absolute;
+        inset: 0;
+        width: 80px;
+        height: 80px;
+        border: 5px solid rgba(255, 255, 255, 0.2);
         border-top-color: white;
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation: spin 0.9s linear infinite;
+      }
+
+      .spinner-inner {
+        position: absolute;
+        inset: 8px;
+        width: 64px;
+        height: 64px;
+        border: 4px solid rgba(255, 255, 255, 0.15);
+        border-bottom-color: rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+        animation: spin-reverse 1.2s linear infinite;
+      }
+
+      .spinner-glow {
+        position: absolute;
+        inset: -10px;
+        background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
       }
 
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
 
+      @keyframes spin-reverse {
+        to { transform: rotate(-360deg); }
+      }
+
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50% { transform: scale(1.15); opacity: 1; }
+      }
+
       .loading-text {
         color: white;
-        margin-top: 20px;
+        margin-top: 24px;
         font-family: 'Inter', sans-serif;
-        font-size: 14px;
+        font-size: 18px;
+        font-weight: 600;
         text-align: center;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
       }
     </style>
   </head>
@@ -135,8 +174,12 @@
     <!-- Loading inicial -->
     <div id="app-loading">
       <div style="text-align: center;">
-        <div class="spinner"><p class="loading-text">Cargando Sistema POS...</p></div>
-        <!-- <p class="loading-text">Cargando Sistema POS...</p> -->
+        <div class="spinner-container">
+          <div class="spinner-glow"></div>
+          <div class="spinner"></div>
+          <div class="spinner-inner"></div>
+        </div>
+        <p class="loading-text">Cargando Sistema POS...</p>
       </div>
     </div>
 

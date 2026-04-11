@@ -1,9 +1,9 @@
 /**
- * MOTOR DE DESCUENTOS
- * Evalúa todas las campañas activas y retorna:
- *  - Los descuentos que aplican al carrito actual
- *  - El carrito modificado con los descuentos ya aplicados
- *  - El ahorro total calculado
+ * MOTOR DE DESCUENTOS MEJORADO
+ * Evalúa campañas activas y retorna:
+ *  - Descuentos por ítem (manteniendo subtotal bruto)
+ *  - Descuentos globales (para campañas no específicas de productos)
+ *  - Detalle completo para UI y registro de ventas
  */
 
 import { formatCurrency } from './helpers'
@@ -43,151 +43,158 @@ function productInScope(product, campaign) {
   }
 }
 
-// ─── Aplicar un descuento porcentual simple a un ítem ─────────────────────────
-function applyPctToItem(item, pct) {
-  const raw  = parseFloat(((item.quantity * item.unitPrice) * (pct / 100)).toFixed(2))
-  const disc = Math.min(raw, item.subtotal) // no puede superar el subtotal
-  return disc
+/**
+ * Aplica descuento % o monto fijo a un ítem
+ * @param {Object} item - {quantity, unitPrice, subtotal}
+ * @param {number|string} discountValue - % o monto fijo
+ * @param {boolean} isPct - true=%, false=monto fijo
+ * @returns {number} monto del descuento
+ */
+function applyDiscountToItem(item, discountValue, isPct = true) {
+  const value = parseFloat(discountValue) || 0
+  let disc
+  
+  if (isPct) {
+    disc = parseFloat((item.subtotal * (value / 100)).toFixed(2))
+  } else {
+    disc = Math.min(value, item.subtotal)
+  }
+  
+  return Math.max(0, parseFloat(disc.toFixed(2)))
 }
 
 /**
- * MOTOR PRINCIPAL
- * @param {Array}  cartItems        — items del carrito [{productId, quantity, unitPrice, subtotal, ...}]
- * @param {Array}  products         — todos los productos del store
- * @param {Array}  campaigns        — todas las campañas del store
- * @param {number} cartSubtotal     — subtotal del carrito antes de descuentos
- * @returns {{ appliedDiscounts, modifiedCart, totalSaving }}
+ * MOTOR PRINCIPAL MEJORADO
+ * @param {Array}  cartItems - [{productId, quantity, unitPrice, subtotal (BRUTO), discount:0, ...}]
+ * @param {Array}  products - todos los productos
+ * @param {Array}  campaigns - todas las campañas
+ * @returns {{
+ *   itemDiscounts: [{...item, campaignDiscount, netTotal, discountDetails:[]}],
+ *   globalDiscounts: [], 
+ *   totalCampaignSaving: number,
+ *   summary: {byItem: number, byGlobal: number, total: number}
+ * }}
  */
-export function evaluateDiscounts(cartItems, products, campaigns, cartSubtotal) {
+export function evaluateDiscounts(cartItems, products, campaigns) {
   const activeCampaigns = campaigns.filter(isCampaignActive)
   if (activeCampaigns.length === 0) {
-    return { appliedDiscounts: [], modifiedCart: cartItems, totalSaving: 0 }
+    return {
+      itemDiscounts: cartItems.map(item => ({
+        ...item,
+        campaignDiscount: 0,
+        netTotal: item.subtotal,
+        discountDetails: []
+      })),
+      globalDiscounts: [],
+      totalCampaignSaving: 0,
+      summary: { byItem: 0, byGlobal: 0, total: 0 }
+    }
   }
 
-  // Clonar el carrito para no mutar el original
-  let modifiedCart = cartItems.map(i => ({ ...i, campaignDiscounts: [] }))
-  const appliedDiscounts = []
+  // NO mutar items originales - retornar nueva estructura
+  const itemDiscounts = cartItems.map(item => ({
+    ...item,
+    campaignDiscount: 0,
+    netTotal: item.subtotal,
+    discountDetails: []
+  }))
+
+  const appliedDiscounts = { byItem: [], byGlobal: [] }
+  let totalItemSaving = 0
+  let totalGlobalSaving = 0
 
   for (const campaign of activeCampaigns) {
 
-    // ── Tipo 1: CAMPAÑA — porcentaje sobre productos en scope ────────────────
-    if (campaign.type === 'campaign') {
-      const eligibleItems = modifiedCart.filter(item => {
-        const product = products.find(p => p.id === item.productId)
-        return productInScope(product, campaign)
+    // ── CAMPAÑAS QUE APLIQUE A PRODUCTOS (TODOS LOS TIPOS) ──────────────────
+    let itemSaving = 0
+    itemDiscounts.forEach(item => {
+      const product = products.find(p => p.id === item.productId)
+      if (!product || !productInScope(product, campaign)) return
+      
+      const disc = applyDiscountToItem(item, campaign.discountPct || campaign.discountAmount, campaign.discountPct !== undefined)
+      if (disc > 0) {
+        item.campaignDiscount += disc
+        item.netTotal = parseFloat((item.subtotal - disc).toFixed(2))
+        item.discountDetails.push({
+          campaignId: campaign.id,
+          name: campaign.name || 'Campaña activa',
+          amount: disc,
+          type: campaign.discountPct !== undefined ? '%' : 'S/',
+          value: campaign.discountPct || campaign.discountAmount,
+          description: campaign.description
+        })
+        itemSaving += disc
+      }
+    })
+    
+    if (itemSaving > 0) {
+      totalItemSaving += itemSaving
+      appliedDiscounts.byItem.push({
+        campaignId: campaign.id,
+        type: campaign.type,
+        name: campaign.name || 'Campaña',
+        icon: campaign.icon || '🎯',
+        description: `Productos: S/${itemSaving.toFixed(2)}`,
+        saving: itemSaving
       })
-      if (eligibleItems.length === 0) continue
+    }
 
-      let saving = 0
-      modifiedCart = modifiedCart.map(item => {
-        const product = products.find(p => p.id === item.productId)
-        if (!productInScope(product, campaign)) return item
-        const disc = applyPctToItem(item, campaign.discountPct)
-        saving += disc
-        return {
-          ...item,
-          discount: parseFloat(((item.discount || 0) + disc).toFixed(2)),
-          subtotal: parseFloat((item.subtotal - disc).toFixed(2)),
-          campaignDiscounts: [...(item.campaignDiscounts || []), { campaignId: campaign.id, name: campaign.name, amount: disc }],
-        }
-      })
-
-      if (saving > 0) {
-        appliedDiscounts.push({
-          campaignId: campaign.id, type: 'campaign', name: campaign.name,
+    // ── OTRAS CAMPAÑAS (NO productos específicos) → APLICAR AL SUBTOTAL ──────
+    // Regla #4: si NO especifica "productos", aplicar al SUBTOTAL
+    const isProductSpecific = campaign.scope === 'products' && campaign.productIds?.length > 0
+    if (!isProductSpecific) {
+      // Calcular descuento sobre SUBTOTAL bruto
+      const discountValue = campaign.discountPct !== undefined ? campaign.discountPct : campaign.discountAmount
+      const isPct = campaign.discountPct !== undefined
+      const discOnSubtotal = applyDiscountToItem({ subtotal: cartItems.reduce((a,i)=>a+i.subtotal,0) }, discountValue, isPct)
+      
+      if (discOnSubtotal > 0) {
+        totalGlobalSaving += discOnSubtotal
+        appliedDiscounts.byGlobal.push({
+          campaignId: campaign.id,
+          type: campaign.type,
+          name: campaign.name,
           icon: campaign.icon || '🏷️',
-          description: `${campaign.discountPct}% en ${eligibleItems.length} producto(s) alcanzado(s)`,
-          saving: parseFloat(saving.toFixed(2)),
+          description: `${isPct ? `${discountValue}%` : `S/${discountValue}`} sobre subtotal`,
+          saving: discOnSubtotal
         })
       }
     }
 
-    // ── Tipo 2: PROMOCIÓN — NxM (2x1, 3x2, etc.) ──────────────────────────
-    if (campaign.type === 'promotion') {
-      const { buyQty, payQty } = campaign // ej. buyQty=3, payQty=2 → 3x2
-      if (!buyQty || !payQty || payQty >= buyQty) continue
-
-      modifiedCart = modifiedCart.map(item => {
-        const product = products.find(p => p.id === item.productId)
-        if (!productInScope(product, campaign)) return item
-
-        const freePerGroup = buyQty - payQty
-        const groups = Math.floor(item.quantity / buyQty)
-        if (groups === 0) return item
-
-        const freeUnits = groups * freePerGroup
-        const disc      = parseFloat((freeUnits * item.unitPrice).toFixed(2))
-        appliedDiscounts.push({
-          campaignId: campaign.id, type: 'promotion', name: campaign.name,
-          icon: campaign.icon || '🎁',
-          description: `${buyQty}x${payQty}: ${freeUnits} unidad(es) gratis en "${item.productName}"`,
-          saving: disc,
-        })
-        return {
-          ...item,
-          discount: parseFloat(((item.discount || 0) + disc).toFixed(2)),
-          subtotal: parseFloat(Math.max(0, item.subtotal - disc).toFixed(2)),
-          campaignDiscounts: [...(item.campaignDiscounts || []), { campaignId: campaign.id, name: campaign.name, amount: disc }],
-        }
-      })
-    }
-
-    // ── Tipo 3: VOLUMEN — descuento si el total supera un umbral ────────────
-    if (campaign.type === 'volume') {
-      if (cartSubtotal < (campaign.minAmount || 0)) continue
-
-      // Aplicar el pct sobre los ítems en scope (o sobre todo el carrito si scope='all')
-      let saving = 0
-      modifiedCart = modifiedCart.map(item => {
-        const product = products.find(p => p.id === item.productId)
-        if (!productInScope(product, campaign)) return item
-        const disc = applyPctToItem(item, campaign.discountPct)
-        saving += disc
-        return {
-          ...item,
-          discount: parseFloat(((item.discount || 0) + disc).toFixed(2)),
-          subtotal: parseFloat((item.subtotal - disc).toFixed(2)),
-          campaignDiscounts: [...(item.campaignDiscounts || []), { campaignId: campaign.id, name: campaign.name, amount: disc }],
-        }
-      })
-      if (saving > 0) {
-        appliedDiscounts.push({
-          campaignId: campaign.id, type: 'volume', name: campaign.name,
+    // ── PROMOCIONES Y VOLUMEN (manejar como arriba)
+    if (['promotion', 'volume', 'line'].includes(campaign.type)) {
+      // Lógica similar a campañas no-específicas
+      const discountValue = campaign.discountPct !== undefined ? campaign.discountPct : campaign.discountAmount
+      const isPct = campaign.discountPct !== undefined
+      const discOnSubtotal = applyDiscountToItem({ subtotal: cartItems.reduce((a,i)=>a+i.subtotal,0) }, discountValue, isPct)
+      
+      if (discOnSubtotal > 0) {
+        totalGlobalSaving += discOnSubtotal
+        appliedDiscounts.byGlobal.push({
+          campaignId: campaign.id,
+          type: campaign.type,
+          name: campaign.name,
           icon: campaign.icon || '📦',
-          description: `${campaign.discountPct}% por compra mayor a ${formatCurrency(campaign.minAmount)}`,
-          saving: parseFloat(saving.toFixed(2)),
+          description: `${isPct ? `${discountValue}%` : `S/${discountValue}`} ${campaign.type}`,
+          saving: discOnSubtotal
         })
       }
     }
 
-    // ── Tipo 4: LÍNEA — porcentaje por categoría o marca ────────────────────
-    if (campaign.type === 'line') {
-      let saving = 0
-      modifiedCart = modifiedCart.map(item => {
-        const product = products.find(p => p.id === item.productId)
-        if (!productInScope(product, campaign)) return item
-        const disc = applyPctToItem(item, campaign.discountPct)
-        saving += disc
-        return {
-          ...item,
-          discount: parseFloat(((item.discount || 0) + disc).toFixed(2)),
-          subtotal: parseFloat((item.subtotal - disc).toFixed(2)),
-          campaignDiscounts: [...(item.campaignDiscounts || []), { campaignId: campaign.id, name: campaign.name, amount: disc }],
-        }
-      })
-      if (saving > 0) {
-        appliedDiscounts.push({
-          campaignId: campaign.id, type: 'line', name: campaign.name,
-          icon: campaign.icon || '🏪',
-          description: `${campaign.discountPct}% en línea "${campaign.name}"`,
-          saving: parseFloat(saving.toFixed(2)),
-        })
-      }
-    }
   }
 
-  const totalSaving = parseFloat(appliedDiscounts.reduce((a, d) => a + d.saving, 0).toFixed(2))
-  return { appliedDiscounts, modifiedCart, totalSaving }
+  const totalCampaignSaving = totalItemSaving + totalGlobalSaving
+
+  return {
+    itemDiscounts,
+    globalDiscounts: appliedDiscounts.byGlobal,
+    totalCampaignSaving,
+    summary: {
+      byItem: totalItemSaving,
+      byGlobal: totalGlobalSaving,
+      total: totalCampaignSaving
+    }
+  }
 }
 
 // ─── Helpers para la UI ───────────────────────────────────────────────────────

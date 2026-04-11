@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useStore, selectCartTotal, selectCartCount } from '../../store/index'
+import { useStore, selectCartCount } from '../../store/index'
 import { saleService } from '../../services/index'
-import { calcCartTotals, fuzzySearch, formatCurrency } from '../../shared/utils/helpers'
+import { fuzzySearch, formatCurrency } from '../../shared/utils/helpers'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import { StockBadge, ExpiryBadge } from '../../shared/components/ui/Badge'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -9,7 +9,7 @@ import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
-import { evaluateDiscounts, isCampaignActive } from '../../shared/utils/discountEngine'
+import { evaluateDiscounts } from '../../shared/utils/discountEngine'
 
 export default function POS() {
   const {
@@ -18,7 +18,6 @@ export default function POS() {
     addToCart, updateCartItem, removeFromCart, clearCart,
   } = useStore()
 
-  const cartTotal = useStore(selectCartTotal)
   const cartCount = useStore(selectCartCount)
 
   const [search, setSearch]               = useState('')
@@ -38,21 +37,50 @@ export default function POS() {
 
   const searchRef  = useRef()
   const debouncedQ = useDebounce(search, 150)
-  const totals     = calcCartTotals(cart)
-  // Aplicar descuento global encima
   const globalDiscAmt = parseFloat(globalDiscount) || 0
-  const finalTotal    = Math.max(0, parseFloat((totals.total - globalDiscAmt).toFixed(2)))
   const ticketDiscAmt = appliedTicket ? appliedTicket.discountAmt : 0
-  const grandTotal    = Math.max(0, parseFloat((finalTotal - ticketDiscAmt).toFixed(2)))
+  const igvRate = Number(systemConfig?.igvRate ?? 0.18)
+  const igvFactor = 1 + igvRate
 
-  // ── Motor de descuentos automáticos ─────────────────────────────────────────
-  const cartSubtotalRaw = totals.subtotal
-  const { appliedDiscounts, modifiedCart: autoDiscountCart, totalSaving } = (() => {
+  // ── Motor de descuentos automáticos MEJORADO ────────────────────────────────
+  const autoDiscountResult = (() => {
     try {
-      return evaluateDiscounts(cart, products, discountCampaigns || [], cartSubtotalRaw)
-    } catch { return { appliedDiscounts: [], modifiedCart: cart, totalSaving: 0 } }
+      return evaluateDiscounts(cart, products, discountCampaigns || [])
+    } catch {
+      return {
+        itemDiscounts: cart.map(item => ({ ...item, campaignDiscount: 0, netTotal: item.subtotal, discountDetails: [] })),
+        globalDiscounts: [],
+        totalCampaignSaving: 0,
+        summary: { byItem: 0, byGlobal: 0, total: 0 }
+      }
+    }
   })()
-  const hasAutoDiscounts = appliedDiscounts.length > 0
+
+  // Merge descuentos manuales con automáticos
+  const mergedCartItems = cart.map(cartItem => {
+    const autoItem = autoDiscountResult.itemDiscounts.find(i =>
+      (i._key === cartItem._key || i.productId === cartItem.productId)
+    ) || { campaignDiscount: 0, netTotal: cartItem.subtotal, discountDetails: [] }
+
+    const manualDiscount = cartItem.discount || 0
+    const totalDiscount = autoItem.campaignDiscount + manualDiscount
+    const netTotal = autoItem.netTotal - manualDiscount // campaña primero, luego manual
+
+    return {
+      ...cartItem,
+      ...autoItem,
+      manualDiscount,
+      totalDiscount,
+      netTotal: parseFloat(netTotal.toFixed(2))
+    }
+  })
+
+  const totalItemDiscounts = mergedCartItems.reduce((a, i) => a + i.totalDiscount, 0)
+  const sumaPreciosSubTotales = parseFloat(mergedCartItems.reduce((a, i) => a + (i.subtotal || 0), 0).toFixed(2))
+  const totalDescuentos = parseFloat((totalItemDiscounts + globalDiscAmt + ticketDiscAmt).toFixed(2))
+  const importeGravado = parseFloat(Math.max(0, (sumaPreciosSubTotales - totalDescuentos) / igvFactor).toFixed(2))
+  const igvCalculado = parseFloat((importeGravado * igvRate).toFixed(2))
+  const totalFinal = parseFloat((importeGravado + igvCalculado).toFixed(2))
 
   const activeProducts = products.filter(p => p.isActive)
   const searchResults  = debouncedQ.trim()
@@ -67,14 +95,15 @@ export default function POS() {
 
   // Atajos teclado con ref pattern (fix stale closure)
   const actionsRef = useRef({})
-  actionsRef.current = {
-    focusSearch: () => searchRef.current?.focus(),
-    clearSearch: () => { setSearch(''); setShowResults(false) },
-    openPayment: () => { if (cart.length > 0 && activeCashSession) setShowPayment(true) },
-    promptClear: () => { if (cart.length > 0) setShowClearConfirm(true) },
-  }
 
   useEffect(() => {
+    actionsRef.current = {
+      focusSearch: () => searchRef.current?.focus(),
+      clearSearch: () => { setSearch(''); setShowResults(false) },
+      openPayment: () => { if (cart.length > 0 && activeCashSession) setShowPayment(true) },
+      promptClear: () => { if (cart.length > 0) setShowClearConfirm(true) },
+    }
+
     const handler = (e) => {
       if (e.key==='F2')  { e.preventDefault(); actionsRef.current.focusSearch() }
       if (e.key==='Escape') actionsRef.current.clearSearch()
@@ -83,7 +112,7 @@ export default function POS() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [cart.length, activeCashSession])
 
   const handleSelectProduct = (product) => {
     if (product.stock <= 0) { toast.error(`${product.name} sin stock`); return }
@@ -135,10 +164,10 @@ export default function POS() {
     // Calcular descuento según el total actual
     let discountAmt = 0
     if (ticket.discountType === 'pct') {
-      discountAmt = parseFloat((finalTotal * ticket.discountValue / 100).toFixed(2))
+      discountAmt = parseFloat((totalFinal * ticket.discountValue / 100).toFixed(2))
       if (ticket.maxAmount) discountAmt = Math.min(discountAmt, ticket.maxAmount)
     } else {
-      discountAmt = Math.min(ticket.discountValue, finalTotal)
+      discountAmt = Math.min(ticket.discountValue, totalFinal)
     }
     discountAmt = Math.max(0, parseFloat(discountAmt.toFixed(2)))
     setAppliedTicket({ ticket, discountAmt })
@@ -150,18 +179,26 @@ export default function POS() {
   const handleCompleteSale = useCallback(async ({ payments, clientId, change }) => {
     setProcessing(true)
     const { getNextInvoice } = useStore.getState()
+
+    const safePayments = (totalFinal <= 0 && (!payments || payments.length === 0))
+      ? [{ method: 'ticket', amount: 0, reference: 'Cobertura total por ticket de descuento' }]
+      : (payments || [])
+
     const salePayload = {
       invoiceNumber: getNextInvoice(),
       clientId:      clientId || null,
       userId:        currentUser?.id,
       userName:      currentUser?.fullName,
-      items:         cart,
-      ...totals,
-      total:         grandTotal,
-      discount:      parseFloat((totals.discount + globalDiscAmt + (appliedTicket?.discountAmt||0)).toFixed(2)),
+      items:         mergedCartItems,
+      subtotal:      sumaPreciosSubTotales,
+      discount:      totalDescuentos,
+      base:          importeGravado,
+      tax:           igvCalculado,
+      total:         totalFinal,
+      igvRate:       igvRate,
       ticketCode:    appliedTicket?.ticket?.code || null,
       ticketDiscount:appliedTicket?.discountAmt  || 0,
-      payments,
+      payments:      safePayments,
       change: change || 0,
     }
     const result = await saleService.create(salePayload)
@@ -169,7 +206,7 @@ export default function POS() {
     if (result.error) { toast.error(result.error); return }
     // Canjear el ticket en el store (marcar como usado)
     if (appliedTicket?.ticket) {
-      redeemDiscountTicket(appliedTicket.ticket.code, result.data?.id, grandTotal, currentUser?.id)
+      redeemDiscountTicket(appliedTicket.ticket.code, result.data?.id, totalFinal, currentUser?.id)
       setAppliedTicket(null); setTicketCode(''); setTicketError('')
     }
 
@@ -186,7 +223,7 @@ export default function POS() {
     setCompletedSale(result.data)
     setShowTicket(true)
     toast.success(`Venta ${result.data.invoiceNumber} completada`, { duration: 3000, icon: '🎉' })
-  }, [cart, totals, finalTotal, globalDiscAmt, currentUser])
+  }, [currentUser, mergedCartItems, sumaPreciosSubTotales, totalDescuentos, importeGravado, igvCalculado, totalFinal, appliedTicket, redeemDiscountTicket])
 
   const discountsEnabled = systemConfig?.allowDiscounts !== false
   const maxDiscPct = systemConfig?.maxDiscountPct ?? 50
@@ -234,67 +271,206 @@ export default function POS() {
           )}
         </div>
 
-        {/* Carrito */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* ── CARRITO ─────────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+
           {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
               <div className="text-5xl opacity-20">🛒</div>
               <p className="text-gray-400 text-sm">Busca un producto para comenzar</p>
               <p className="text-gray-300 text-xs">F2 buscar · F8 cobrar · Ctrl+Del vaciar</p>
             </div>
-          ) : cart.map(item => {
-            const key = item._key || item.productId
-            const ed  = discountEdit[key]
-            return (
-              <div key={key} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <div className="p-3 flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 truncate">{item.productName}</div>
-                    <div className="text-xs text-gray-400">{formatCurrency(item.unitPrice)} /{item.unit||'u'}</div>
-                  </div>
-                  {/* Descuento aplicado */}
-                  {item.discount > 0 && (
-                    <div className="text-xs text-green-600 font-medium whitespace-nowrap">-{formatCurrency(item.discount)}</div>
-                  )}
-                  {/* Controles cantidad */}
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => handleUpdateQty(key, item.quantity-1)} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg text-lg leading-none">−</button>
-                    <button onClick={() => { const v=prompt('Cantidad:',item.quantity); if(v!==null) handleUpdateQty(key,parseFloat(v)||0) }} className="w-10 text-center text-sm font-medium text-gray-800 hover:bg-gray-100 rounded px-1 py-0.5">
-                      {item.quantity}
-                    </button>
-                    <button onClick={() => handleUpdateQty(key, item.quantity+1)} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg text-lg leading-none">+</button>
-                  </div>
-                  <div className="text-sm font-semibold text-gray-800 w-20 text-right">{formatCurrency(item.subtotal)}</div>
-                  {/* Botón descuento por ítem */}
-                  {discountsEnabled && (
-                    <button onClick={() => setDiscountEdit(d => d[key] ? (()=>{const n={...d};delete n[key];return n})() : {...d, [key]:{value:'',pct:true}})}
-                      className={`px-1.5 py-0.5 rounded text-xs font-bold transition-colors ${ed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-700'}`}
-                      title="Aplicar descuento">%</button>
-                  )}
-                  <button onClick={() => removeFromCart(key)} className="text-gray-300 hover:text-red-400 transition-colors">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </div>
+          ) : (
+            <div className="p-3 space-y-2">
 
-                {/* Panel de descuento por ítem (desplegable) */}
-                {ed && discountsEnabled && (
-                  <div className="px-3 pb-3 bg-amber-50 border-t border-amber-100">
-                    <div className="flex items-center gap-2 pt-2">
-                      <span className="text-xs text-amber-700 font-medium">Descuento:</span>
-                      <input type="number" min="0" step="0.01" value={ed.value} onChange={e => setDiscountEdit(d => ({...d,[key]:{...d[key],value:e.target.value}}))}
-                        className="w-24 px-2 py-1 border border-amber-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white" placeholder="0"/>
-                      <button onClick={() => setDiscountEdit(d => ({...d,[key]:{...d[key],pct:!d[key].pct}}))
-                      } className={`px-2 py-1 rounded text-xs font-bold border transition-colors ${ed.pct ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
-                        {ed.pct ? `% (máx ${maxDiscPct}%)` : 'S/'}
-                      </button>
-                      <button onClick={() => applyDiscount(key, item)} className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-semibold hover:bg-amber-700">Aplicar</button>
-                      <button onClick={() => updateCartItem(key, {discount:0})} className="text-xs text-gray-400 hover:text-red-400">Quitar</button>
-                    </div>
-                  </div>
-                )}
+              {/* ── CABECERA DE COLUMNAS — sticky ── */}
+              <div className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm rounded-lg border border-gray-200 px-3 py-2 shadow-sm">
+                <div className="grid items-center gap-2" style={{gridTemplateColumns:'1fr 100px 90px 96px 96px 68px'}}>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide pl-1">Producto</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide text-center">Cant.</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Subtotal</span>
+                  <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide text-right">Descuento</span>
+                  <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide text-right">Total</span>
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Acc.</span>
+                </div>
               </div>
-            )
-          })}
+
+              {/* ── FILAS DE PRODUCTOS ── */}
+              {mergedCartItems.map(item => {
+                const key = item._key || item.productId
+                const ed  = discountEdit[key]
+                const hasDisc = item.totalDiscount > 0
+                const hasCampaign = item.campaignDiscount > 0
+
+                return (
+                  <div key={key} className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all overflow-hidden">
+
+                    {/* ── FILA PRINCIPAL ── */}
+                    <div className="grid items-center gap-2 px-3 py-3" style={{gridTemplateColumns:'1fr 100px 90px 96px 96px 68px'}}>
+
+                      {/* 1. Producto */}
+                      <div className="min-w-0 pl-1">
+                        <p className="text-sm font-semibold text-gray-800 leading-tight truncate">{item.productName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {formatCurrency(item.unitPrice)}
+                          <span className="text-gray-300"> /{item.unit || 'und'}</span>
+                        </p>
+                        {/* Badges de campaña activa + concepto de descuento - MEJORADO */}
+                        {(hasCampaign || item.manualDiscount > 0) && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1" title={item.discountDetails?.map(d => d?.name || d?.description || 'Campaña activa').join(', ') || 'Descuento manual'}>
+                            {hasCampaign && item.discountDetails?.length > 0 && item.discountDetails.map((d, i) => {
+                              const campaignName = 
+                                d?.name ||
+                                d?.campaignName ||
+                                d?.description ||
+                                d?.campaignDescription ||
+                                d?.ticketDescription ||
+                                d?.ticketCode ||
+                                'Campaña activa'
+                              return (
+                                <span key={i} className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full leading-none whitespace-nowrap" title={`Campaña: ${campaignName}`}>
+                                  🏷️ {campaignName}
+                                </span>
+                              )
+                            })}
+                            {(!hasCampaign || item.discountDetails?.length === 0) && (
+                              <span className="text-[10px] text-amber-500 leading-none font-medium" title="Campaña activa">
+                                Campaña activa
+                              </span>
+                            )}
+                            {item.manualDiscount > 0 && (
+                              <span className="text-[10px] text-gray-400 leading-none" title="Descuento manual">
+                                + manual
+                              </span>
+                            )}
+                            {!hasCampaign && item.manualDiscount > 0 && !item.discountDetails?.length && (
+                              <span className="text-[10px] text-gray-400 leading-none" title="Descuento manual">
+                                manual
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Cantidad */}
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => handleUpdateQty(key, item.quantity - 1)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200 hover:border-red-200 transition-all text-base font-bold leading-none">
+                          −
+                        </button>
+                        <span className="w-8 text-center text-sm font-bold text-gray-800">{item.quantity}</span>
+                        <button onClick={() => handleUpdateQty(key, item.quantity + 1)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 border border-gray-200 hover:border-emerald-200 transition-all text-base font-bold leading-none">
+                          +
+                        </button>
+                      </div>
+
+                      {/* 3. Subtotal (precio × cantidad, sin descuento) */}
+                      <div className="text-right">
+                        <span className="text-sm font-medium text-gray-600">{formatCurrency(item.subtotal)}</span>
+                      </div>
+
+                      {/* 4. Descuento */}
+                      <div className="text-right">
+                        {hasDisc ? (
+                          <span className="text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 leading-tight inline-block">
+                            -{formatCurrency(item.totalDiscount)}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-300">—</span>
+                        )}
+                      </div>
+
+                      {/* 5. Total neto */}
+                      <div className="text-right">
+                        <span className={`text-sm font-bold ${hasDisc ? 'text-emerald-700' : 'text-gray-800'}`}>
+                          {formatCurrency(item.netTotal)}
+                        </span>
+                        {hasDisc && (
+                          <p className="text-[10px] text-gray-300 line-through leading-none mt-0.5">
+                            {formatCurrency(item.subtotal)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 6. Acciones */}
+                      <div className="flex items-center justify-center gap-1">
+                        {discountsEnabled && (
+                          <button
+                            onClick={() => setDiscountEdit(d => d[key]
+                              ? (()=>{const n={...d};delete n[key];return n})()
+                              : {...d,[key]:{value:'',pct:true}}
+                            )}
+                            title="Descuento manual"
+                            className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold border transition-all ${
+                              ed
+                                ? 'bg-amber-500 text-white border-amber-500'
+                                : 'text-gray-400 border-gray-200 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-300'
+                            }`}>
+                            %
+                          </button>
+                        )}
+                        <button onClick={() => removeFromCart(key)}
+                          title="Eliminar"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 border border-gray-200 hover:border-red-200 transition-all">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ── PANEL DESCUENTO MANUAL ── */}
+                    {ed && discountsEnabled && (
+                      <div className="mx-3 mb-3 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-amber-700 whitespace-nowrap shrink-0">Dto. manual:</span>
+                          <input
+                            type="number" min="0" max={item.subtotal} step="0.01"
+                            value={ed.value}
+                            onChange={e => setDiscountEdit(d => ({...d,[key]:{...d[key],value:e.target.value}}))}
+                            className="flex-1 px-2 py-1.5 border border-amber-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white text-right min-w-0"
+                            placeholder="0.00"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => setDiscountEdit(d => ({...d,[key]:{...d[key],pct:!d[key].pct}}))}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border shrink-0 transition-all ${
+                              ed.pct
+                                ? 'bg-amber-500 text-white border-amber-500'
+                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                            }`}>
+                            {ed.pct ? '%' : 'S/'}
+                          </button>
+                          <button
+                            onClick={() => applyDiscount(key, item)}
+                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors shrink-0">
+                            Aplicar
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between mt-1.5 text-xs text-amber-600">
+                          <span>
+                            Preview: <strong>-S/{(ed.pct
+                              ? item.subtotal * (parseFloat(ed.value)||0) / 100
+                              : parseFloat(ed.value)||0
+                            ).toFixed(2)}</strong>
+                            {ed.pct && <span className="text-amber-400 ml-1">(máx {maxDiscPct}%)</span>}
+                          </span>
+                          {item.manualDiscount > 0 && (
+                            <button onClick={() => updateCartItem(key, {discount:0})}
+                              className="text-red-400 hover:text-red-500 font-medium transition-colors">
+                              Quitar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Atajos */}
@@ -304,152 +480,212 @@ export default function POS() {
       </div>
 
       {/* Panel derecho: totales + cobro */}
-      <div className="w-80 bg-white border-l border-gray-100 flex flex-col flex-shrink-0">
+{/* Panel derecho: totales + cobro */}
+<div className="w-80 bg-white border-l border-gray-100 flex flex-col flex-shrink-0">
 
-        {/* Totales */}
-        <div className="p-4 border-b border-gray-100 space-y-1.5">
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>Subtotal ({cartCount} items)</span>
-            <span>{formatCurrency(totals.subtotal)}</span>
-          </div>
-          {totals.discount > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Descuento ítems</span><span>-{formatCurrency(totals.discount)}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>IGV (18%)</span><span>{formatCurrency(totals.tax)}</span>
-          </div>
+  {/* ── HEADER DE LA COLUMNA ─────────────────────────────────── */}
+  <div className="px-4 py-3 bg-blue-600 text-white">
+    <div className="flex items-center gap-2">
+      <svg className="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+      </svg>
+      <div>
+        <h2 className="text-sm font-bold tracking-wide uppercase">Resumen de Venta</h2>
+        <p className="text-xs text-blue-200 mt-0.5">{cartCount} producto{cartCount !== 1 ? 's' : ''} en carrito</p>
+      </div>
+    </div>
+  </div>
 
-          {/* Descuento global */}
-          {discountsEnabled && (
-            <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs text-gray-500 whitespace-nowrap">Dto. global S/</span>
-              <input type="number" min="0" step="0.50" value={globalDiscount}
-                onChange={e => setGlobalDiscount(e.target.value)}
-                className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 text-right"
-                placeholder="0.00"/>
-              {globalDiscAmt > 0 && <button onClick={() => setGlobalDiscount('')} className="text-xs text-red-400 hover:text-red-500">✕</button>}
-            </div>
-          )}
-          {globalDiscAmt > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Descuento global</span><span>-{formatCurrency(globalDiscAmt)}</span>
-            </div>
-          )}
+  {/* ── TOTALES ──────────────────────────────────────────────── */}
+  <div className="p-4 border-b border-gray-100 space-y-3">
 
-          {/* ── Campo de Ticket de Descuento ──────────────────────────── */}
-          <div className="pt-2 border-t border-dashed border-gray-200">
-            <p className="text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">🎟️ Ticket de descuento</p>
-            {!appliedTicket ? (
-              <div className="space-y-1">
-                <div className="flex gap-1.5">
-                  <input
-                    value={ticketCode}
-                    onChange={e => { setTicketCode(e.target.value.toUpperCase()); setTicketError('') }}
-                    onKeyDown={e => e.key === 'Enter' && handleCheckTicket()}
-                    placeholder="Ingresa el código..."
-                    className="flex-1 px-2.5 py-2 border border-gray-200 rounded-lg text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-400 bg-amber-50/50 placeholder:normal-case"
-                  />
-                  <button onClick={handleCheckTicket} disabled={!ticketCode.trim() || cart.length === 0}
-                    className="px-3 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 disabled:opacity-40 whitespace-nowrap">
-                    Validar
-                  </button>
-                </div>
-                {ticketError && <p className="text-xs text-red-500 flex items-center gap-1">⚠️ {ticketError}</p>}
-              </div>
-            ) : (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-green-600 text-base">✅</span>
-                      <code className="font-mono font-bold text-green-700 text-xs tracking-widest">{appliedTicket.ticket.code}</code>
-                    </div>
-                    <p className="text-xs text-green-700 font-medium">{appliedTicket.ticket.holderName}</p>
-                    <p className="text-xs text-green-600">
-                      {appliedTicket.ticket.discountType === 'pct'
-                        ? `${appliedTicket.ticket.discountValue}% → -${formatCurrency(appliedTicket.discountAmt)}`
-                        : `Vale S/${appliedTicket.ticket.discountValue}`}
-                    </p>
-                    {appliedTicket.ticket.campaignName && <p className="text-xs text-green-500 italic">{appliedTicket.ticket.campaignName}</p>}
-                  </div>
-                  <button onClick={handleRemoveTicket} className="text-gray-400 hover:text-red-400 flex-shrink-0 mt-0.5">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+    {/* LÍNEA 1 — SUBTOTAL BRUTO (REQ #5) */}
+    <div className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg border border-gray-100">
+      <span className="text-sm text-gray-600 font-semibold">SUBTOTAL BRUTO</span>
+      <span className="text-lg font-bold text-gray-800">
+        {formatCurrency(sumaPreciosSubTotales)}
+      </span>
+    </div>
 
-          {/* Descuento por ticket */}
-          {ticketDiscAmt > 0 && (
-            <div className="flex justify-between text-sm font-medium text-green-600">
-              <span>🎟️ Descuento ticket</span><span>-{formatCurrency(ticketDiscAmt)}</span>
-            </div>
-          )}
+    {/* LÍNEA 2 — DESGLOSE DESCUENTOS (REQ #2) */}
+    <div className="rounded-xl border border-dashed border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold text-green-700 uppercase tracking-wide flex items-center gap-1">
+          🏷️ Descuentos totales
+        </p>
+        <span className="text-lg font-extrabold text-green-700 leading-none">
+          {formatCurrency(totalDescuentos)}
+        </span>
+      </div>
+      <div className="mt-2 h-px bg-green-200/70" />
+      <p className="mt-2 text-[11px] text-green-700/80 font-medium">
+        Ahorro acumulado aplicado a la venta
+      </p>
+    </div>
 
-          <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-gray-100">
-            <span>TOTAL</span><span>{formatCurrency(grandTotal)}</span>
-          </div>
-        </div>
-
-        {/* Descuentos automáticos aplicados */}
-        {hasAutoDiscounts && (
-          <div className="px-4 py-3 border-b border-green-100 bg-green-50">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-xs font-semibold text-green-700">🏷️ Descuentos automáticos activos</span>
-            </div>
-            {appliedDiscounts.map((d, i) => (
-              <div key={i} className="flex justify-between text-xs text-green-700 mb-1">
-                <span className="flex items-center gap-1"><span>{d.icon}</span><span className="truncate max-w-[140px]">{d.name}</span></span>
-                <span className="font-semibold text-green-600 whitespace-nowrap">-{formatCurrency(d.saving)}</span>
-              </div>
-            ))}
-            <div className="border-t border-green-200 pt-1.5 mt-1.5 flex justify-between text-xs font-bold text-green-700">
-              <span>Ahorro total</span>
-              <span>-{formatCurrency(totalSaving)}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Historial turno */}
-        <div className="border-b border-gray-100">
-          <button onClick={() => setShowHistory(!showHistory)} className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors">
-            <span>Ventas del turno ({sessionSales.length})</span>
-            <span>{showHistory ? '▲' : '▼'}</span>
-          </button>
-          {showHistory && (
-            <div className="max-h-44 overflow-y-auto px-3 pb-2 space-y-1">
-              {sessionSales.length===0
-                ? <p className="text-xs text-gray-400 text-center py-3">Sin ventas aún</p>
-                : sessionSales.map(s => (
-                  <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0 text-xs">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-gray-600">{s.invoiceNumber}</div>
-                      <div className="text-gray-400">{s.items?.length} items</div>
-                    </div>
-                    <span className="font-medium text-gray-800">{formatCurrency(s.total)}</span>
-                  </div>
-                ))
-              }
-            </div>
-          )}
-        </div>
-
-        {/* Acciones */}
-        <div className="p-4 mt-auto space-y-2">
-          {cart.length > 0 && (
-            <button onClick={() => setShowClearConfirm(true)} className="w-full py-2 text-sm text-gray-400 hover:text-red-400 transition-colors border border-gray-100 rounded-lg hover:border-red-100">
-              Vaciar carrito
+    {/* LÍNEA 3 — TICKET DE DESCUENTO */}
+    <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/60 p-3">
+      <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">
+        🎟️ Ticket de descuento
+      </p>
+      {!appliedTicket ? (
+        <div className="space-y-1.5">
+          <div className="flex gap-1.5">
+            <input
+              value={ticketCode}
+              onChange={e => { setTicketCode(e.target.value.toUpperCase()); setTicketError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleCheckTicket()}
+              placeholder="Ingresa el código..."
+              className="flex-1 px-2.5 py-2 border border-amber-300 rounded-lg text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white placeholder:normal-case"
+            />
+            <button
+              onClick={handleCheckTicket}
+              disabled={!ticketCode.trim() || cart.length === 0}
+              className="px-3 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 disabled:opacity-40 whitespace-nowrap transition-colors">
+              Validar
             </button>
+          </div>
+          {ticketError && (
+            <p className="text-xs text-red-500 flex items-center gap-1">⚠️ {ticketError}</p>
           )}
-          <button onClick={() => setShowPayment(true)} disabled={cart.length===0}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
-            <span>Cobrar</span><span className="opacity-60 text-xs">F8</span>
-          </button>
+        </div>
+      ) : (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-green-600 text-base">✅</span>
+                <code className="font-mono font-bold text-green-700 text-xs tracking-widest">
+                  {appliedTicket.ticket.code}
+                </code>
+              </div>
+              <p className="text-xs text-green-700 font-medium">{appliedTicket.ticket.holderName}</p>
+              <p className="text-xs text-green-600">
+                {appliedTicket.ticket.discountType === 'pct'
+                  ? `${appliedTicket.ticket.discountValue}% → -${formatCurrency(appliedTicket.discountAmt)}`
+                  : `Vale S/${appliedTicket.ticket.discountValue}`}
+              </p>
+              {appliedTicket.ticket.campaignName && (
+                <p className="text-xs text-green-500 italic">{appliedTicket.ticket.campaignName}</p>
+              )}
+            </div>
+            <button onClick={handleRemoveTicket}
+              className="text-gray-400 hover:text-red-400 flex-shrink-0 mt-0.5 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Descuento ticket aplicado */}
+      {ticketDiscAmt > 0 && (
+        <div className="flex justify-between text-xs font-bold text-amber-700 mt-2 pt-2 border-t border-amber-200">
+          <span>🎟️ Descuento ticket</span>
+          <span>-{formatCurrency(ticketDiscAmt)}</span>
+        </div>
+      )}
+    </div>
+
+    {/* LÍNEA 4 — BASE IMPONIBLE */}
+    <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-1">
+          💼 Importe Gravado
+        </p>
+        <span className="text-lg font-extrabold text-indigo-700 leading-none">
+          {formatCurrency(importeGravado)}
+        </span>
+      </div>
+    </div>
+
+    {/* LÍNEA 5 — IGV (REQ #2, #5: sobre subtotal SIN descuentos) */}
+    <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-1">
+          🧾 IGV {(igvRate * 100).toFixed(0)}%
+        </p>
+        <span className="text-lg font-extrabold text-indigo-700 leading-none">
+          {formatCurrency(igvCalculado)}
+        </span>
+      </div>
+    </div>
+
+    {/* LÍNEA 6 — TOTAL FINAL (REQ #2) */}
+    <div className="rounded-xl bg-gradient-to-r from-emerald-600 to-blue-600 p-4 text-white shadow-2xl">
+      <div className="flex justify-between items-center mb-2">
+        <div>
+          <p className="text-xs uppercase tracking-wider font-bold opacity-90">TOTAL A PAGAR</p>
+          <p className="text-3xl font-black tracking-tight leading-tight">
+            {formatCurrency(totalFinal)}
+          </p>
+        </div>
+        <div className="text-right text-sm">
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1.5">
+            <p className="opacity-90">+IGV</p>
+            <p className="font-bold">{formatCurrency(igvCalculado)}</p>
+          </div>
         </div>
       </div>
+      {totalDescuentos > 0 && (
+        <div className="flex justify-between items-center text-xs bg-white/10 backdrop-blur-sm rounded-lg p-2">
+          <span className="font-semibold flex items-center gap-1">💰 Ahorro total</span>
+          <span className="font-black text-green-300 text-sm">
+            -{formatCurrency(totalDescuentos)}
+          </span>
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* LÍNEA 6 — VENTAS DEL TURNO */}
+  <div className="border-b border-gray-100">
+    <button
+      onClick={() => setShowHistory(!showHistory)}
+      className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors">
+      <span>Ventas del turno ({sessionSales.length})</span>
+      <span>{showHistory ? '▲' : '▼'}</span>
+    </button>
+    {showHistory && (
+      <div className="max-h-44 overflow-y-auto px-3 pb-2 space-y-1">
+        {sessionSales.length === 0
+          ? <p className="text-xs text-gray-400 text-center py-3">Sin ventas aún</p>
+          : sessionSales.map(s => (
+            <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0 text-xs">
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-gray-600">{s.invoiceNumber}</div>
+                <div className="text-gray-400">{s.items?.length} items</div>
+              </div>
+              <span className="font-medium text-gray-800">{formatCurrency(s.total)}</span>
+            </div>
+          ))
+        }
+      </div>
+    )}
+  </div>
+
+  {/* Acciones */}
+  <div className="p-4 mt-auto space-y-2">
+    {cart.length > 0 && (
+      <button
+        onClick={() => setShowClearConfirm(true)}
+        className="w-full py-2 text-sm text-gray-400 hover:text-red-400 transition-colors border border-gray-100 rounded-lg hover:border-red-100">
+        Vaciar carrito
+      </button>
+    )}
+    <button
+      onClick={() => setShowPayment(true)}
+      disabled={cart.length === 0}
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a5 5 0 00-10 0v2m-2 0h14a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2z" />
+      </svg>
+      <span>Cobrar</span>
+      {/* <span className="opacity-60 text-xs">F </span> */}
+    </button>
+
+
 
       {/* Panel de pago */}
       {showPayment && (
@@ -462,7 +698,12 @@ export default function POS() {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <PaymentPanel total={grandTotal} clients={clients} onConfirm={handleCompleteSale} processing={processing}/>
+              {totalFinal <= 0 && (
+                <div className="mx-4 mt-3 mb-0 rounded-lg border border-green-200 bg-green-50 p-2.5 text-xs text-green-700">
+                  Venta con total S/0.00: se confirmará cobro cubierto por ticket y se generará comprobante para descargar stock.
+                </div>
+              )}
+              <PaymentPanel total={totalFinal} clients={clients} onConfirm={handleCompleteSale} processing={processing}/>
             </div>
           </div>
         </div>
@@ -478,5 +719,7 @@ export default function POS() {
         <SaleTicket sale={completedSale} onClose={() => { setShowTicket(false); setCompletedSale(null) }}/>
       )}
     </div>
+  </div>
+</div>
   )
 }

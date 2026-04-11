@@ -1,17 +1,27 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useStore } from '../../../store/index'
-import { formatCurrency, formatDateTime, formatDate } from '../../../shared/utils/helpers'
+import { formatCurrency, formatDateTime } from '../../../shared/utils/helpers'
 import { PAYMENT_METHODS } from '../../../config/app'
 
-// ─── Constantes SUNAT ──────────────────────────────────────────────────────────
-const IGV_RATE = 0.18
+// ─── Cálculos de comprobante ───────────────────────────────────────────────────
+const DEFAULT_IGV_RATE = 0.18
+const round2 = (n) => parseFloat((Number(n || 0)).toFixed(2))
+
+function getSaleAmounts(sale) {
+  const igvRate = Number(sale?.igvRate ?? DEFAULT_IGV_RATE)
+  const subtotal = round2(sale?.subtotal ?? sale?.items?.reduce((a, i) => a + (i?.subtotal || 0), 0))
+  const discount = round2(sale?.discount ?? sale?.items?.reduce((a, i) => a + ((i?.discount || 0) + (i?.campaignDiscount || 0)), 0))
+  const base = round2(sale?.base ?? Math.max(0, (subtotal / (1 + igvRate)) - discount))
+  const tax = round2(sale?.tax ?? (base * igvRate))
+  const total = round2(sale?.total ?? (base + tax))
+  return { subtotal, discount, base, tax, total, igvRate }
+}
 
 // ─── HTML del comprobante (80mm) para impresión directa ───────────────────────
 function buildTicketHTML(sale, businessConfig) {
-  const baseImponible = parseFloat((sale.total / (1 + IGV_RATE)).toFixed(2))
-  const igv           = parseFloat((sale.total - baseImponible).toFixed(2))
+  const { subtotal, discount, base, tax, total, igvRate } = getSaleAmounts(sale)
   const logoHtml      = businessConfig?.logoUrl
-    ? `<div style="text-align:center;margin-bottom:3mm"><img src="${businessConfig.logoUrl}" style="max-width:50mm;max-height:20mm;object-fit:contain" onerror="this.style.display='none'"></div>`
+    ? `<div style="display:flex;justify-content:center;align-items:center;width:100%;margin-bottom:3.5mm"><img src="${businessConfig.logoUrl}" style="display:block;margin:0 auto;max-width:50mm;max-height:20mm;object-fit:contain" onerror="this.style.display='none'"></div>`
     : ''
 
   const itemsHtml = (sale.items || []).map(item => `
@@ -80,9 +90,11 @@ function buildTicketHTML(sale, businessConfig) {
   ${itemsHtml}
   <hr class="hr">
 
-  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Op. Gravada:</span><span>${formatCurrency(baseImponible)}</span></div>
-  <div class="row" style="font-size:10px;margin-bottom:1.5mm"><span>I.G.V. (18%):</span><span>${formatCurrency(igv)}</span></div>
-  <div class="row bold" style="font-size:13px;margin-bottom:1mm"><span>IMPORTE TOTAL:</span><span>${formatCurrency(sale.total)}</span></div>
+  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Subtotal:</span><span>${formatCurrency(subtotal)}</span></div>
+  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Descuentos:</span><span>-${formatCurrency(discount)}</span></div>
+  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Op. Gravada:</span><span>${formatCurrency(base)}</span></div>
+  <div class="row" style="font-size:10px;margin-bottom:1.5mm"><span>I.G.V. (${(igvRate * 100).toFixed(0)}%):</span><span>${formatCurrency(tax)}</span></div>
+  <div class="row bold" style="font-size:13px;margin-bottom:1mm"><span>IMPORTE TOTAL:</span><span>${formatCurrency(total)}</span></div>
   <hr class="hr">
 
   <div class="bold" style="font-size:10px;margin-bottom:1.5mm">FORMA DE PAGO:</div>
@@ -107,8 +119,7 @@ export default function SaleTicket({ sale, onClose }) {
   const [phone, setPhone]         = useState('')
   const [phoneError, setPhoneError] = useState('')
 
-  const baseImponible = parseFloat((sale.total / (1 + IGV_RATE)).toFixed(2))
-  const igv           = parseFloat((sale.total - baseImponible).toFixed(2))
+  const { subtotal, discount, base, tax, total, igvRate } = getSaleAmounts(sale)
 
   // ── Imprimir: abre ventana optimizada para impresora de tickets 80mm ─────────
   const handlePrint = () => {
@@ -144,9 +155,11 @@ export default function SaleTicket({ sale, onClose }) {
       `─────────────────────`,
       ...sale.items.map(i => `• ${i.productName}\n  ${i.quantity} ${i.unit||'u'} × ${formatCurrency(i.unitPrice)} = *${formatCurrency(i.subtotal)}*`),
       `─────────────────────`,
-      `Op. Gravada: ${formatCurrency(baseImponible)}`,
-      `IGV (18%): ${formatCurrency(igv)}`,
-      `*TOTAL: ${formatCurrency(sale.total)}*`,
+      `Subtotal: ${formatCurrency(subtotal)}`,
+      `Descuentos: -${formatCurrency(discount)}`,
+      `Op. Gravada: ${formatCurrency(base)}`,
+      `IGV (${(igvRate * 100).toFixed(0)}%): ${formatCurrency(tax)}`,
+      `*TOTAL: ${formatCurrency(total)}*`,
       sale.payments?.length ? `─────────────────────` : null,
       ...(sale.payments || []).map(p => {
         const m = PAYMENT_METHODS.find(pm => pm.value === p.method)
@@ -191,8 +204,8 @@ export default function SaleTicket({ sale, onClose }) {
             }}>
               {/* Logo del negocio */}
               {businessConfig?.logoUrl && (
-                <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                  <img src={businessConfig.logoUrl} alt="Logo" style={{ maxWidth: '120px', maxHeight: '50px', objectFit: 'contain' }} onError={e => e.target.style.display='none'}/>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
+                  <img src={businessConfig.logoUrl} alt="Logo" style={{ display: 'block', margin: '0 auto', maxWidth: '120px', maxHeight: '50px', objectFit: 'contain' }} onError={e => e.target.style.display='none'}/>
                 </div>
               )}
 
@@ -234,13 +247,19 @@ export default function SaleTicket({ sale, onClose }) {
 
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
-                <span>Op. Gravada:</span><span>{formatCurrency(baseImponible)}</span>
+                <span>Subtotal:</span><span>{formatCurrency(subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
+                <span>Descuentos:</span><span>-{formatCurrency(discount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
+                <span>Op. Gravada:</span><span>{formatCurrency(base)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '4px' }}>
-                <span>I.G.V. (18%):</span><span>{formatCurrency(igv)}</span>
+                <span>I.G.V. ({(igvRate * 100).toFixed(0)}%):</span><span>{formatCurrency(tax)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>
-                <span>IMPORTE TOTAL</span><span>{formatCurrency(sale.total)}</span>
+                <span>IMPORTE TOTAL</span><span>{formatCurrency(total)}</span>
               </div>
 
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>

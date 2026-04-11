@@ -41,6 +41,7 @@ export default function Settings() {
   const [biz, setBiz] = useState({ ...businessConfig })
   const [sys, setSys] = useState({ ...systemConfig })
   const [saved, setSaved] = useState(false)
+  const [activeTab, setActiveTab] = useState('business')
 
   const handleSave = () => {
     updateBusinessConfig(biz)
@@ -63,107 +64,147 @@ export default function Settings() {
         </button>
       </div>
 
-      {/* NEGOCIO */}
-      <Section title="🏪 Datos del negocio">
-        <Field label="Nombre del negocio" sub="Aparece en tickets y reportes">
-          <input value={biz.name||''} onChange={e => setBiz({...biz, name: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"/>
-        </Field>
-        <Field label="RUC" sub="Número de contribuyente">
-          <input value={biz.ruc||''} onChange={e => setBiz({...biz, ruc: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"/>
-        </Field>
-        <Field label="Dirección" sub="Dirección del local">
-          <input value={biz.address||''} onChange={e => setBiz({...biz, address: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"/>
-        </Field>
-        <Field label="Teléfono" sub="Número de contacto">
-          <input value={biz.phone||''} onChange={e => setBiz({...biz, phone: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40"/>
-        </Field>
-        <Field label="Logo (URL)" sub="URL de imagen para tickets y reportes">
-          <input value={biz.logoUrl||''} onChange={e => setBiz({...biz, logoUrl: e.target.value})} placeholder="https://..." className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"/>
-        </Field>
-        <Field label="Rubro del negocio" sub="Tipo de negocio para el demo">
-          <select value={biz.sector||'bodega'} onChange={e => setBiz({...biz, sector: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            {SECTORS.map(s => <option key={s.value} value={s.value}>{s.icon} {s.label}</option>)}
-          </select>
-        </Field>
-      </Section>
-
-      {/* FISCAL */}
-      <Section title="💰 Configuración fiscal y comercial">
-        <Field label="Tasa IGV" sub="Porcentaje de impuesto general a las ventas (Perú: 18%)">
-          <Input type="number" value={(sys.igvRate||0.18)*100} onChange={v => setSys({...sys, igvRate: v/100})} step="0.5" min="0" max="50" suffix="%"/>
-        </Field>
-        <Field label="Prefijo de boleta" sub="Prefijo para el número de comprobante (ej: B001)">
-          <input value={sys.invoicePrefix||'B001'} onChange={e => setSys({...sys, invoicePrefix: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"/>
-        </Field>
-        <Field label="Moneda" sub="Símbolo de moneda en pantalla">
-          <input value={sys.currencySymbol||'S/'} onChange={e => setSys({...sys, currencySymbol: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-20"/>
-        </Field>
-        <Field label="Descuentos habilitados" sub="Permite aplicar descuentos en el POS">
-          <Toggle value={sys.allowDiscounts !== false} onChange={v => setSys({...sys, allowDiscounts: v})}/>
-        </Field>
-        {sys.allowDiscounts !== false && (
-          <Field label="Descuento máximo permitido" sub="Porcentaje máximo que puede aplicar un cajero">
-            <Input type="number" value={sys.maxDiscountPct||50} onChange={v => setSys({...sys, maxDiscountPct: v})} min="0" max="100" suffix="%"/>
-          </Field>
-        )}
-      </Section>
-
-      {/* INVENTARIO */}
-      <Section title="📦 Inventario y stock">
-        <Field label="Stock mínimo por defecto" sub="Valor inicial de stockMin para nuevos productos">
-          <Input type="number" value={sys.lowStockDefault||5} onChange={v => setSys({...sys, lowStockDefault: v})} min="0"/>
-        </Field>
-        <Field label="Alertas de stock habilitadas" sub="Muestra alertas cuando el stock cae al mínimo">
-          <Toggle value={sys.stockAlertEnabled !== false} onChange={v => setSys({...sys, stockAlertEnabled: v})}/>
-        </Field>
-        <Field label="Días de alerta por vencimiento" sub="Días antes del vencimiento para mostrar alerta">
-          <Input type="number" value={sys.expiryAlertDays||30} onChange={v => setSys({...sys, expiryAlertDays: v})} min="1" suffix="días"/>
-        </Field>
-        <Field label="Permitir stock negativo" sub="Permite vender aunque el stock llegue a cero">
-          <Toggle value={sys.allowNegativeStock === true} onChange={v => setSys({...sys, allowNegativeStock: v})}/>
-        </Field>
-      </Section>
-
-      {/* VENTAS / CAJA */}
-      <Section title="🖥️ Punto de venta y caja">
-        <Field label="Requerir caja abierta para vender" sub="Bloquea el POS si la caja no está aperturada">
-          <Toggle value={sys.requireCashToSell !== false} onChange={v => setSys({...sys, requireCashToSell: v})}/>
-        </Field>
-        <Field label="Imprimir ticket automáticamente" sub="Abre ventana de impresión al completar la venta">
-          <Toggle value={sys.printAutomatically === true} onChange={v => setSys({...sys, printAutomatically: v})}/>
-        </Field>
-        <Field label="Pie del ticket" sub="Texto que aparece al final de cada boleta">
-          <input value={sys.ticketFooter||''} onChange={e => setSys({...sys, ticketFooter: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64" placeholder="¡Gracias por su compra!"/>
-        </Field>
-      </Section>
-
-      {/* AUDITORÍA */}
-      <Section title="🔍 Auditoría y seguridad">
-        <Field label="Auditoría habilitada" sub="Registra todas las operaciones del sistema con trazabilidad completa">
-          <Toggle value={sys.auditEnabled !== false} onChange={v => setSys({...sys, auditEnabled: v})}/>
-        </Field>
-        <Field label="Zona horaria" sub="Para cálculos de fechas y reportes">
-          <select value={sys.timeZone||'America/Lima'} onChange={e => setSys({...sys, timeZone: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="America/Lima">Lima (UTC-5)</option>
-            <option value="America/Bogota">Bogotá (UTC-5)</option>
-            <option value="America/Santiago">Santiago (UTC-4/-3)</option>
-            <option value="America/Buenos_Aires">Buenos Aires (UTC-3)</option>
-            <option value="America/Mexico_City">Ciudad de México (UTC-6/-5)</option>
-          </select>
-        </Field>
-      </Section>
-
-      {/* Vista previa */}
-      <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
-        <p className="text-xs font-medium text-gray-600 dark:text-slate-300 mb-3">Vista previa — encabezado del ticket</p>
-        <div className="bg-white dark:bg-slate-800 border border-dashed border-gray-300 rounded-lg p-4 font-mono text-xs text-center text-gray-700 space-y-1">
-          <div className="font-bold text-sm">{biz.name || 'MI NEGOCIO'}</div>
-          {biz.ruc     && <div>RUC: {biz.ruc}</div>}
-          {biz.address && <div>{biz.address}</div>}
-          {biz.phone   && <div>Tel: {biz.phone}</div>}
-          <div className="border-t border-dashed border-gray-300 pt-1 mt-1">{sys.ticketFooter || '¡Gracias por su compra!'}</div>
+      {/* Tabs de configuración */}
+      <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-2 overflow-x-auto">
+        <div className="flex items-center gap-2 min-w-max">
+          {[
+            { key: 'business', label: '🏪 Negocio' },
+            { key: 'fiscal', label: '💰 Fiscal' },
+            { key: 'inventory', label: '📦 Inventario' },
+            { key: 'pos', label: '🖥️ POS / Caja' },
+            { key: 'audit', label: '🔍 Auditoría' }
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {activeTab === 'business' && (
+        <Section title="🏪 Datos del negocio">
+          <Field label="Nombre del negocio" sub="Aparece en tickets y reportes">
+            <input value={biz.name||''} onChange={e => setBiz({...biz, name: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"/>
+          </Field>
+          <Field label="RUC" sub="Número de contribuyente">
+            <input value={biz.ruc||''} onChange={e => setBiz({...biz, ruc: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"/>
+          </Field>
+          <Field label="Dirección" sub="Dirección del local">
+            <input value={biz.address||''} onChange={e => setBiz({...biz, address: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"/>
+          </Field>
+          <Field label="Teléfono" sub="Número de contacto">
+            <input value={biz.phone||''} onChange={e => setBiz({...biz, phone: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40"/>
+          </Field>
+          <Field label="Logo (URL)" sub="URL de imagen para tickets y reportes">
+            <input value={biz.logoUrl||''} onChange={e => setBiz({...biz, logoUrl: e.target.value})} placeholder="https://..." className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"/>
+          </Field>
+          <Field label="Rubro del negocio" sub="Tipo de negocio para el demo">
+            <select value={biz.sector||'bodega'} onChange={e => setBiz({...biz, sector: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {SECTORS.map(s => <option key={s.value} value={s.value}>{s.icon} {s.label}</option>)}
+            </select>
+          </Field>
+
+          {/* Vista previa */}
+          <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+            <p className="text-xs font-medium text-gray-600 dark:text-slate-300 mb-3">Vista previa — encabezado del ticket</p>
+            <div className="bg-white dark:bg-slate-800 border border-dashed border-gray-300 rounded-lg p-4 font-mono text-xs text-center text-gray-700 space-y-1">
+              {biz.logoUrl && (
+                <div className="flex justify-center mb-2">
+                  <img
+                    src={biz.logoUrl}
+                    alt="Logo del negocio"
+                    className="max-h-16 w-auto object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                  />
+                </div>
+              )}
+              <div className="font-bold text-sm">{biz.name || 'MI NEGOCIO'}</div>
+              {biz.ruc     && <div>RUC: {biz.ruc}</div>}
+              {biz.address && <div>{biz.address}</div>}
+              {biz.phone   && <div>Tel: {biz.phone}</div>}
+              <div className="border-t border-dashed border-gray-300 pt-1 mt-1">{sys.ticketFooter || '¡Gracias por su compra!'}</div>
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {activeTab === 'fiscal' && (
+        <Section title="💰 Configuración fiscal y comercial">
+          <Field label="Tasa IGV" sub="Porcentaje de impuesto general a las ventas (Perú: 18%)">
+            <Input type="number" value={(sys.igvRate||0.18)*100} onChange={v => setSys({...sys, igvRate: v/100})} step="0.5" min="0" max="50" suffix="%"/>
+          </Field>
+          <Field label="Prefijo de boleta" sub="Prefijo para el número de comprobante (ej: B001)">
+            <input value={sys.invoicePrefix||'B001'} onChange={e => setSys({...sys, invoicePrefix: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"/>
+          </Field>
+          <Field label="Moneda" sub="Símbolo de moneda en pantalla">
+            <input value={sys.currencySymbol||'S/'} onChange={e => setSys({...sys, currencySymbol: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-20"/>
+          </Field>
+          <Field label="Descuentos habilitados" sub="Permite aplicar descuentos en el POS">
+            <Toggle value={sys.allowDiscounts !== false} onChange={v => setSys({...sys, allowDiscounts: v})}/>
+          </Field>
+          {sys.allowDiscounts !== false && (
+            <Field label="Descuento máximo permitido" sub="Porcentaje máximo que puede aplicar un cajero">
+              <Input type="number" value={sys.maxDiscountPct||50} onChange={v => setSys({...sys, maxDiscountPct: v})} min="0" max="100" suffix="%"/>
+            </Field>
+          )}
+        </Section>
+      )}
+
+      {activeTab === 'inventory' && (
+        <Section title="📦 Inventario y stock">
+          <Field label="Stock mínimo por defecto" sub="Valor inicial de stockMin para nuevos productos">
+            <Input type="number" value={sys.lowStockDefault||5} onChange={v => setSys({...sys, lowStockDefault: v})} min="0"/>
+          </Field>
+          <Field label="Alertas de stock habilitadas" sub="Muestra alertas cuando el stock cae al mínimo">
+            <Toggle value={sys.stockAlertEnabled !== false} onChange={v => setSys({...sys, stockAlertEnabled: v})}/>
+          </Field>
+          <Field label="Días de alerta por vencimiento" sub="Días antes del vencimiento para mostrar alerta">
+            <Input type="number" value={sys.expiryAlertDays||30} onChange={v => setSys({...sys, expiryAlertDays: v})} min="1" suffix="días"/>
+          </Field>
+          <Field label="Permitir stock negativo" sub="Permite vender aunque el stock llegue a cero">
+            <Toggle value={sys.allowNegativeStock === true} onChange={v => setSys({...sys, allowNegativeStock: v})}/>
+          </Field>
+        </Section>
+      )}
+
+      {activeTab === 'pos' && (
+        <Section title="🖥️ Punto de venta y caja">
+          <Field label="Requerir caja abierta para vender" sub="Bloquea el POS si la caja no está aperturada">
+            <Toggle value={sys.requireCashToSell !== false} onChange={v => setSys({...sys, requireCashToSell: v})}/>
+          </Field>
+          <Field label="Imprimir ticket automáticamente" sub="Abre ventana de impresión al completar la venta">
+            <Toggle value={sys.printAutomatically === true} onChange={v => setSys({...sys, printAutomatically: v})}/>
+          </Field>
+          <Field label="Pie del ticket" sub="Texto que aparece al final de cada boleta">
+            <input value={sys.ticketFooter||''} onChange={e => setSys({...sys, ticketFooter: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64" placeholder="¡Gracias por su compra!"/>
+          </Field>
+        </Section>
+      )}
+
+      {activeTab === 'audit' && (
+        <Section title="🔍 Auditoría y seguridad">
+          <Field label="Auditoría habilitada" sub="Registra todas las operaciones del sistema con trazabilidad completa">
+            <Toggle value={sys.auditEnabled !== false} onChange={v => setSys({...sys, auditEnabled: v})}/>
+          </Field>
+          <Field label="Zona horaria" sub="Para cálculos de fechas y reportes">
+            <select value={sys.timeZone||'America/Lima'} onChange={e => setSys({...sys, timeZone: e.target.value})} className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="America/Lima">Lima (UTC-5)</option>
+              <option value="America/Bogota">Bogotá (UTC-5)</option>
+              <option value="America/Santiago">Santiago (UTC-4/-3)</option>
+              <option value="America/Buenos_Aires">Buenos Aires (UTC-3)</option>
+              <option value="America/Mexico_City">Ciudad de México (UTC-6/-5)</option>
+            </select>
+          </Field>
+        </Section>
+      )}
 
       <div className="flex justify-end">
         <button onClick={handleSave} className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${saved ? 'bg-green-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>

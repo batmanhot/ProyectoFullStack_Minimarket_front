@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PAYMENT_METHODS, BILLETES_PEN } from '../../../config/app'
-import { formatCurrency, calcChange, calcBilletes } from '../../../shared/utils/helpers'
+import { formatCurrency, calcBilletes } from '../../../shared/utils/helpers'
 import toast from 'react-hot-toast'
 
 export default function PaymentPanel({ total, clients, onConfirm, processing }) {
@@ -15,7 +15,8 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
   const paid      = parseFloat(payments.reduce((a, p) => a + p.amount, 0).toFixed(2))
   const remaining = parseFloat((total - paid).toFixed(2))
   const change    = remaining < 0 ? Math.abs(remaining) : 0
-  const isComplete = paid >= total
+  const isZeroTotal = total <= 0
+  const isComplete = isZeroTotal ? true : paid >= total
 
   const methodConfig = PAYMENT_METHODS.find(m => m.value === currentMethod)
   const filteredClients = clients.filter(c =>
@@ -46,6 +47,16 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
 
   const handleConfirm = () => {
     if (!isComplete) { toast.error(`Falta ${formatCurrency(remaining)} por cobrar`); return }
+
+    if (isZeroTotal) {
+      onConfirm({
+        payments: payments.length > 0 ? payments : [{ method: 'ticket', amount: 0, reference: 'Cobertura total por ticket de descuento' }],
+        clientId,
+        change: 0
+      })
+      return
+    }
+
     onConfirm({ payments, clientId, change })
   }
 
@@ -109,7 +120,12 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
             </div>
           )
         })}
-        {paid > 0 && (
+        {isZeroTotal ? (
+          <div className="flex justify-between text-sm font-medium mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 text-green-600">
+            <span>✓ Total cubierto por ticket</span>
+            <span>{formatCurrency(0)}</span>
+          </div>
+        ) : paid > 0 && (
           <div className={`flex justify-between text-sm font-medium mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 ${isComplete ? 'text-green-600' : 'text-red-500'}`}>
             <span>{isComplete ? (change > 0 ? 'Vuelto' : '✓ Cobrado') : 'Pendiente'}</span>
             <span>{isComplete ? (change > 0 ? formatCurrency(change) : '') : formatCurrency(remaining)}</span>
@@ -126,8 +142,17 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
       </div>
 
       {/* Selector de método */}
-      <div className="p-3 border-b border-gray-100 dark:border-slate-700 flex-1 overflow-y-auto">
-        <p className="text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-2">Agregar pago</p>
+      <div className={`p-3 border-b border-gray-100 dark:border-slate-700 overflow-y-auto ${isZeroTotal ? '' : 'flex-1'}`}>
+        <p className="text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-2">
+          {isZeroTotal ? 'Pago automático' : 'Agregar pago'}
+        </p>
+
+        {isZeroTotal && (
+          <div className="mb-3 p-2.5 rounded-lg border border-green-200 bg-green-50 text-xs text-green-700">
+            El total a cobrar es S/0.00. La venta se confirmará como cubierta por ticket de descuento.
+          </div>
+        )}
+
         <div className="grid grid-cols-4 gap-1.5 mb-3">
           {PAYMENT_METHODS.map(pm => (
             <button key={pm.value} onClick={() => setCurrentMethod(pm.value)}
@@ -139,27 +164,29 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
         </div>
 
         {/* Monto */}
-        <div className="flex gap-2 mb-2">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500 font-medium">S/</span>
-            <input type="number" value={currentAmount} onChange={e => setCurrentAmount(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder={remaining > 0 ? remaining.toFixed(2) : '0.00'} min="0" step="0.50" />
+        {!isZeroTotal && (
+          <div className="flex gap-2 mb-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500 font-medium">S/</span>
+              <input type="number" value={currentAmount} onChange={e => setCurrentAmount(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder={remaining > 0 ? remaining.toFixed(2) : '0.00'} min="0" step="0.50" />
+            </div>
+            <button onClick={addPayment} className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium">
+              + Agregar
+            </button>
           </div>
-          <button onClick={addPayment} className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium">
-            + Agregar
-          </button>
-        </div>
+        )}
 
         {/* Referencia */}
-        {methodConfig?.requiresRef && (
+        {!isZeroTotal && methodConfig?.requiresRef && (
           <input value={currentRef} onChange={e => setCurrentRef(e.target.value)}
             className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
             placeholder={methodConfig.refLabel} />
         )}
 
         {/* Botones rápidos (efectivo) */}
-        {currentMethod === 'efectivo' && (
+        {!isZeroTotal && currentMethod === 'efectivo' && (
           <div className="grid grid-cols-5 gap-1.5">
             <button onClick={() => quickAmount(remaining)} className="py-1 text-xs border border-gray-200 dark:border-slate-600 rounded text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 col-span-2">
               Exacto
@@ -173,7 +200,7 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
         )}
 
         {/* QR display Yape/Plin */}
-        {(currentMethod === 'yape' || currentMethod === 'plin') && (
+        {!isZeroTotal && (currentMethod === 'yape' || currentMethod === 'plin') && (
           <div className="mt-2 bg-gray-50 dark:bg-slate-800/50 rounded-lg p-3 text-center">
             <div className="w-20 h-20 bg-gray-200 rounded-lg mx-auto mb-2 flex items-center justify-center text-2xl">
               {currentMethod === 'yape' ? '💜' : '💙'}
@@ -185,13 +212,17 @@ export default function PaymentPanel({ total, clients, onConfirm, processing }) 
       </div>
 
       {/* Botón cobrar */}
-      <div className="p-3">
+      <div className="p-3 sticky bottom-0 bg-white border-t border-gray-100 dark:border-slate-700">
         <button onClick={handleConfirm} disabled={processing || !isComplete}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
           {processing ? (
             <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Procesando...</>
           ) : (
-            <><span>Confirmar venta</span><span className="opacity-60 text-xs">F8</span></>
+            <>
+              <span className="text-base leading-none" aria-hidden="true">✅</span>
+              <span>Confirmar venta</span>
+              <span className="opacity-60 text-xs">F8</span>
+            </>
           )}
         </button>
       </div>

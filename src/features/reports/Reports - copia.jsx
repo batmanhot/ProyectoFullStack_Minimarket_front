@@ -84,64 +84,24 @@ export default function Reports() {
   const paymentData = Object.entries(metrics.byPayment).map(([name, value]) => ({ name: name.charAt(0).toUpperCase()+name.slice(1), value: parseFloat(value.toFixed(2)) }))
   const catData     = Object.entries(metrics.byCat).sort((a,b)=>b[1]-a[1]).map(([name,value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
 
-const handleExportExcel = (tab) => {
-  addAuditLog({ action: 'EXPORT', module: 'Reportes', detail: `Excel: ${tab} · ${filteredSales.length} ventas` })
-  if (tab === 'ventas') {
-    exportToExcel(filteredSales.map(s => ({ Boleta: s.invoiceNumber, Fecha: formatDate(s.createdAt), Items: s.items?.length, Total: s.total, Método: s.payments?.map(p=>p.method).join('+'), Estado: s.status })), 'ventas')
-  } else if (tab === 'productos') {
-    exportToExcel(metrics.topProducts.map((p,i) => ({ Posición: i+1, Producto: p.name, Unidades: p.qty, Ingresos: p.revenue.toFixed(2) })), 'top_productos')
-  } else if (tab === 'detalle_venta') {
-    const rows = filteredSales.flatMap(s => s.items?.map(item => ({
-      Boleta: s.invoiceNumber, Fecha: formatDate(s.createdAt), Producto: item.productName,
-      Cantidad: item.quantity, PrecioUnit: item.unitPrice, Descuento: item.discount||0, Subtotal: item.subtotal
-    }))||[])
-    exportToExcel(rows, 'detalle_productos_ventas')
-  } else if (tab === 'deuda') {
-    exportToExcel(clients.filter(c=>c.currentDebt>0).map(c => ({ Nombre: c.name, Documento: c.documentNumber, Deuda: c.currentDebt, Límite: c.creditLimit })), 'cuentas_cobrar')
-  } else if (tab === 'inmovilizado') {
-    exportToExcel(metrics.sinMovimiento.map(p => ({ Nombre: p.name, Barcode: p.barcode, Stock: p.stock, Costo: p.priceBuy, ValorInmovilizado: p.priceBuy*p.stock })), 'sin_movimiento')
-  }
-}
-
-const handleExportExcelOperaciones = () => {
-  addAuditLog({ action: 'EXPORT', module: 'Reportes', detail: `Excel operaciones ventas · ${filteredSales.length} ventas` })
-
-  const data = filteredSales.map(s => {
-    // Cálculos existentes del detalle_venta
-    const itemsDiscount  = s.items?.reduce((a, i) => a + (i.discount || 0), 0) || 0
-    const globalDisc     = s.discount || 0
-    const ticketDisc     = s.ticketDiscount || 0
-    const totalDescuentos = parseFloat((itemsDiscount + globalDisc + ticketDisc).toFixed(2))
-    const baseImponible  = parseFloat(Math.max(0, s.subtotal - totalDescuentos).toFixed(2))
-    const igvCalculado   = parseFloat((baseImponible * 0.18).toFixed(2))
-    const metodoPago     = s.payments?.map(p => p.method).filter(Boolean).join(' + ') || '—'
-    const fechaHora = s.createdAt ? new Date(s.createdAt).toLocaleString('es-PE', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: true
-    }) : '—'
-    const [fechaCompleta, hora] = fechaHora.split(', ')
-
-    const unidades = s.items?.reduce((a, i) => a + i.quantity, 0) || 0
-
-    return {
-      "Comprobante": s.invoiceNumber,
-      "Fecha": formatDate(s.createdAt),
-      "Hora": hora || '—',
-      "Usuario": s.userName || s.userId || '—',
-      "Items": s.items?.length || 0,
-      "Unidades": unidades,
-      "Subtotal": formatCurrency(s.subtotal),
-      "Descuentos": totalDescuentos > 0 ? `-${formatCurrency(totalDescuentos)}` : '—',
-      "Base Imponible": formatCurrency(baseImponible),
-      "IGV": formatCurrency(igvCalculado),
-      "Total": formatCurrency(s.total),
-      "Método": metodoPago,
-      "Estado": s.status
+  const handleExportExcel = (tab) => {
+    addAuditLog({ action: 'EXPORT', module: 'Reportes', detail: `Excel: ${tab} · ${filteredSales.length} ventas` })
+    if (tab === 'ventas') {
+      exportToExcel(filteredSales.map(s => ({ Boleta: s.invoiceNumber, Fecha: formatDate(s.createdAt), Items: s.items?.length, Total: s.total, Método: s.payments?.map(p=>p.method).join('+'), Estado: s.status })), 'ventas')
+    } else if (tab === 'productos') {
+      exportToExcel(metrics.topProducts.map((p,i) => ({ Posición: i+1, Producto: p.name, Unidades: p.qty, Ingresos: p.revenue.toFixed(2) })), 'top_productos')
+    } else if (tab === 'detalle_venta') {
+      const rows = filteredSales.flatMap(s => s.items?.map(item => ({
+        Boleta: s.invoiceNumber, Fecha: formatDate(s.createdAt), Producto: item.productName,
+        Cantidad: item.quantity, PrecioUnit: item.unitPrice, Descuento: item.discount||0, Subtotal: item.subtotal
+      }))||[])
+      exportToExcel(rows, 'detalle_productos_ventas')
+    } else if (tab === 'deuda') {
+      exportToExcel(clients.filter(c=>c.currentDebt>0).map(c => ({ Nombre: c.name, Documento: c.documentNumber, Deuda: c.currentDebt, Límite: c.creditLimit })), 'cuentas_cobrar')
+    } else if (tab === 'inmovilizado') {
+      exportToExcel(metrics.sinMovimiento.map(p => ({ Nombre: p.name, Barcode: p.barcode, Stock: p.stock, Costo: p.priceBuy, ValorInmovilizado: p.priceBuy*p.stock })), 'sin_movimiento')
     }
-  })
-
-  exportToExcel(data, 'operaciones_ventas')
-}
+  }
 
   const handleExportPDF = (tab) => {
     addAuditLog({ action: 'EXPORT', module: 'Reportes', detail: `PDF: ${tab}` })
@@ -279,184 +239,31 @@ const handleExportExcelOperaciones = () => {
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600 dark:text-slate-300">Click en una venta para ver el detalle de productos vendidos</p>
             <div className="flex gap-2">
-              <button onClick={() => handleExportExcelOperaciones()} className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📈 Excel operaciones</button>
               <button onClick={() => handleExportExcel('detalle_venta')} className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel detalle</button>
               <button onClick={() => handleExportPDF('ventas')} className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
             </div>
           </div>
           <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
             {filteredSales.length === 0 ? <div className="text-center py-8 text-sm text-gray-300">Sin ventas en el período</div>
-              : filteredSales.slice(0, 50).map(s => {
-
-                // ── Cálculos de la cabecera ──────────────────────────────────
-                const itemsDiscount  = s.items?.reduce((a, i) => a + (i.discount || 0), 0) || 0
-                const globalDisc     = s.discount || 0
-                const ticketDisc     = s.ticketDiscount || 0
-                const totalDescuentos = parseFloat((itemsDiscount + globalDisc + ticketDisc).toFixed(2))
-                const baseImponible  = parseFloat(Math.max(0, s.subtotal - totalDescuentos).toFixed(2))
-                const igvCalculado   = parseFloat((baseImponible * 0.18).toFixed(2))
-                const metodoPago     = s.payments?.map(p => p.method).filter(Boolean).join(' + ') || '—'
-
-                // Fecha y hora separadas
-                const fechaHora = s.createdAt
-                  ? new Date(s.createdAt).toLocaleString('es-PE', {
-                      day: '2-digit', month: '2-digit', year: 'numeric',
-                      hour: '2-digit', minute: '2-digit', hour12: true
-                    })
-                  : '—'
-
-                return (
-                  <div key={s.id}>
-                    <button
-                      onClick={() => setExpandedSale(expandedSale === s.id ? null : s.id)}
-                      className="w-full text-left border-b border-gray-100 dark:border-slate-700 hover:bg-blue-50/40 dark:hover:bg-slate-700/50 transition-colors"
-                    >
-                      {/* ── CABECERA PRINCIPAL ── */}
-                      <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-4">
-
-                        {/* Bloque izquierdo: Serie + Comprobante */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="bg-blue-100 dark:bg-blue-900/40 rounded-lg px-2.5 py-1.5 flex-shrink-0">
-                            <p className="text-xs text-blue-500 dark:text-blue-400 font-medium uppercase tracking-wide leading-none mb-0.5">
-                              Comprobante
-                            </p>
-                            <p className="text-sm font-black font-mono text-blue-700 dark:text-blue-300 tracking-widest">
-                              {s.invoiceNumber}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Bloque derecho: Total + chevron */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="text-right">
-                            <p className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-wide">
-                              Total Pagado
-                            </p>
-                            <p className="text-base font-black text-gray-800 dark:text-slate-100">
-                              {formatCurrency(s.total)}
-                            </p>
-                          </div>
-                          <svg
-                            className={`w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform flex-shrink-0 ${expandedSale === s.id ? 'rotate-180' : ''}`}
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
-                          </svg>
-                        </div>
-                      </div>
-
-                      {/* ── GRID DE DATOS DE CABECERA ── */}
-                      <div className="px-4 pb-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-x-3 gap-y-2 border-t border-gray-50 dark:border-slate-700/50 pt-2">
-
-                        {/* Fecha y Hora */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">🕐</span>
-                          <div className="min-w-0">
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Fecha y Hora
-                            </p>
-                            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 leading-tight whitespace-nowrap truncate">
-                              {fechaHora}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Cantidad de Productos */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">📦</span>
-                          <div>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Cant. Productos
-                            </p>
-                            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 whitespace-nowrap">
-                              {s.items?.length || 0} producto{s.items?.length !== 1 ? 's' : ''}
-                              {' · '}
-                              {s.items?.reduce((a, i) => a + i.quantity, 0) || 0} unid.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Forma de Pago */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">💳</span>
-                          <div className="min-w-0">
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Forma de Pago
-                            </p>
-                            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 capitalize whitespace-nowrap truncate">
-                              {metodoPago}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Usuario de Caja */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">👤</span>
-                          <div className="min-w-0">
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Usuario de Caja
-                            </p>
-                            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 whitespace-nowrap truncate">
-                              {s.userName || s.userId || '—'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Operación Gravada / Base Imponible */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">📋</span>
-                          <div>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Op. Gravada (Base Imp.)
-                            </p>
-                            <p className="text-xs font-semibold text-gray-700 dark:text-slate-300">
-                              {formatCurrency(baseImponible)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Descuentos */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">🏷️</span>
-                          <div>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Descuentos
-                            </p>
-                            <p className={`text-xs font-semibold ${totalDescuentos > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-slate-500'}`}>
-                              {totalDescuentos > 0 ? `-${formatCurrency(totalDescuentos)}` : '—'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* IGV */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">🧾</span>
-                          <div>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              IGV (18%)
-                            </p>
-                            <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                              {formatCurrency(igvCalculado)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Total Pagado */}
-                        <div className="flex items-start gap-1.5">
-                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">💰</span>
-                          <div>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">
-                              Total Pagado
-                            </p>
-                            <p className="text-xs font-black text-blue-600 dark:text-blue-400">
-                              {formatCurrency(s.total)}
-                            </p>
-                          </div>
-                        </div>
-
-                      </div>
-                    </button>
-
-                {/* ── DETALLE DE PRODUCTOS → SIN CAMBIOS ── */}
+            : filteredSales.slice(0, 50).map(s => (
+              <div key={s.id}>
+                <button
+                  onClick={() => setExpandedSale(expandedSale === s.id ? null : s.id)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700 text-left border-b border-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-mono text-gray-500 dark:text-slate-400">{s.invoiceNumber}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{formatDate(s.createdAt)}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{s.items?.length} producto(s)</span>
+                    {s.payments?.map(p=>p.method).filter(Boolean).length > 0 && (
+                      <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-2 py-0.5 rounded-full">{s.payments.map(p=>p.method).join(' + ')}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-800 dark:text-slate-100">{formatCurrency(s.total)}</span>
+                    <svg className={`w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform ${expandedSale===s.id?'rotate-180':''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
+                  </div>
+                </button>
                 {expandedSale === s.id && (
                   <div className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700 px-4 py-3">
                     <table className="w-full">
@@ -490,7 +297,7 @@ const handleExportExcelOperaciones = () => {
                   </div>
                 )}
               </div>
-            )})}
+            ))}
           </div>
           {filteredSales.length > 50 && <p className="text-xs text-gray-400 dark:text-slate-500 text-center">Mostrando 50 de {filteredSales.length} ventas. Exporta a Excel para ver todas.</p>}
         </div>

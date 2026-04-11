@@ -148,7 +148,7 @@ export const useStore = create(
           }
         },
         updateCartItem: (key, updates) =>
-          set((s) => ({ cart: s.cart.map((i) => { if(i._key!==key&&i.productId!==key) return i; const u={...i,...updates}; u.subtotal=formatNumber((u.quantity*u.unitPrice)-(u.discount||0)); return u }) })),
+          set((s) => ({ cart: s.cart.map((i) => { if(i._key!==key&&i.productId!==key) return i; const u={...i,...updates}; u.subtotal=formatNumber(u.quantity*u.unitPrice); return u }) })),
         removeFromCart: (key) => set((s) => ({ cart: s.cart.filter((i) => i._key!==key&&i.productId!==key) })),
         clearCart: () => set({ cart:[] }),
 

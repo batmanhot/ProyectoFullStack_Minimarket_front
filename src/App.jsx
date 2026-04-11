@@ -34,13 +34,19 @@ const PAGES = {
 
 function PageFallback() {
   return (
-    <div className="flex items-center justify-center h-full min-h-64">
-      <div className="flex flex-col items-center gap-3 text-gray-300">
-        <svg className="animate-spin w-8 h-8" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-        </svg>
-        <span className="text-sm">Cargando módulo...</span>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-purple-600/95 via-purple-700/95 to-indigo-800/95 px-4">
+      <div className="flex flex-col items-center justify-center gap-4 text-center max-w-md mx-auto animate-fade-in">
+        {/* Spinner doble anillo con glow */}
+        <div className="relative flex items-center justify-center w-20 h-20">
+          <div className="w-20 h-20 border-4 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
+          <div className="w-20 h-20 border-4 border-purple-200/30 border-t-purple-300/70 absolute inset-0 rounded-full animate-spin" style={{ animationDuration: '1.2s', animationDirection: 'reverse' }}></div>
+          <div className="absolute inset-0 w-20 h-20 bg-gradient-to-r from-purple-400/30 via-blue-400/30 to-purple-400/30 rounded-full blur-xl animate-pulse"></div>
+        </div>
+
+        {/* Texto centrado en línea independiente */}
+        <p className="text-white font-semibold text-2xl leading-tight text-center">
+          Cargando Sistema POS...
+        </p>
       </div>
     </div>
   )
