@@ -9,22 +9,22 @@
 }
 
 @layer utilities {
-  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #e5e7eb transparent; }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--border, #e5e7eb) transparent; }
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 2px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background-color: var(--border, #e5e7eb); border-radius: 2px; }
 }
 
-/* =============================================================================
-   SISTEMA DE TEMAS — 4 variantes: light · dark · ocean · forest
-   ============================================================================= */
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PALETA DE VARIABLES POR TEMA
+   ═══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── TEMA CLARO (por defecto) ────────────────────────────────────────────────── */
+/* ── CLARO (por defecto) ───────────────────────────────────────────────────── */
 :root, [data-theme="light"] {
   --bg-page:      #f8fafc;
   --bg-surface:   #ffffff;
   --bg-elevated:  #f1f5f9;
-  --bg-hover:     #f1f5f9;
+  --bg-hover:     #e2e8f0;
   --border:       #e2e8f0;
   --border-soft:  #f1f5f9;
   --text-primary: #1e293b;
@@ -34,9 +34,13 @@
   --accent-light: #eff6ff;
   --accent-text:  #1d4ed8;
   --logo-bg:      #2563eb;
+  --input-bg:     #ffffff;
+  --input-text:   #1e293b;
+  --input-border: #e2e8f0;
+  --input-placeholder: #94a3b8;
 }
 
-/* ── TEMA OSCURO ─────────────────────────────────────────────────────────────── */
+/* ── OSCURO ─────────────────────────────────────────────────────────────────── */
 [data-theme="dark"] {
   --bg-page:      #0f172a;
   --bg-surface:   #1e293b;
@@ -51,9 +55,13 @@
   --accent-light: #1e3a5f;
   --accent-text:  #93c5fd;
   --logo-bg:      #1d4ed8;
+  --input-bg:     #253045;
+  --input-text:   #f1f5f9;
+  --input-border: #334155;
+  --input-placeholder: #64748b;
 }
 
-/* ── TEMA OCÉANO — Azul marino + cyan eléctrico ──────────────────────────────── */
+/* ── OCÉANO ─────────────────────────────────────────────────────────────────── */
 [data-theme="ocean"] {
   --bg-page:      #0a1628;
   --bg-surface:   #0f2040;
@@ -68,9 +76,13 @@
   --accent-light: #083344;
   --accent-text:  #22d3ee;
   --logo-bg:      #0891b2;
+  --input-bg:     #162847;
+  --input-text:   #e0f2fe;
+  --input-border: #1e3a5a;
+  --input-placeholder: #38bdf8;
 }
 
-/* ── TEMA BOSQUE — Verde esmeralda + crema dorado ────────────────────────────── */
+/* ── BOSQUE ─────────────────────────────────────────────────────────────────── */
 [data-theme="forest"] {
   --bg-page:      #0a1f0f;
   --bg-surface:   #102818;
@@ -85,23 +97,91 @@
   --accent-light: #064e3b;
   --accent-text:  #34d399;
   --logo-bg:      #059669;
+  --input-bg:     #163320;
+  --input-text:   #ecfdf5;
+  --input-border: #1f4a2e;
+  --input-placeholder: #6ee7b7;
 }
 
-/* =============================================================================
+/* ── ATARDECER ──────────────────────────────────────────────────────────────── */
+[data-theme="sunset"] {
+  --bg-page:      #1a0f1e;
+  --bg-surface:   #271535;
+  --bg-elevated:  #33194a;
+  --bg-hover:     #3d1f58;
+  --border:       #4a2570;
+  --border-soft:  #33194a;
+  --text-primary: #fde8d8;
+  --text-sec:     #f4a96a;
+  --text-muted:   #c87941;
+  --accent:       #f97316;
+  --accent-light: #4a1f0a;
+  --accent-text:  #fb923c;
+  --logo-bg:      #ea580c;
+  --input-bg:     #33194a;
+  --input-text:   #fde8d8;
+  --input-border: #4a2570;
+  --input-placeholder: #c87941;
+}
+
+/* ── MEDIANOCHE ─────────────────────────────────────────────────────────────── */
+[data-theme="midnight"] {
+  --bg-page:      #05050f;
+  --bg-surface:   #0d0d1f;
+  --bg-elevated:  #141430;
+  --bg-hover:     #1a1a40;
+  --border:       #252560;
+  --border-soft:  #141430;
+  --text-primary: #e0e0ff;
+  --text-sec:     #9090e0;
+  --text-muted:   #5555a0;
+  --accent:       #6366f1;
+  --accent-light: #1a1a50;
+  --accent-text:  #818cf8;
+  --logo-bg:      #4f46e5;
+  --input-bg:     #141430;
+  --input-text:   #e0e0ff;
+  --input-border: #252560;
+  --input-placeholder: #5555a0;
+}
+
+/* ── NATURALEZA ─────────────────────────────────────────────────────────────── */
+[data-theme="nature"] {
+  --bg-page:      #1c1408;
+  --bg-surface:   #2a1f0e;
+  --bg-elevated:  #352815;
+  --bg-hover:     #40311c;
+  --border:       #5c4422;
+  --border-soft:  #352815;
+  --text-primary: #fef3c7;
+  --text-sec:     #fcd34d;
+  --text-muted:   #92660a;
+  --accent:       #d97706;
+  --accent-light: #3d2200;
+  --accent-text:  #fbbf24;
+  --logo-bg:      #b45309;
+  --input-bg:     #352815;
+  --input-text:   #fef3c7;
+  --input-border: #5c4422;
+  --input-placeholder: #92660a;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    CLASES SEMÁNTICAS DEL SIDEBAR
-   ============================================================================= */
-.sidebar-root         { background-color: var(--bg-surface); color: var(--text-primary); }
-.sidebar-border       { border-color: var(--border) !important; }
-.sidebar-text-primary { color: var(--text-primary) !important; }
-.sidebar-text-sec     { color: var(--text-sec) !important; }
-.sidebar-muted        { color: var(--text-muted) !important; }
-.sidebar-hover:hover  { background-color: var(--bg-hover) !important; color: var(--text-primary) !important; }
-.sidebar-nav-active   { background-color: var(--accent-light) !important; color: var(--accent-text) !important; }
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.sidebar-root          { background-color: var(--bg-surface); color: var(--text-primary); }
+.sidebar-border        { border-color: var(--border) !important; }
+.sidebar-text-primary  { color: var(--text-primary) !important; }
+.sidebar-text-sec      { color: var(--text-sec) !important; }
+.sidebar-muted         { color: var(--text-muted) !important; }
+.sidebar-hover:hover   { background-color: var(--bg-hover) !important; color: var(--text-primary) !important; }
+.sidebar-nav-active    { background-color: var(--accent-light) !important; color: var(--accent-text) !important; }
 .sidebar-nav-hover:hover { background-color: var(--bg-hover) !important; color: var(--text-primary) !important; }
-.sidebar-active-icon  { color: var(--accent-text) !important; }
-.sidebar-avatar       { background-color: var(--bg-elevated); color: var(--text-sec); }
-.sidebar-logo-icon    { background-color: var(--logo-bg); }
-.sidebar-dropdown     { background-color: var(--bg-surface); }
+.sidebar-active-icon   { color: var(--accent-text) !important; }
+.sidebar-avatar        { background-color: var(--bg-elevated); color: var(--text-sec); }
+.sidebar-logo-icon     { background-color: var(--logo-bg); }
+.sidebar-dropdown      { background-color: var(--bg-surface); border-color: var(--border); }
 .sidebar-dropdown-item { color: var(--text-primary); }
 .sidebar-dropdown-item:hover { background-color: var(--bg-hover) !important; }
 .sidebar-dropdown-active {
@@ -109,240 +189,202 @@
   color: var(--accent-text) !important;
 }
 
-/* =============================================================================
-   APLICACIÓN AL CONTENIDO PRINCIPAL — override de clases Tailwind
-   ============================================================================= */
 
-/* ── Body ── */
-[data-theme="dark"] body, [data-theme="ocean"] body, [data-theme="forest"] body {
+/* ═══════════════════════════════════════════════════════════════════════════════
+   APLICACIÓN GLOBAL A TODOS LOS TEMAS OSCUROS
+   Selector: cualquier data-theme distinto de light
+   ═══════════════════════════════════════════════════════════════════════════════ */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) body {
   background-color: var(--bg-page) !important;
   color: var(--text-primary) !important;
 }
-/* Mantener clase .dark activa para compatibilidad con dark: prefix en Sidebar */
-.dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
 
 /* ── Fondos ── */
-[data-theme="dark"] .bg-white,
-[data-theme="ocean"] .bg-white,
-[data-theme="forest"] .bg-white    { background-color: var(--bg-surface) !important; }
-
-[data-theme="dark"] .bg-gray-50,
-[data-theme="ocean"] .bg-gray-50,
-[data-theme="forest"] .bg-gray-50  { background-color: var(--bg-page) !important; }
-
-[data-theme="dark"] .bg-gray-100,
-[data-theme="ocean"] .bg-gray-100,
-[data-theme="forest"] .bg-gray-100 { background-color: var(--bg-elevated) !important; }
-
-[data-theme="dark"] .bg-gray-200,
-[data-theme="ocean"] .bg-gray-200,
-[data-theme="forest"] .bg-gray-200 { background-color: var(--bg-hover) !important; }
-
-/* ── Bordes ── */
-[data-theme="dark"] .border-gray-50,
-[data-theme="ocean"] .border-gray-50,
-[data-theme="forest"] .border-gray-50   { border-color: var(--border-soft) !important; }
-
-[data-theme="dark"] .border-gray-100,
-[data-theme="ocean"] .border-gray-100,
-[data-theme="forest"] .border-gray-100  { border-color: var(--border) !important; }
-
-[data-theme="dark"] .border-gray-200,
-[data-theme="ocean"] .border-gray-200,
-[data-theme="forest"] .border-gray-200  { border-color: var(--border) !important; }
-
-[data-theme="dark"] .border-gray-300,
-[data-theme="ocean"] .border-gray-300,
-[data-theme="forest"] .border-gray-300  { border-color: var(--border) !important; }
-
-/* ── Textos ── */
-[data-theme="dark"] .text-gray-800,
-[data-theme="ocean"] .text-gray-800,
-[data-theme="forest"] .text-gray-800   { color: var(--text-primary) !important; }
-
-[data-theme="dark"] .text-gray-700,
-[data-theme="ocean"] .text-gray-700,
-[data-theme="forest"] .text-gray-700   { color: var(--text-primary) !important; }
-
-[data-theme="dark"] .text-gray-600,
-[data-theme="ocean"] .text-gray-600,
-[data-theme="forest"] .text-gray-600   { color: var(--text-sec) !important; }
-
-[data-theme="dark"] .text-gray-500,
-[data-theme="ocean"] .text-gray-500,
-[data-theme="forest"] .text-gray-500   { color: var(--text-muted) !important; }
-
-[data-theme="dark"] .text-gray-400,
-[data-theme="ocean"] .text-gray-400,
-[data-theme="forest"] .text-gray-400   { color: var(--text-muted) !important; }
-
-[data-theme="dark"] .text-gray-300,
-[data-theme="ocean"] .text-gray-300,
-[data-theme="forest"] .text-gray-300   { color: var(--border) !important; }
-
-/* ── DIVISORES DE TABLA ── */
-/* CLARO: divide-gray-50 era #f9fafb invisible sobre blanco */
-.divide-gray-50  > * + * { border-color: #e2e8f0 !important; }
-.divide-gray-100 > * + * { border-color: #e2e8f0 !important; }
-/* Oscuros: divisores sutiles por tema */
-[data-theme="dark"] .divide-gray-50 > * + *,
-[data-theme="dark"] .divide-gray-100 > * + *,
-[data-theme="dark"] .divide-y > * + *,
-[data-theme="ocean"] .divide-gray-50 > * + *,
-[data-theme="ocean"] .divide-gray-100 > * + *,
-[data-theme="ocean"] .divide-y > * + *,
-[data-theme="forest"] .divide-gray-50 > * + *,
-[data-theme="forest"] .divide-gray-100 > * + *,
-[data-theme="forest"] .divide-y > * + * { border-color: var(--border-soft) !important; }
-
-/* ── HOVER EN FILAS DE TABLA ── */
-[data-theme="dark"] .hover\:bg-gray-50:hover,
-[data-theme="ocean"] .hover\:bg-gray-50:hover,
-[data-theme="forest"] .hover\:bg-gray-50:hover,
-[data-theme="dark"] .hover\:bg-gray-100:hover,
-[data-theme="ocean"] .hover\:bg-gray-100:hover,
-[data-theme="forest"] .hover\:bg-gray-100:hover { background-color: var(--bg-hover) !important; }
-
-[data-theme="dark"] tr.hover\:bg-gray-50:hover td,
-[data-theme="ocean"] tr.hover\:bg-gray-50:hover td,
-[data-theme="forest"] tr.hover\:bg-gray-50:hover td { color: inherit !important; }
-
-/* ── INPUTS / TEXTAREA / SELECT ── */
-[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="ocean"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="forest"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-[data-theme="dark"] textarea, [data-theme="ocean"] textarea, [data-theme="forest"] textarea,
-[data-theme="dark"] select, [data-theme="ocean"] select, [data-theme="forest"] select {
-  background-color: var(--bg-elevated) !important;
-  color: var(--text-primary) !important;
-  border-color: var(--border) !important;
-  caret-color: var(--text-primary);
-}
-[data-theme="dark"] input::placeholder, [data-theme="ocean"] input::placeholder, [data-theme="forest"] input::placeholder,
-[data-theme="dark"] textarea::placeholder, [data-theme="ocean"] textarea::placeholder, [data-theme="forest"] textarea::placeholder {
-  color: var(--text-muted) !important; opacity: 1;
-}
-[data-theme="dark"] input:focus, [data-theme="ocean"] input:focus, [data-theme="forest"] input:focus,
-[data-theme="dark"] textarea:focus, [data-theme="ocean"] textarea:focus, [data-theme="forest"] textarea:focus,
-[data-theme="dark"] select:focus, [data-theme="ocean"] select:focus, [data-theme="forest"] select:focus {
-  border-color: var(--accent) !important; outline: none;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.25) !important;
-}
-
-/* ── HOVERS BOTONES ── */
-[data-theme="dark"] .hover\:bg-gray-50:hover,
-[data-theme="ocean"] .hover\:bg-gray-50:hover,
-[data-theme="forest"] .hover\:bg-gray-50:hover,
-[data-theme="dark"] .hover\:bg-gray-100:hover,
-[data-theme="ocean"] .hover\:bg-gray-100:hover,
-[data-theme="forest"] .hover\:bg-gray-100:hover  { background-color: var(--bg-hover) !important; }
-
-[data-theme="dark"] .hover\:bg-blue-50:hover,
-[data-theme="ocean"] .hover\:bg-blue-50:hover,
-[data-theme="forest"] .hover\:bg-blue-50:hover   { background-color: var(--accent-light) !important; }
-
-[data-theme="dark"] .hover\:bg-red-50:hover,
-[data-theme="ocean"] .hover\:bg-red-50:hover,
-[data-theme="forest"] .hover\:bg-red-50:hover    { background-color: #3b1f1f !important; }
-
-[data-theme="dark"] .hover\:bg-green-50:hover,
-[data-theme="ocean"] .hover\:bg-green-50:hover,
-[data-theme="forest"] .hover\:bg-green-50:hover  { background-color: #0d2b1e !important; }
-
-[data-theme="dark"] .hover\:bg-amber-50:hover,
-[data-theme="ocean"] .hover\:bg-amber-50:hover,
-[data-theme="forest"] .hover\:bg-amber-50:hover  { background-color: #261a06 !important; }
-
-/* ── FONDOS DE BADGES ── */
-[data-theme="dark"] .bg-blue-50, [data-theme="ocean"] .bg-blue-50, [data-theme="forest"] .bg-blue-50,
-[data-theme="dark"] .bg-blue-100, [data-theme="ocean"] .bg-blue-100, [data-theme="forest"] .bg-blue-100 { background-color: var(--accent-light) !important; }
-
-[data-theme="dark"] .bg-green-50   { background-color: #0d2b1e !important; }
-[data-theme="dark"] .bg-green-100  { background-color: #14291e !important; }
-[data-theme="dark"] .bg-red-50     { background-color: #2d1515 !important; }
-[data-theme="dark"] .bg-red-100    { background-color: #3b1f1f !important; }
-[data-theme="dark"] .bg-amber-50   { background-color: #261a06 !important; }
-[data-theme="dark"] .bg-amber-100  { background-color: #312208 !important; }
-[data-theme="dark"] .bg-teal-50    { background-color: #0d2b2b !important; }
-[data-theme="dark"] .bg-purple-50  { background-color: #1e1a3b !important; }
-
-[data-theme="ocean"] .bg-green-50  { background-color: #083d2a !important; }
-[data-theme="ocean"] .bg-green-100 { background-color: #0d4a33 !important; }
-[data-theme="ocean"] .bg-red-50    { background-color: #3b1515 !important; }
-[data-theme="ocean"] .bg-red-100   { background-color: #4a1e1e !important; }
-[data-theme="ocean"] .bg-amber-50  { background-color: #2d1f06 !important; }
-[data-theme="ocean"] .bg-amber-100 { background-color: #38260a !important; }
-[data-theme="ocean"] .bg-teal-50   { background-color: #073944 !important; }
-
-[data-theme="forest"] .bg-green-50  { background-color: #062d15 !important; }
-[data-theme="forest"] .bg-green-100 { background-color: #083d1e !important; }
-[data-theme="forest"] .bg-red-50    { background-color: #2d1010 !important; }
-[data-theme="forest"] .bg-red-100   { background-color: #3b1818 !important; }
-[data-theme="forest"] .bg-amber-50  { background-color: #261b04 !important; }
-[data-theme="forest"] .bg-amber-100 { background-color: #302207 !important; }
-[data-theme="forest"] .bg-teal-50   { background-color: #06302a !important; }
-
-/* ── TEXTOS DE COLOR ── */
-[data-theme="dark"] .text-blue-600, [data-theme="dark"] .text-blue-700   { color: #93c5fd !important; }
-[data-theme="ocean"] .text-blue-600, [data-theme="ocean"] .text-blue-700  { color: #22d3ee !important; }
-[data-theme="forest"] .text-blue-600, [data-theme="forest"] .text-blue-700 { color: #6ee7b7 !important; }
-[data-theme="dark"] .text-blue-400   { color: #60a5fa !important; }
-
-[data-theme="dark"] .text-green-600, [data-theme="dark"] .text-green-700, [data-theme="dark"] .text-green-500 { color: #4ade80 !important; }
-[data-theme="ocean"] .text-green-600, [data-theme="ocean"] .text-green-700  { color: #34d399 !important; }
-[data-theme="forest"] .text-green-600, [data-theme="forest"] .text-green-700 { color: #6ee7b7 !important; }
-
-[data-theme="dark"] .text-red-500, [data-theme="dark"] .text-red-600,
-[data-theme="ocean"] .text-red-500, [data-theme="ocean"] .text-red-600,
-[data-theme="forest"] .text-red-500, [data-theme="forest"] .text-red-600  { color: #f87171 !important; }
-
-[data-theme="dark"] .text-amber-600, [data-theme="ocean"] .text-amber-600, [data-theme="forest"] .text-amber-600 { color: #fbbf24 !important; }
-[data-theme="dark"] .text-teal-600,  [data-theme="ocean"] .text-teal-600,  [data-theme="forest"] .text-teal-600  { color: #2dd4bf !important; }
-[data-theme="dark"] .text-purple-600,[data-theme="ocean"] .text-purple-600,[data-theme="forest"] .text-purple-600{ color: #a78bfa !important; }
-
-/* ── BORDES ESTADO ── */
-[data-theme="dark"] .border-blue-500, [data-theme="ocean"] .border-blue-500, [data-theme="forest"] .border-blue-500 { border-color: var(--accent) !important; }
-[data-theme="dark"] .border-blue-200, [data-theme="ocean"] .border-blue-200, [data-theme="forest"] .border-blue-200 { border-color: var(--accent-light) !important; }
-[data-theme="dark"] .border-green-200,[data-theme="ocean"] .border-green-200,[data-theme="forest"] .border-green-200 { border-color: #14291e !important; }
-[data-theme="dark"] .border-red-100,  [data-theme="ocean"] .border-red-100,  [data-theme="forest"] .border-red-100   { border-color: #3b1f1f !important; }
-[data-theme="dark"] .border-amber-300,[data-theme="ocean"] .border-amber-300,[data-theme="forest"] .border-amber-300 { border-color: #78350f !important; }
-
-/* ── MODALES ── */
-[data-theme="dark"] .rounded-2xl.shadow-2xl,
-[data-theme="ocean"] .rounded-2xl.shadow-2xl,
-[data-theme="forest"] .rounded-2xl.shadow-2xl { background-color: var(--bg-surface) !important; }
-
-[data-theme="dark"] .shadow-2xl, [data-theme="ocean"] .shadow-2xl, [data-theme="forest"] .shadow-2xl {
-  box-shadow: 0 25px 50px rgba(0,0,0,0.55) !important;
-}
-
-/* ── DROPDOWNS ── */
-[data-theme="dark"] .absolute.bg-white, [data-theme="ocean"] .absolute.bg-white, [data-theme="forest"] .absolute.bg-white {
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-white {
   background-color: var(--bg-surface) !important;
 }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-gray-50 {
+  background-color: var(--bg-page) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-gray-100 {
+  background-color: var(--bg-elevated) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-gray-200 {
+  background-color: var(--bg-hover) !important;
+}
 
-/* ── SKELETON ── */
-[data-theme="dark"] .animate-pulse .bg-gray-100, [data-theme="dark"] .animate-pulse .bg-gray-200,
-[data-theme="ocean"] .animate-pulse .bg-gray-100, [data-theme="ocean"] .animate-pulse .bg-gray-200,
-[data-theme="forest"] .animate-pulse .bg-gray-100, [data-theme="forest"] .animate-pulse .bg-gray-200 {
+/* ── Textos ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-gray-900,.text-gray-800,.text-gray-700) {
+  color: var(--text-primary) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-gray-600,.text-gray-500) {
+  color: var(--text-sec) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-gray-400,.text-gray-300) {
+  color: var(--text-muted) !important;
+}
+
+/* ── Bordes ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(.border-gray-50,.border-gray-100,.border-gray-200,.border-gray-300) {
+  border-color: var(--border) !important;
+}
+
+/* ── INPUTS / TEXTAREA / SELECT — corrección profunda ── */
+/* Cubre TODOS los inputs: con clase, sin clase, anidados en modales, dropdowns */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]) {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border-color: var(--input-border) !important;
+  caret-color: var(--input-text);
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus {
+  border-color: var(--accent) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(input::placeholder, textarea::placeholder) {
+  color: var(--input-placeholder) !important;
+  opacity: 1;
+}
+/* Forzar sobre clases Tailwind de fondo en inputs */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(input.bg-white, input.bg-gray-50, input.bg-gray-100,
+      select.bg-white, select.bg-gray-50, textarea.bg-white) {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+}
+
+/* ── Divisores de tabla ── */
+/* Modo claro: divide-gray-50 era invisible (#f9fafb sobre blanco) */
+.divide-gray-50 > * + *, .divide-gray-100 > * + * { border-color: #e2e8f0; }
+
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(.divide-gray-50,.divide-gray-100,.divide-y) > * + * {
+  border-color: var(--border-soft) !important;
+}
+
+/* ── Hover filas de tabla ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(.hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
+  background-color: var(--bg-hover) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  tr:is(.hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) td {
+  color: inherit !important;
+}
+
+/* ── Hovers botones ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .hover\:bg-blue-50:hover {
+  background-color: var(--accent-light) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .hover\:bg-red-50:hover {
+  background-color: #3b1515 !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .hover\:bg-green-50:hover {
+  background-color: #0d2b1e !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .hover\:bg-amber-50:hover {
+  background-color: #261a06 !important;
+}
+
+/* ── Badges / fondos de estado ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.bg-blue-50,.bg-blue-100) {
+  background-color: var(--accent-light) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-green-50 { background-color: #0d2b1e !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-green-100 { background-color: #14291e !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-red-50 { background-color: #2d1515 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-red-100 { background-color: #3b1f1f !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-amber-50 { background-color: #261a06 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-amber-100 { background-color: #312208 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-teal-50 { background-color: #0d2b2b !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-purple-50 { background-color: #1e1a3b !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .bg-orange-50 { background-color: #2d1a0a !important; }
+
+/* ── Textos de color — aclarados para contraste ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-blue-600,.text-blue-700) { color: var(--accent-text) !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-green-600,.text-green-700,.text-green-500) { color: #4ade80 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-red-500,.text-red-600,.text-red-700) { color: #f87171 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-amber-600,.text-amber-700) { color: #fbbf24 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-teal-600,.text-teal-700) { color: #2dd4bf !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.text-purple-600,.text-purple-700) { color: #a78bfa !important; }
+
+/* ── Bordes de estado ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(.border-blue-100,.border-blue-200) { border-color: var(--accent-light) !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .border-blue-500 { border-color: var(--accent) !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.border-green-100,.border-green-200,.border-green-300) { border-color: #1a3328 !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.border-red-100,.border-red-200,.border-red-300) { border-color: #7f1d1d !important; }
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) :is(.border-amber-100,.border-amber-200,.border-amber-300) { border-color: #78350f !important; }
+
+/* ── Modales y dropdowns ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  :is(.rounded-2xl.shadow-2xl, .rounded-xl.shadow-xl, .rounded-xl.shadow-lg) {
+  background-color: var(--bg-surface) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .absolute.bg-white {
+  background-color: var(--bg-surface) !important;
+}
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"]) .shadow-2xl {
+  box-shadow: 0 25px 50px rgba(0,0,0,0.6) !important;
+}
+
+/* ── Skeleton ── */
+:is([data-theme="dark"],[data-theme="ocean"],[data-theme="forest"],
+    [data-theme="sunset"],[data-theme="midnight"],[data-theme="nature"])
+  .animate-pulse :is(.bg-gray-100,.bg-gray-200) {
   background-color: var(--bg-elevated) !important;
 }
 
-/* ── BADGE — texto en fondos de color con tema oscuro ── */
-[data-theme="dark"] .bg-red-100.text-red-600,
-[data-theme="ocean"] .bg-red-100.text-red-600,
-[data-theme="forest"] .bg-red-100.text-red-600    { color: #fca5a5 !important; }
-[data-theme="dark"] .bg-green-100.text-green-700,
-[data-theme="ocean"] .bg-green-100.text-green-700,
-[data-theme="forest"] .bg-green-100.text-green-700 { color: #86efac !important; }
-[data-theme="dark"] .bg-amber-100.text-amber-600,
-[data-theme="ocean"] .bg-amber-100.text-amber-600,
-[data-theme="forest"] .bg-amber-100.text-amber-600 { color: #fcd34d !important; }
-[data-theme="dark"] .bg-blue-100.text-blue-700,
-[data-theme="ocean"] .bg-blue-100.text-blue-700,
-[data-theme="forest"] .bg-blue-100.text-blue-700   { color: var(--accent-text) !important; }
-
-/* ── TICKET — papel siempre blanco con tinta negra en cualquier tema ── */
+/* ── Ticket de venta — papel siempre blanco con tinta negra ── */
 .ticket-paper, .ticket-paper * { color: #111111 !important; }
 .ticket-paper { background-color: #ffffff !important; }
 .ticket-paper [style*="color:#555"], .ticket-paper [style*="color: #555"] { color: #555555 !important; }

@@ -1,27 +1,21 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useStore } from '../../../store/index'
-import { formatCurrency, formatDateTime } from '../../../shared/utils/helpers'
+import { formatCurrency, formatDateTime, formatDate } from '../../../shared/utils/helpers'
 import { PAYMENT_METHODS } from '../../../config/app'
 
-// ─── Cálculos de comprobante ───────────────────────────────────────────────────
-const DEFAULT_IGV_RATE = 0.18
-const round2 = (n) => parseFloat((Number(n || 0)).toFixed(2))
-
-function getSaleAmounts(sale) {
-  const igvRate = Number(sale?.igvRate ?? DEFAULT_IGV_RATE)
-  const subtotal = round2(sale?.subtotal ?? sale?.items?.reduce((a, i) => a + (i?.subtotal || 0), 0))
-  const discount = round2(sale?.discount ?? sale?.items?.reduce((a, i) => a + ((i?.discount || 0) + (i?.campaignDiscount || 0)), 0))
-  const base = round2(sale?.base ?? Math.max(0, (subtotal / (1 + igvRate)) - discount))
-  const tax = round2(sale?.tax ?? (base * igvRate))
-  const total = round2(sale?.total ?? (base + tax))
-  return { subtotal, discount, base, tax, total, igvRate }
-}
+// ─── Constantes SUNAT ──────────────────────────────────────────────────────────
+const IGV_RATE = 0.18
 
 // ─── HTML del comprobante (80mm) para impresión directa ───────────────────────
 function buildTicketHTML(sale, businessConfig) {
-  const { subtotal, discount, base, tax, total, igvRate } = getSaleAmounts(sale)
+  // Usar valores fiscales guardados en la venta; fallback al cálculo si es venta antigua
+  const igvRate       = sale.igvRate || IGV_RATE
+  const baseImponible = sale.baseImponible ?? parseFloat((sale.total / (1 + igvRate)).toFixed(2))
+  const igv           = sale.igv           ?? parseFloat((sale.total - baseImponible).toFixed(2))
+  const subtotalBruto = sale.subtotalBruto ?? sale.total
+  const descuentos    = sale.totalDescuentos ?? sale.discount ?? 0
   const logoHtml      = businessConfig?.logoUrl
-    ? `<div style="display:flex;justify-content:center;align-items:center;width:100%;margin-bottom:3.5mm"><img src="${businessConfig.logoUrl}" style="display:block;margin:0 auto;max-width:50mm;max-height:20mm;object-fit:contain" onerror="this.style.display='none'"></div>`
+    ? `<div style="text-align:center;margin-bottom:3mm"><img src="${businessConfig.logoUrl}" style="max-width:50mm;max-height:20mm;object-fit:contain" onerror="this.style.display='none'"></div>`
     : ''
 
   const itemsHtml = (sale.items || []).map(item => `
@@ -90,11 +84,11 @@ function buildTicketHTML(sale, businessConfig) {
   ${itemsHtml}
   <hr class="hr">
 
-  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Subtotal:</span><span>${formatCurrency(subtotal)}</span></div>
-  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Descuentos:</span><span>-${formatCurrency(discount)}</span></div>
-  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Op. Gravada:</span><span>${formatCurrency(base)}</span></div>
-  <div class="row" style="font-size:10px;margin-bottom:1.5mm"><span>I.G.V. (${(igvRate * 100).toFixed(0)}%):</span><span>${formatCurrency(tax)}</span></div>
-  <div class="row bold" style="font-size:13px;margin-bottom:1mm"><span>IMPORTE TOTAL:</span><span>${formatCurrency(total)}</span></div>
+  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Subtotal:</span><span>${formatCurrency(subtotalBruto)}</span></div>
+  ${descuentos > 0 ? `<div class="row" style="font-size:10px;margin-bottom:1mm;color:#555"><span>Descuentos:</span><span>-${formatCurrency(descuentos)}</span></div>` : ''}
+  <div class="row" style="font-size:10px;margin-bottom:1mm"><span>Op. Gravada:</span><span>${formatCurrency(baseImponible)}</span></div>
+  <div class="row" style="font-size:10px;margin-bottom:1.5mm"><span>I.G.V. (${Math.round(igvRate*100)}%):</span><span>${formatCurrency(igv)}</span></div>
+  <div class="row bold" style="font-size:13px;margin-bottom:1mm"><span>IMPORTE TOTAL</span><span>${formatCurrency(sale.total)}</span></div>
   <hr class="hr">
 
   <div class="bold" style="font-size:10px;margin-bottom:1.5mm">FORMA DE PAGO:</div>
@@ -119,7 +113,11 @@ export default function SaleTicket({ sale, onClose }) {
   const [phone, setPhone]         = useState('')
   const [phoneError, setPhoneError] = useState('')
 
-  const { subtotal, discount, base, tax, total, igvRate } = getSaleAmounts(sale)
+  const igvRate       = sale.igvRate || IGV_RATE
+  const baseImponible = sale.baseImponible ?? parseFloat((sale.total / (1 + igvRate)).toFixed(2))
+  const igv           = sale.igv           ?? parseFloat((sale.total - baseImponible).toFixed(2))
+  const subtotalBruto = sale.subtotalBruto ?? sale.total
+  const descuentos    = sale.totalDescuentos ?? sale.discount ?? 0
 
   // ── Imprimir: abre ventana optimizada para impresora de tickets 80mm ─────────
   const handlePrint = () => {
@@ -155,11 +153,9 @@ export default function SaleTicket({ sale, onClose }) {
       `─────────────────────`,
       ...sale.items.map(i => `• ${i.productName}\n  ${i.quantity} ${i.unit||'u'} × ${formatCurrency(i.unitPrice)} = *${formatCurrency(i.subtotal)}*`),
       `─────────────────────`,
-      `Subtotal: ${formatCurrency(subtotal)}`,
-      `Descuentos: -${formatCurrency(discount)}`,
-      `Op. Gravada: ${formatCurrency(base)}`,
-      `IGV (${(igvRate * 100).toFixed(0)}%): ${formatCurrency(tax)}`,
-      `*TOTAL: ${formatCurrency(total)}*`,
+      `Op. Gravada: ${formatCurrency(baseImponible)}`,
+      `IGV (18%): ${formatCurrency(igv)}`,
+      `*TOTAL: ${formatCurrency(sale.total)}*`,
       sale.payments?.length ? `─────────────────────` : null,
       ...(sale.payments || []).map(p => {
         const m = PAYMENT_METHODS.find(pm => pm.value === p.method)
@@ -178,23 +174,23 @@ export default function SaleTicket({ sale, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-800 dark:text-slate-100 text-base">Comprobante de venta</h2>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sale.invoiceNumber} · {formatDateTime(sale.createdAt)}</p>
+            <h2 className="font-bold text-gray-800 text-base">Comprobante de venta</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{sale.invoiceNumber} · {formatDateTime(sale.createdAt)}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         {/* ── Vista previa del ticket ── */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-slate-900">
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           <div className="flex justify-center">
-            <div className="ticket-paper" style={{
+            <div style={{
               fontFamily: "'Courier New', monospace",
               fontSize: '11px', width: '300px', maxWidth: '100%',
               background: '#fff', padding: '12px',
@@ -204,8 +200,8 @@ export default function SaleTicket({ sale, onClose }) {
             }}>
               {/* Logo del negocio */}
               {businessConfig?.logoUrl && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', marginBottom: '10px' }}>
-                  <img src={businessConfig.logoUrl} alt="Logo" style={{ display: 'block', margin: '0 auto', maxWidth: '120px', maxHeight: '50px', objectFit: 'contain' }} onError={e => e.target.style.display='none'}/>
+                <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                  <img src={businessConfig.logoUrl} alt="Logo" style={{ maxWidth: '120px', maxHeight: '50px', objectFit: 'contain' }} onError={e => e.target.style.display='none'}/>
                 </div>
               )}
 
@@ -247,19 +243,21 @@ export default function SaleTicket({ sale, onClose }) {
 
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
-                <span>Subtotal:</span><span>{formatCurrency(subtotal)}</span>
+                <span>Subtotal:</span><span>{formatCurrency(subtotalBruto)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
-                <span>Descuentos:</span><span>-{formatCurrency(discount)}</span>
+              {descuentos > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', marginBottom:'1mm', color:'#555' }}>
+                <span>Descuentos:</span><span>-{formatCurrency(descuentos)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
-                <span>Op. Gravada:</span><span>{formatCurrency(base)}</span>
+              )}
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', marginBottom:'1mm' }}>
+                <span>Op. Gravada:</span><span>{formatCurrency(baseImponible)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '4px' }}>
-                <span>I.G.V. ({(igvRate * 100).toFixed(0)}%):</span><span>{formatCurrency(tax)}</span>
+                <span>I.G.V. ({Math.round(igvRate*100)}%):</span><span>{formatCurrency(igv)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>
-                <span>IMPORTE TOTAL</span><span>{formatCurrency(total)}</span>
+                <span>IMPORTE TOTAL</span><span>{formatCurrency(sale.total)}</span>
               </div>
 
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
@@ -305,9 +303,9 @@ export default function SaleTicket({ sale, onClose }) {
 
         {/* ── Panel WhatsApp: pedir número ── */}
         {showPhone && (
-          <div className="px-5 py-4 border-t border-green-100 dark:border-green-900/40 bg-green-50 dark:bg-green-950/30 flex-shrink-0">
-            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">📱 Enviar comprobante por WhatsApp</p>
-            <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">Ingresa el número de celular del cliente para enviar el comprobante</p>
+          <div className="px-5 py-4 border-t border-blue-100 bg-green-50 flex-shrink-0">
+            <p className="text-sm font-semibold text-gray-700 mb-2">📱 Enviar comprobante por WhatsApp</p>
+            <p className="text-xs text-gray-500 mb-3">Ingresa el número de celular del cliente para enviar el comprobante</p>
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">+51</span>
@@ -334,7 +332,7 @@ export default function SaleTicket({ sale, onClose }) {
         )}
 
         {/* ── Botones de acción ── */}
-        <div className="px-5 py-4 border-t border-gray-100 dark:border-slate-700 flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
+        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
           <div className="grid grid-cols-3 gap-2">
             {/* WhatsApp */}
             <button

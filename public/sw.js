@@ -230,6 +230,22 @@ async function syncPendingSales() {
 // ==========================================
 // NOTIFICACIONES PUSH (opcional)
 // ==========================================
+async function showNotificationIfAllowed(title, options) {
+  try {
+    if (typeof self.registration.permissionState === 'function') {
+      const permission = await self.registration.permissionState({ name: 'notifications' })
+      if (permission !== 'granted') {
+        console.warn('[SW] No se mostrará la notificación porque el permiso no está concedido:', permission)
+        return
+      }
+    }
+
+    await self.registration.showNotification(title, options)
+  } catch (error) {
+    console.warn('[SW] No se pudo mostrar la notificación:', error)
+  }
+}
+
 self.addEventListener('push', (event) => {
   console.log('[SW] Push recibido:', event)
   
@@ -257,7 +273,7 @@ self.addEventListener('push', (event) => {
   }
   
   event.waitUntil(
-    self.registration.showNotification('POS Minimarket', options)
+    showNotificationIfAllowed('POS Minimarket', options)
   )
 })
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { getInitialDemoState } from '../data/seedData'
 import { formatInvoice, formatNumber } from '../shared/utils/helpers'
+import { isCampaignActive } from '../shared/utils/discountEngine'
 
 export const useStore = create(
   subscribeWithSelector(
@@ -58,42 +59,33 @@ export const useStore = create(
           set((s) => ({ discountCampaigns: s.discountCampaigns.filter(c => c.id!==id) }))
         },
 
-        // ── TICKETS DE DESCUENTO ─────────────────────────────────────────────
+        // ── TICKETS DE DESCUENTO ──────────────────────────────────────────────
         discountTickets: [],
         addDiscountTicket: (ticket) => {
-          get().addAuditLog({ action:'CREATE', module:'Tickets Descuento', detail:`Ticket creado: ${ticket.code} · ${ticket.holderName}`, entityId:ticket.id })
+          get().addAuditLog({ action:'CREATE', module:'Tickets', detail:`Ticket creado: ${ticket.code} · ${ticket.holderName}`, entityId:ticket.id })
           set((s) => ({ discountTickets: [ticket, ...s.discountTickets] }))
         },
         updateDiscountTicket: (id, updates) => {
-          get().addAuditLog({ action:'UPDATE', module:'Tickets Descuento', detail:`Ticket actualizado: ID ${id}`, entityId:id })
+          get().addAuditLog({ action:'UPDATE', module:'Tickets', detail:`Ticket actualizado: ID ${id}`, entityId:id })
           set((s) => ({ discountTickets: s.discountTickets.map(t => t.id===id ? { ...t, ...updates } : t) }))
         },
-        redeemDiscountTicket: (code, saleId, saleTotal, userId) => {
-          const state = get()
-          const ticket = state.discountTickets.find(t => t.code.toUpperCase() === code.toUpperCase())
-          if (!ticket) return { ok: false, error: 'Código de ticket no encontrado' }
-          if (!ticket.isActive) return { ok: false, error: 'Este ticket está desactivado' }
-          if (ticket.used) return { ok: false, error: `Ticket ya utilizado el ${new Date(ticket.usedAt).toLocaleDateString('es-PE')}` }
-          const now = new Date()
-          if (ticket.validFrom && now < new Date(ticket.validFrom)) return { ok: false, error: 'El ticket aún no está vigente' }
-          if (ticket.validTo && now > new Date(ticket.validTo + 'T23:59:59')) return { ok: false, error: 'El ticket ha vencido' }
-          // Calcular el descuento
-          let discountAmt = 0
-          if (ticket.discountType === 'pct') {
-            discountAmt = parseFloat((saleTotal * ticket.discountValue / 100).toFixed(2))
-            if (ticket.maxAmount) discountAmt = Math.min(discountAmt, ticket.maxAmount)
-          } else {
-            discountAmt = Math.min(ticket.discountValue, saleTotal)
-          }
-          discountAmt = Math.max(0, parseFloat(discountAmt.toFixed(2)))
-          // Marcar como usado
-          state.updateDiscountTicket(ticket.id, {
-            used: true, usedAt: now.toISOString(), usedInSale: saleId,
-            usedByUserId: userId, discountApplied: discountAmt
-          })
-          get().addAuditLog({ action:'UPDATE', module:'Tickets Descuento', detail:`Ticket canjeado: ${ticket.code} · S/${discountAmt} desc. en venta ${saleId}`, entityId:ticket.id })
-          return { ok: true, ticket, discountAmt }
+        deleteDiscountTicket: (id) => {
+          get().addAuditLog({ action:'DELETE', module:'Tickets', detail:`Ticket eliminado: ID ${id}`, entityId:id })
+          set((s) => ({ discountTickets: s.discountTickets.filter(t => t.id!==id) }))
         },
+        redeemDiscountTicket: (code, saleId, saleTotal, userId) => {
+          const now = new Date().toISOString()
+          get().addAuditLog({ action:'UPDATE', module:'Tickets', detail:`Ticket canjeado: ${code} · Venta ${saleId} · S/${saleTotal}`, entityId:code })
+          set((s) => ({
+            discountTickets: s.discountTickets.map(t =>
+              t.code.toUpperCase() === code.toUpperCase()
+                ? { ...t, used:true, usedAt:now, usedInSale:saleId, usedByUser:userId }
+                : t
+            )
+          }))
+        },
+
+
 
         // ── AUDIT LOG ─────────────────────────────────────────────────────────
         auditLog: [],
@@ -148,7 +140,7 @@ export const useStore = create(
           }
         },
         updateCartItem: (key, updates) =>
-          set((s) => ({ cart: s.cart.map((i) => { if(i._key!==key&&i.productId!==key) return i; const u={...i,...updates}; u.subtotal=formatNumber(u.quantity*u.unitPrice); return u }) })),
+          set((s) => ({ cart: s.cart.map((i) => { if(i._key!==key&&i.productId!==key) return i; const u={...i,...updates}; u.subtotal=formatNumber((u.quantity*u.unitPrice)-(u.discount||0)); return u }) })),
         removeFromCart: (key) => set((s) => ({ cart: s.cart.filter((i) => i._key!==key&&i.productId!==key) })),
         clearCart: () => set({ cart:[] }),
 
@@ -253,5 +245,7 @@ export const selectTodaySales = (s) => {
     const d = new Date(sale.createdAt)
     return sale.status==='completada' && d.getDate()===now.getDate() && d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()
   })
+
 }
-// selectActiveDiscounts: usar isCampaignActive directamente en el componente
+export const selectActiveDiscountCampaigns = (s) => (s.discountCampaigns || []).filter(isCampaignActive)
+

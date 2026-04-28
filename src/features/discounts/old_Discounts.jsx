@@ -25,181 +25,6 @@ function StatusBadge({ campaign }) {
 }
 
 // ─── Formulario de campaña ─────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
-// MODAL DE PLANTILLAS — componente propio (cumple Rules of Hooks)
-// ══════════════════════════════════════════════════════════════════════════════
-function TemplatesModal({ onUse, onClose }) {
-  const [tplFilter,   setTplFilter]   = useState('all')
-  const [selectedTpl, setSelectedTpl] = useState(null)
-  const [quickDate,   setQuickDate]   = useState(null)
-
-  const today = new Date()
-  const fmt   = d => d.toISOString().split('T')[0]
-  const QUICK_DATES = [
-    { label: 'Esta semana',   from: fmt(today), to: fmt(new Date(today.getTime() + 6*86400000)) },
-    { label: 'Este mes',      from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(new Date(today.getFullYear(), today.getMonth()+1, 0)) },
-    { label: 'Próx. 30 días', from: fmt(today), to: fmt(new Date(today.getTime() + 29*86400000)) },
-    { label: 'Próx. 90 días', from: fmt(today), to: fmt(new Date(today.getTime() + 89*86400000)) },
-  ]
-  const TYPE_FILTERS = [
-    { value:'all',       label:'Todas',    count: CAMPAIGN_TEMPLATES.length },
-    { value:'campaign',  label:'Campañas', count: CAMPAIGN_TEMPLATES.filter(t=>t.type==='campaign').length },
-    { value:'promotion', label:'NxM',      count: CAMPAIGN_TEMPLATES.filter(t=>t.type==='promotion').length },
-    { value:'volume',    label:'Volumen',  count: CAMPAIGN_TEMPLATES.filter(t=>t.type==='volume').length },
-    { value:'line',      label:'Compra X', count: CAMPAIGN_TEMPLATES.filter(t=>t.type==='line').length },
-  ]
-  const TYPE_COLORS = {
-    campaign:  'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300',
-    promotion: 'bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-300',
-    volume:    'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-900/20 dark:border-teal-800 dark:text-teal-300',
-    line:      'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-300',
-  }
-  const filtered = tplFilter === 'all' ? CAMPAIGN_TEMPLATES : CAMPAIGN_TEMPLATES.filter(t => t.type === tplFilter)
-
-  const handleUse = () => {
-    if (!selectedTpl) return
-    const dates = quickDate ? { dateFrom: quickDate.from, dateTo: quickDate.to } : { dateFrom: '', dateTo: '' }
-    onUse({ ...selectedTpl, ...dates })
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700 shrink-0">
-          <div>
-            <h2 className="font-semibold text-gray-800 dark:text-slate-100">⚡ Plantillas de campañas</h2>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Elige una plantilla, configura fechas rápidas y ábrela en el formulario.</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div className="flex flex-1 overflow-hidden">
-          {/* Panel izquierdo */}
-          <div className="w-64 shrink-0 border-r border-gray-100 dark:border-slate-700 flex flex-col">
-            <div className="p-3 border-b border-gray-100 dark:border-slate-700 space-y-1">
-              {TYPE_FILTERS.map(f => (
-                <button key={f.value} onClick={() => { setTplFilter(f.value); setSelectedTpl(null) }}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${tplFilter===f.value ? 'bg-blue-600 text-white' : 'text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>
-                  <span>{f.label}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${tplFilter===f.value ? 'bg-white/20' : 'bg-gray-100 dark:bg-slate-700 text-gray-500'}`}>{f.count}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {filtered.map((tpl, i) => (
-                <button key={i} onClick={() => { setSelectedTpl(tpl); setQuickDate(null) }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all border ${selectedTpl===tpl ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-slate-700'}`}>
-                  <span className="text-xl shrink-0">{tpl.icon}</span>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-semibold truncate ${selectedTpl===tpl ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-slate-100'}`}>{tpl.name}</p>
-                    <p className="text-[10px] text-gray-400 dark:text-slate-500">{CAMPAIGN_TYPES.find(t=>t.value===tpl.type)?.label}</p>
-                  </div>
-                  {selectedTpl===tpl && <span className="ml-auto text-blue-500 text-xs shrink-0">✓</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* Panel derecho */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedTpl ? (
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl">{selectedTpl.icon}</span>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{selectedTpl.name}</h3>
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${TYPE_COLORS[selectedTpl.type] || TYPE_COLORS.campaign}`}>
-                      {CAMPAIGN_TYPES.find(t=>t.value===selectedTpl.type)?.icon} {CAMPAIGN_TYPES.find(t=>t.value===selectedTpl.type)?.label}
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-3 text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
-                  {CAMPAIGN_TYPES.find(t=>t.value===selectedTpl.type)?.desc}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {selectedTpl.type !== 'promotion' && selectedTpl.discountPct > 0 && (
-                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Descuento</p>
-                      <p className="text-2xl font-black text-blue-600 dark:text-blue-400">{selectedTpl.discountPct}%</p>
-                    </div>
-                  )}
-                  {selectedTpl.type === 'promotion' && (
-                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Fórmula</p>
-                      <p className="text-2xl font-black text-purple-600 dark:text-purple-400">{selectedTpl.buyQty}×{selectedTpl.payQty}</p>
-                    </div>
-                  )}
-                  {selectedTpl.type === 'volume' && selectedTpl.minAmount && (
-                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Monto mínimo</p>
-                      <p className="text-xl font-black text-teal-600 dark:text-teal-400">S/ {selectedTpl.minAmount}</p>
-                    </div>
-                  )}
-                  {selectedTpl.type === 'line' && (
-                    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Regla</p>
-                      <p className="text-sm font-bold text-orange-600 dark:text-orange-400">Compra {selectedTpl.minQty} → el {selectedTpl.discountOnNth}° con {selectedTpl.discountPct}%</p>
-                    </div>
-                  )}
-                  <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Alcance</p>
-                    <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                      {selectedTpl.scope==='all' ? '🛒 Todos' : selectedTpl.scope==='categories' ? '🗂️ Categorías' : selectedTpl.scope==='brand' ? '🏷️ Marca' : '📦 Productos específicos'}
-                    </p>
-                  </div>
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1.5">📝 Deberás completar en el formulario:</p>
-                  <ul className="space-y-1 text-xs text-amber-600 dark:text-amber-500">
-                    <li>• Rango de fechas de vigencia</li>
-                    {selectedTpl.scope === 'categories' && <li>• Categorías específicas</li>}
-                    {selectedTpl.scope === 'brand' && <li>• Marcas específicas</li>}
-                    {(selectedTpl.type === 'promotion' || selectedTpl.scope === 'products') && <li>• Productos incluidos</li>}
-                    <li>• Días de la semana (opcional)</li>
-                  </ul>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wide">⚡ Precargar fechas</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {QUICK_DATES.map((qd, i) => (
-                      <button key={i} onClick={() => setQuickDate(quickDate?.label === qd.label ? null : qd)}
-                        className={`px-3 py-2 rounded-lg text-xs font-medium border text-left transition-all ${quickDate?.label === qd.label ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-slate-700'}`}>
-                        <p className="font-semibold">{qd.label}</p>
-                        <p className={`text-[10px] mt-0.5 ${quickDate?.label === qd.label ? 'text-blue-100' : 'text-gray-400 dark:text-slate-500'}`}>{qd.from} → {qd.to}</p>
-                      </button>
-                    ))}
-                  </div>
-                  {!quickDate && <p className="text-[11px] text-gray-400 dark:text-slate-500 italic">Sin fecha rápida: ingresa fechas manualmente en el formulario.</p>}
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8 text-gray-400 dark:text-slate-500">
-                <span className="text-5xl opacity-30">⚡</span>
-                <p className="text-sm font-medium">Selecciona una plantilla</p>
-                <p className="text-xs">Elige una opción del panel izquierdo para ver su configuración.</p>
-              </div>
-            )}
-            <div className="px-5 py-4 border-t border-gray-100 dark:border-slate-700 shrink-0 flex items-center justify-between gap-3">
-              <p className="text-xs text-gray-400 dark:text-slate-500 truncate">
-                {selectedTpl ? `Seleccionada: ${selectedTpl.name}` : 'Ninguna plantilla seleccionada'}
-              </p>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={onClose} className="px-4 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                <button onClick={handleUse} disabled={!selectedTpl}
-                  className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${selectedTpl ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 dark:bg-slate-700 text-gray-400 cursor-not-allowed'}`}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                  Usar esta plantilla
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function CampaignForm({ campaign, categories, products, onClose }) {
   const { addDiscountCampaign, updateDiscountCampaign } = useStore()
   const editing = !!campaign
@@ -226,9 +51,6 @@ function CampaignForm({ campaign, categories, products, onClose }) {
   const [payQty,         setPayQty]         = useState(campaign?.payQty         || 1)
   const [maxPerPurchase, setMaxPerPurchase] = useState(campaign?.maxPerPurchase  || 0)
   const [productSearch,  setProductSearch]  = useState('')
-  // Tipo line — Compra X lleva desc. en N°
-  const [minQty,         setMinQty]         = useState(campaign?.minQty         || 2)
-  const [discountOnNth,  setDiscountOnNth]  = useState(campaign?.discountOnNth  || 3)
 
   const typeCfg = CAMPAIGN_TYPES.find(t => t.value === type)
 
@@ -254,11 +76,10 @@ function CampaignForm({ campaign, categories, products, onClose }) {
       if (parseInt(buyQty) < 2) { toast.error('El cliente debe llevar al menos 2 unidades'); return }
       if (productIds.length === 0) { toast.error('La promoción NxM requiere seleccionar al menos un producto'); return }
     }
-    if (type === 'line') {
-      if (parseInt(discountOnNth) <= parseInt(minQty)) { toast.error('El producto con descuento (N°) debe ser mayor a la cantidad mínima requerida'); return }
-      if (parseInt(minQty) < 1) { toast.error('La cantidad mínima debe ser al menos 1'); return }
+    if (type !== 'promotion') {
       if (scope === 'categories' && categoryIds.length === 0) { toast.error('Selecciona al menos una categoría'); return }
-      if (scope === 'brand'      && !brands.trim())           { toast.error('Selecciona al menos una marca'); return }
+      if (scope === 'products'   && productIds.length === 0)  { toast.error('Selecciona al menos un producto'); return }
+      if (scope === 'brand'      && !brands.trim())           { toast.error('Ingresa al menos una marca'); return }
     }
 
     const data = {
@@ -276,8 +97,6 @@ function CampaignForm({ campaign, categories, products, onClose }) {
       buyQty:      type === 'promotion' ? parseInt(buyQty)        : 0,
       payQty:      type === 'promotion' ? parseInt(payQty)        : 0,
       maxPerPurchase: type === 'promotion' ? parseInt(maxPerPurchase) || 0 : 0,
-      minQty:         type === 'line'   ? parseInt(minQty)        : 0,
-      discountOnNth:  type === 'line'   ? parseInt(discountOnNth) : 0,
       createdAt:   campaign?.createdAt || new Date().toISOString(),
       updatedAt:   new Date().toISOString(),
     }
@@ -328,7 +147,7 @@ function CampaignForm({ campaign, categories, products, onClose }) {
       </div>
 
       {/* Parámetros según tipo */}
-      {type === 'campaign' && (
+      {(type === 'campaign' || type === 'line') && (
         <div>
           <label className={labelCls}>Porcentaje de descuento *</label>
           <div className="relative w-40">
@@ -337,229 +156,6 @@ function CampaignForm({ campaign, categories, products, onClose }) {
           </div>
         </div>
       )}
-
-      {/* ── LÍNEA: Compra X lleva desc. en N° ─────────────────────────────── */}
-      {type === 'line' && (() => {
-        const qty  = parseInt(minQty)      || 0
-        const nth  = parseInt(discountOnNth) || 0
-        const pct  = parseFloat(discountPct) || 0
-        const valid = qty >= 1 && nth > qty && pct > 0
-
-        const LINE_SCOPES = [
-          { value: 'all',        label: 'Todos los productos',   icon: '🛒', desc: 'Aplica a cualquier producto' },
-          { value: 'categories', label: 'Categoría específica',  icon: '🗂️', desc: 'Solo la categoría elegida' },
-          { value: 'brand',      label: 'Marca específica',      icon: '🏷️', desc: 'Solo la marca elegida' },
-        ]
-
-        return (
-          <div className="space-y-4">
-
-            {/* Banner */}
-            <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl p-3">
-              <span className="text-xl flex-shrink-0">🏪</span>
-              <div>
-                <p className="text-sm font-semibold text-orange-800">Compra X — el N° producto con descuento</p>
-                <p className="text-xs text-orange-600 mt-0.5 leading-relaxed">
-                  Cuando el cliente compra la cantidad mínima requerida dentro del filtro, el siguiente producto
-                  indicado recibe el descuento configurado. Aplica <strong>una sola vez por compra</strong>.
-                  <br/>Ej: <em>"Compra 3 Lácteos → el 4° tiene 50% descuento"</em>
-                </p>
-              </div>
-            </div>
-
-            {/* Configuración de la regla */}
-            <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-4">
-              <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Regla de activación</p>
-
-              <div className="grid grid-cols-3 gap-3">
-
-                {/* Cantidad mínima */}
-                <div>
-                  <label className={labelCls}>Compra mínima (unids.) *</label>
-                  <div className="flex items-center gap-1.5">
-                    <button type="button"
-                      onClick={() => setMinQty(v => Math.max(1, parseInt(v||1)-1))}
-                      className="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 font-bold text-base shrink-0">−</button>
-                    <input type="number" min="1" step="1" value={minQty}
-                      onChange={e => setMinQty(Math.max(1, parseInt(e.target.value)||1))}
-                      className={inputCls + ' text-center font-bold'}/>
-                    <button type="button"
-                      onClick={() => setMinQty(v => parseInt(v||1)+1)}
-                      className="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 font-bold text-base shrink-0">+</button>
-                  </div>
-                  <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 text-center">unidades que activan</p>
-                </div>
-
-                {/* Producto beneficiado */}
-                <div>
-                  <label className={labelCls}>N° producto beneficiado *</label>
-                  <div className="flex items-center gap-1.5">
-                    <button type="button"
-                      onClick={() => setDiscountOnNth(v => Math.max(parseInt(minQty||1)+1, parseInt(v||2)-1))}
-                      className="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 font-bold text-base shrink-0">−</button>
-                    <input type="number" min={parseInt(minQty||1)+1} step="1" value={discountOnNth}
-                      onChange={e => setDiscountOnNth(Math.max(parseInt(minQty||1)+1, parseInt(e.target.value)||2))}
-                      className={inputCls + ' text-center font-bold'}/>
-                    <button type="button"
-                      onClick={() => setDiscountOnNth(v => parseInt(v||2)+1)}
-                      className="w-8 h-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 font-bold text-base shrink-0">+</button>
-                  </div>
-                  <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 text-center">el N° con descuento</p>
-                </div>
-
-                {/* Porcentaje */}
-                <div>
-                  <label className={labelCls}>Descuento aplicado *</label>
-                  <div className="relative">
-                    <input type="number" min="1" max="100" step="1" value={discountPct}
-                      onChange={e => setDiscountPct(e.target.value)}
-                      className={inputCls + ' pr-8 font-bold text-center'}
-                      placeholder="50"/>
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400 dark:text-slate-500 pointer-events-none">%</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 text-center">sobre 1 unidad</p>
-                </div>
-              </div>
-
-              {/* Preview visual de la regla */}
-              {valid ? (
-                <div className="flex items-stretch gap-3 bg-white dark:bg-slate-800 border border-orange-200 rounded-xl overflow-hidden">
-                  {/* Símbolo visual */}
-                  <div className="bg-orange-500 px-4 flex flex-col items-center justify-center text-white shrink-0">
-                    <span className="text-2xl font-black leading-none">{qty}</span>
-                    <span className="text-[10px] font-semibold leading-tight mt-0.5 uppercase tracking-wide">uds.</span>
-                    <span className="text-xl leading-none mt-1">→</span>
-                    <span className="text-2xl font-black leading-none mt-1">{pct}%</span>
-                    <span className="text-[10px] font-semibold leading-tight mt-0.5 uppercase tracking-wide">desc.</span>
-                  </div>
-                  {/* Descripción */}
-                  <div className="p-3 flex-1 space-y-1.5">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">
-                      Por la compra de <strong>{qty}</strong> unid., el <strong>{nth}°</strong> producto tiene <strong className="text-orange-600">{pct}% de descuento</strong>
-                    </p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 dark:text-slate-400">
-                      <span>🎯 Unidades necesarias: <strong>{qty}</strong></span>
-                      <span>🎁 Producto beneficiado: <strong>el {nth}°</strong></span>
-                      <span>🔂 Aplica: <strong>1 vez por compra</strong></span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 dark:text-slate-500 italic">
-                      Si el carrito tiene menos de {nth} unidades elegibles, no se aplica el descuento.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                  <span>⚠️</span>
-                  <span>El N° de producto beneficiado debe ser mayor a la cantidad mínima y el descuento debe ser mayor a 0</span>
-                </div>
-              )}
-            </div>
-
-            {/* Filtro de alcance */}
-            <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
-              <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">¿A qué productos aplica la regla?</p>
-
-              <div className="grid grid-cols-3 gap-2">
-                {LINE_SCOPES.map(s => (
-                  <button key={s.value} type="button" onClick={() => setScope(s.value)}
-                    className={`flex flex-col gap-1 p-3 rounded-xl border text-left transition-all ${
-                      scope === s.value
-                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-                        : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700'
-                    }`}>
-                    <span className="text-xl">{s.icon}</span>
-                    <span className={`text-xs font-semibold leading-tight ${scope === s.value ? 'text-orange-800 dark:text-orange-300' : 'text-gray-700 dark:text-slate-200'}`}>{s.label}</span>
-                    <span className="text-[11px] text-gray-400 dark:text-slate-500 leading-tight">{s.desc}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Categorías */}
-              {scope === 'categories' && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">Selecciona las categorías:</p>
-                  <div className="flex flex-wrap gap-2 p-2 border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 min-h-[44px]">
-                    {categories.map(c => (
-                      <button key={c.id} type="button" onClick={() => toggleCat(c.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                          categoryIds.includes(c.id)
-                            ? 'bg-orange-500 text-white border-orange-500'
-                            : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:border-orange-300'
-                        }`}>
-                        {c.name}
-                      </button>
-                    ))}
-                  </div>
-                  {categoryIds.length > 0 && (
-                    <p className="text-xs text-orange-600 mt-1.5">✓ {categoryIds.length} categoría{categoryIds.length !== 1 ? 's' : ''} seleccionada{categoryIds.length !== 1 ? 's' : ''}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Marcas */}
-              {scope === 'brand' && (
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">
-                    Marcas en inventario: <span className="text-gray-400">{brandList.length > 0 ? brandList.join(' · ') : 'Ninguna'}</span>
-                  </p>
-                  <div className="flex flex-wrap gap-2 p-2 border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 min-h-[44px]">
-                    {brandList.map(b => (
-                      <button key={b} type="button"
-                        onClick={() => setBrands(prev => {
-                          const list = prev.split(',').map(x=>x.trim()).filter(Boolean)
-                          return list.includes(b) ? list.filter(x=>x!==b).join(', ') : [...list, b].join(', ')
-                        })}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                          brands.split(',').map(x=>x.trim()).includes(b)
-                            ? 'bg-orange-500 text-white border-orange-500'
-                            : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:border-orange-300'
-                        }`}>
-                        {b}
-                      </button>
-                    ))}
-                    {brandList.length === 0 && (
-                      <p className="text-xs text-gray-400 dark:text-slate-500 p-1">Sin marcas en inventario</p>
-                    )}
-                  </div>
-                  {brands.trim() && (
-                    <p className="text-xs text-orange-600 mt-1.5">✓ Marcas: <strong>{brands}</strong></p>
-                  )}
-                </div>
-              )}
-
-              {scope === 'all' && (
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2">
-                  <span>ℹ️</span>
-                  <span>Contará todas las unidades del carrito sin filtro de categoría ni marca.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Ejemplo dinámico */}
-            {valid && (
-              <div className="border border-dashed border-orange-300 rounded-xl p-3 text-xs text-orange-700 dark:text-orange-300 space-y-1">
-                <p className="font-semibold">📋 Ejemplos de aplicación:</p>
-                {scope === 'all' && (
-                  <p>"{`Por la compra de ${qty} ${qty === 1 ? 'producto' : 'productos'}, el ${nth}° tiene ${pct}% de descuento.`}"</p>
-                )}
-                {scope === 'categories' && categoryIds.length > 0 && (
-                  <p>"{`Por la compra de ${qty} ${categoryIds.map(id => categories.find(c=>c.id===id)?.name).filter(Boolean).join(', ')}, el ${nth}° tiene ${pct}% de descuento.`}"</p>
-                )}
-                {scope === 'categories' && categoryIds.length === 0 && (
-                  <p className="text-gray-400 dark:text-slate-500 italic">Selecciona las categorías para ver el ejemplo.</p>
-                )}
-                {scope === 'brand' && brands.trim() && (
-                  <p>"{`Por la compra de ${qty} productos de la marca ${brands}, el ${nth}° tiene ${pct}% de descuento.`}"</p>
-                )}
-                {scope === 'brand' && !brands.trim() && (
-                  <p className="text-gray-400 dark:text-slate-500 italic">Selecciona las marcas para ver el ejemplo.</p>
-                )}
-                <p className="text-orange-500 dark:text-orange-400">⚠ Si el cliente tiene menos de {nth} unidades elegibles, no se aplica el descuento.</p>
-              </div>
-            )}
-          </div>
-        )
-      })()}
 
       {type === 'volume' && (() => {
         // ── Vista previa del descuento por volumen ────────────────────────────
@@ -905,8 +501,8 @@ function CampaignForm({ campaign, categories, products, onClose }) {
         )
       })()}
 
-      {/* Alcance (scope) — oculto en NxM, volume y line (tienen su propio selector integrado) */}
-      {type !== 'promotion' && type !== 'volume' && type !== 'line' && (
+      {/* Alcance (scope) — oculto en NxM y volume (tienen su propio selector integrado) */}
+      {type !== 'promotion' && type !== 'volume' && (
       <div>
         <label className={labelCls}>¿A qué productos aplica? *</label>
         <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1050,27 +646,10 @@ function CampaignCard({ campaign, categories, products, onEdit, onToggle, onDele
                 <span>en subtotal</span>
               </div>
             </div>
-          ) : campaign.type === 'line' ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-center gap-2">
-                <div className="text-center">
-                  <span className="text-2xl font-black text-orange-500">{campaign.minQty}</span>
-                  <p className="text-[10px] text-gray-400 leading-tight">compras</p>
-                </div>
-                <span className="text-gray-300 text-xl font-light">→</span>
-                <div className="text-center">
-                  <span className="text-2xl font-black text-orange-600">{campaign.discountPct}%</span>
-                  <p className="text-[10px] text-gray-400 leading-tight">el {campaign.discountOnNth}°</p>
-                </div>
-              </div>
-              <div className="inline-flex items-center gap-1 text-[11px] text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5 font-medium">
-                <span>🔂</span><span>1 vez por compra</span>
-              </div>
-            </div>
           ) : (
             <span className="text-3xl font-black text-blue-600">{campaign.discountPct}%</span>
           )}
-          {campaign.type !== 'volume' && campaign.type !== 'line' && <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">de descuento</div>}
+          {campaign.type !== 'volume' && <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">de descuento</div>}
         </div>
 
         {/* Detalles */}
@@ -1090,7 +669,7 @@ function CampaignCard({ campaign, categories, products, onEdit, onToggle, onDele
                 : `${campaign.productIds?.length || 0} producto(s)`}
             </span>
           </div>
-          {/* Volume: frase descriptiva */}
+          {/* Volume: ejemplo descriptivo */}
           {campaign.type === 'volume' && (
             <div className="text-[11px] text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 rounded-lg px-2 py-1.5 leading-relaxed">
               {campaign.scope === 'all'
@@ -1098,16 +677,6 @@ function CampaignCard({ campaign, categories, products, onEdit, onToggle, onDele
                 : campaign.scope === 'categories'
                   ? `Por compras ≥ ${formatCurrency(campaign.minAmount)} en ${catNames.join(', ') || 'categorías sel.'} → ${campaign.discountPct}%`
                   : `Por compras ≥ ${formatCurrency(campaign.minAmount)} en ${campaign.brands?.join(', ') || 'marcas sel.'} → ${campaign.discountPct}%`}
-            </div>
-          )}
-          {/* Line: frase descriptiva */}
-          {campaign.type === 'line' && (
-            <div className="text-[11px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded-lg px-2 py-1.5 leading-relaxed">
-              {campaign.scope === 'all'
-                ? `Por la compra de ${campaign.minQty} uds., el ${campaign.discountOnNth}° tiene ${campaign.discountPct}% desc.`
-                : campaign.scope === 'categories'
-                  ? `Por ${campaign.minQty} uds. en ${catNames.join(', ') || 'categorías sel.'}, el ${campaign.discountOnNth}° tiene ${campaign.discountPct}% desc.`
-                  : `Por ${campaign.minQty} uds. en ${campaign.brands?.join(', ') || 'marcas sel.'}, el ${campaign.discountOnNth}° tiene ${campaign.discountPct}% desc.`}
             </div>
           )}
           {campaign.type === 'promotion' && parseInt(campaign.maxPerPurchase) > 0 && (
@@ -1297,11 +866,36 @@ export default function Discounts() {
         </Modal>
       )}
 
-      {/* ── Modal plantillas ───────────────────────────────────────────────── */}
+      {/* Modal plantillas */}
       {showTemplates && (
-        <TemplatesModal
-          onUse={handleTemplate}
-          onClose={() => setShowTemplates(false)}/>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h2 className="font-semibold text-gray-800 dark:text-slate-100">⚡ Plantillas de campañas</h2>
+              <button onClick={() => setShowTemplates(false)} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-5">
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Selecciona una plantilla y personaliza las fechas y el alcance.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {CAMPAIGN_TEMPLATES.map((tpl, i) => {
+                  const typeCfg = CAMPAIGN_TYPES.find(t => t.value === tpl.type)
+                  return (
+                    <button key={i} onClick={() => handleTemplate(tpl)}
+                      className="flex items-start gap-3 p-4 border border-gray-200 dark:border-slate-600 rounded-xl hover:border-blue-300 hover:bg-blue-50 text-left transition-all">
+                      <span className="text-2xl">{tpl.icon}</span>
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800 dark:text-slate-100">{tpl.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{typeCfg?.label} · {tpl.type !== 'promotion' ? `${tpl.discountPct}% descuento` : `${tpl.buyQty}×${tpl.payQty}`}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Confirm eliminar */}

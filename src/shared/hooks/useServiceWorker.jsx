@@ -23,6 +23,35 @@ export const useServiceWorker = () => {
     }
   }, [])
 
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      console.warn('[SW] Notificaciones no soportadas en este navegador')
+      return null
+    }
+
+    if (Notification.permission === 'granted') {
+      return 'granted'
+    }
+
+    if (Notification.permission === 'denied') {
+      toast.error('Las notificaciones están bloqueadas en el navegador', { icon: '🔕' })
+      return 'denied'
+    }
+
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        toast.success('Permiso de notificaciones habilitado', { icon: '🔔' })
+      } else {
+        toast('Notificaciones no autorizadas', { icon: '⚠️' })
+      }
+      return permission
+    } catch (error) {
+      console.error('[SW] Error solicitando permiso de notificaciones:', error)
+      return null
+    }
+  }
+
   const registerServiceWorker = async () => {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', {
@@ -31,6 +60,10 @@ export const useServiceWorker = () => {
 
       console.log('✅ Service Worker registrado:', reg.scope)
       setRegistration(reg)
+
+      if ('Notification' in window && Notification.permission === 'default') {
+        await requestNotificationPermission()
+      }
 
       // Escuchar actualizaciones
       reg.addEventListener('updatefound', () => {

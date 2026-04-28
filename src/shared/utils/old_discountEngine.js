@@ -165,60 +165,6 @@ export function evaluateDiscounts(cartItems, products, campaigns) {
         })
       }
     }
-
-    // ── 4. LÍNEA (Compra X lleva desc. en N°) ──────────────────────────────
-    // Regla: si la cantidad total elegible >= minQty,
-    // se aplica discountPct% al precio unitario del item nro. discountOnNth
-    // una sola vez por compra (regla de negocio).
-    if (c.type === 'line') {
-      const minQty      = parseInt(c.minQty)       || 0  // cantidad mínima que activa
-      const onNth       = parseInt(c.discountOnNth) || 0  // al N-ésimo producto se aplica
-      const pct         = parseFloat(c.discountPct) || 0
-      if (minQty < 1 || onNth <= minQty || pct <= 0) continue
-
-      // 1. Contar unidades totales elegibles en el carrito
-      let totalEligible = 0
-      cartItems.forEach(item => {
-        const product = products.find(p => p.id === item.productId)
-        if (productInScope(product, c)) totalEligible += item.quantity
-      })
-
-      // 2. ¿Se alcanza el umbral?
-      if (totalEligible < minQty) continue
-
-      // 3. Aplicar descuento sobre 1 unidad del producto de mayor precio en scope
-      //    (representa el N-ésimo producto, aplicado UNA sola vez)
-      const eligibleItems = cartItems
-        .filter(item => {
-          const product = products.find(p => p.id === item.productId)
-          return productInScope(product, c)
-        })
-        .sort((a, b) => b.unitPrice - a.unitPrice)  // mayor precio primero
-
-      if (eligibleItems.length === 0) continue
-
-      // Descuento = pct% del precio de 1 unidad del item beneficiado
-      const benefitItem  = eligibleItems[0]
-      const disc         = parseFloat((benefitItem.unitPrice * pct / 100).toFixed(2))
-      if (disc <= 0) continue
-
-      const key = benefitItem._key || benefitItem.productId
-      itemMap[key].campaignDiscount = parseFloat((itemMap[key].campaignDiscount + disc).toFixed(2))
-      itemMap[key].netTotal         = parseFloat(Math.max(0, itemMap[key].netTotal - disc).toFixed(2))
-      itemMap[key].discountDetails.push({
-        campaignId:   c.id,
-        campaignName: c.name,
-        type:         'line',
-        icon:         c.icon || '🏪',
-        amount:       disc,
-        label:        `Compra ${minQty}, el ${onNth}° con ${pct}% — 1 ud. en ${benefitItem.productName}`,
-        minQty,
-        onNth,
-        totalEligible,
-        appliedOnce:  true,
-      })
-      byItem = parseFloat((byItem + disc).toFixed(2))
-    }
   }
 
   const totalCampaignSaving = parseFloat((byItem + byGlobal).toFixed(2))
@@ -233,10 +179,10 @@ export function evaluateDiscounts(cartItems, products, campaigns) {
 
 // ─── Constantes de UI ────────────────────────────────────────────────────────
 export const CAMPAIGN_TYPES = [
-  { value: 'campaign',  label: 'Campaña temporal',          icon: '🏷️', desc: 'Descuento % en productos por temporada (Navidad, Día de la Madre...)' },
-  { value: 'promotion', label: 'Promoción NxM',              icon: '🎁', desc: '2×1, 3×2 — el cliente lleva más pagando menos' },
-  { value: 'volume',    label: 'Descuento por volumen',      icon: '📦', desc: '% cuando el subtotal supera un monto mínimo' },
-  { value: 'line',      label: 'Compra X lleva desc. en N°', icon: '🏪', desc: 'Por comprar X unidades, el siguiente producto tiene Y% de descuento' },
+  { value: 'campaign',  label: 'Campaña',              icon: '🏷️', desc: 'Descuento % en productos específicos por temporada (Navidad, Día de la Madre...)' },
+  { value: 'promotion', label: 'Promoción NxM',         icon: '🎁', desc: '2×1, 3×2 — el cliente lleva más pagando menos' },
+  { value: 'volume',    label: 'Descuento por volumen', icon: '📦', desc: '% sobre la compra cuando el total supera un monto mínimo' },
+  { value: 'line',      label: 'Línea de productos',   icon: '🏪', desc: '% sobre categoría o marca completa' },
 ]
 
 export const SCOPE_OPTIONS = [
@@ -254,17 +200,16 @@ export const DAYS_OF_WEEK = [
 ]
 
 export const CAMPAIGN_TEMPLATES = [
-  { name: '💜 Día de la Madre',         icon: '💜', type: 'campaign',  discountPct: 15, scope: 'all' },
-  { name: '👔 Día del Padre',            icon: '👔', type: 'campaign',  discountPct: 10, scope: 'all' },
-  { name: '❤️ San Valentín',             icon: '❤️', type: 'campaign',  discountPct: 12, scope: 'all' },
-  { name: '🎄 Navidad',                  icon: '🎄', type: 'campaign',  discountPct: 20, scope: 'all' },
-  { name: '🎉 Fiestas Patrias',           icon: '🎉', type: 'campaign',  discountPct: 10, scope: 'all' },
-  { name: '🛒 Cyber Monday',             icon: '🛒', type: 'campaign',  discountPct: 25, scope: 'all' },
-  { name: '⚡ Flash Sale',                icon: '⚡', type: 'campaign',  discountPct: 30, scope: 'all' },
-  { name: '2×1 Producto destacado',      icon: '🎁', type: 'promotion', buyQty: 2, payQty: 1, scope: 'products', maxPerPurchase: 1 },
-  { name: '3×2 Temporada',               icon: '🎁', type: 'promotion', buyQty: 3, payQty: 2, scope: 'products', maxPerPurchase: 0 },
-  { name: '5% compra ≥ S/100',           icon: '📦', type: 'volume',    discountPct: 5,  minAmount: 100, scope: 'all' },
-  { name: '10% compra ≥ S/300',          icon: '📦', type: 'volume',    discountPct: 10, minAmount: 300, scope: 'all' },
-  { name: 'Compra 3 Lácteos, 4to 50%',  icon: '🏪', type: 'line', discountPct: 50, minQty: 3, discountOnNth: 4, scope: 'categories' },
-  { name: 'Compra 2 Nike, 3er 40%',     icon: '🏪', type: 'line', discountPct: 40, minQty: 2, discountOnNth: 3, scope: 'brand' },
+  { name: '💜 Día de la Madre',       icon: '💜', type: 'campaign',  discountPct: 15, scope: 'all' },
+  { name: '👔 Día del Padre',          icon: '👔', type: 'campaign',  discountPct: 10, scope: 'all' },
+  { name: '❤️ San Valentín',           icon: '❤️', type: 'campaign',  discountPct: 12, scope: 'all' },
+  { name: '🎄 Navidad',                icon: '🎄', type: 'campaign',  discountPct: 20, scope: 'all' },
+  { name: '🎉 Fiestas Patrias',         icon: '🎉', type: 'campaign',  discountPct: 10, scope: 'all' },
+  { name: '🛒 Cyber Monday',           icon: '🛒', type: 'campaign',  discountPct: 25, scope: 'all' },
+  { name: '⚡ Flash Sale',              icon: '⚡', type: 'campaign',  discountPct: 30, scope: 'all' },
+  { name: '2×1 Producto destacado',    icon: '🎁', type: 'promotion', buyQty: 2, payQty: 1, scope: 'products', maxPerPurchase: 1 },
+  { name: '3×2 Temporada',             icon: '🎁', type: 'promotion', buyQty: 3, payQty: 2, scope: 'products', maxPerPurchase: 0 },
+  { name: '5% compra ≥ S/100',         icon: '📦', type: 'volume',    discountPct: 5,  minAmount: 100, scope: 'all' },
+  { name: '10% compra ≥ S/300',        icon: '📦', type: 'volume',    discountPct: 10, minAmount: 300, scope: 'all' },
+  { name: '15% línea Bebidas',         icon: '🏪', type: 'line',      discountPct: 15, scope: 'categories' },
 ]

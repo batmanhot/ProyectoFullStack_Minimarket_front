@@ -160,6 +160,7 @@ export function getInitialDemoState() {
   return {
     suppliers:         [...SEED_SUPPLIERS],
     categories:        [...SEED_CATEGORIES],
+    brands:            [...SEED_BRANDS],
     products:          SEED_PRODUCTS.map(p => ({ ...p })),
     clients:           [...SEED_CLIENTS],
     users:             [...SEED_USERS],
@@ -176,3 +177,22 @@ export function getInitialDemoState() {
     nextInvoice: Math.max(...SEED_SALES.map(s => parseInt(s.invoiceNumber.split('-')[1] || '0'))) + 1,
   }
 }
+
+// ─── MARCAS ───────────────────────────────────────────────────────────────────
+export const SEED_BRANDS = [
+  { id: 'brn-001', name: 'Alicorp',       description: 'Corporación alimentaria peruana',   color: '#f97316', isActive: true, createdAt: subtractDays(120) },
+  { id: 'brn-002', name: 'Gloria',        description: 'Lácteos y derivados',                color: '#3b82f6', isActive: true, createdAt: subtractDays(115) },
+  { id: 'brn-003', name: 'Backus',        description: 'Bebidas y gaseosas',                 color: '#eab308', isActive: true, createdAt: subtractDays(110) },
+  { id: 'brn-004', name: 'Procter & Gamble', description: 'Higiene y limpieza del hogar',   color: '#8b5cf6', isActive: true, createdAt: subtractDays(105) },
+  { id: 'brn-005', name: 'Quaker',        description: 'Cereales y avenas',                  color: '#ef4444', isActive: true, createdAt: subtractDays(100) },
+  { id: 'brn-006', name: 'Nestlé',        description: 'Alimentos y bebidas globales',       color: '#ec4899', isActive: true, createdAt: subtractDays(95)  },
+  { id: 'brn-007', name: 'Coca-Cola',     description: 'Bebidas carbonatadas y jugos',       color: '#dc2626', isActive: true, createdAt: subtractDays(90)  },
+  { id: 'brn-008', name: 'Colgate',       description: 'Higiene dental y personal',          color: '#06b6d4', isActive: true, createdAt: subtractDays(85)  },
+  { id: 'brn-009', name: 'Ariel',         description: 'Detergentes y limpieza de ropa',     color: '#10b981', isActive: true, createdAt: subtractDays(80)  },
+  { id: 'brn-010', name: 'Clorox',        description: 'Productos de desinfección',          color: '#f59e0b', isActive: true, createdAt: subtractDays(75)  },
+  { id: 'brn-011', name: 'Huggies',       description: 'Pañales y cuidado del bebé',         color: '#6366f1', isActive: true, createdAt: subtractDays(70)  },
+  { id: 'brn-012', name: 'Don Vittorio',  description: 'Pastas y fideos',                    color: '#f97316', isActive: true, createdAt: subtractDays(65)  },
+  { id: 'brn-013', name: 'San Luis',      description: 'Agua mineral',                       color: '#0ea5e9', isActive: true, createdAt: subtractDays(60)  },
+  { id: 'brn-014', name: 'Frugos',        description: 'Jugos y néctares de frutas',         color: '#84cc16', isActive: true, createdAt: subtractDays(55)  },
+  { id: 'brn-015', name: 'Lays',          description: 'Snacks y papas fritas',              color: '#fbbf24', isActive: true, createdAt: subtractDays(50)  },
+]

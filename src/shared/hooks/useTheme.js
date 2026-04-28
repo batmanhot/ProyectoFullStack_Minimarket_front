@@ -1,28 +1,28 @@
 import { useState, useEffect } from 'react'
 
-// Temas disponibles: 'light' | 'dark' | 'ocean' | 'forest'
+const THEMES = ['light', 'dark', 'ocean', 'forest', 'sunset', 'midnight', 'nature']
+
 export function useTheme() {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('pos_theme') || 'light'
+    const saved = localStorage.getItem('pos_theme') || 'light'
+    return THEMES.includes(saved) ? saved : 'light'
   })
 
   useEffect(() => {
     const root = document.documentElement
-    // Limpiar todos los atributos de tema anteriores
+    // Limpiar todo
     root.classList.remove('dark')
-    root.removeAttribute('data-theme')
-
+    // Aplicar data-theme para TODOS los temas (el CSS lo consume)
     root.setAttribute('data-theme', theme)
-    if (theme === 'dark') root.classList.add('dark')
-
+    // Agregar clase .dark solo para dark/ocean/forest/sunset/midnight/nature
+    if (theme !== 'light') {
+      root.classList.add('dark')
+    }
     localStorage.setItem('pos_theme', theme)
   }, [theme])
 
-  const toggle = () => setTheme(t => {
-    const order = ['light', 'dark', 'ocean', 'forest']
-    return order[(order.indexOf(t) + 1) % order.length]
-  })
-  const setDirect = (t) => setTheme(t)
+  const toggle   = () => setTheme(t => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length])
+  const setDirect = (t) => setTheme(THEMES.includes(t) ? t : 'light')
 
   return { theme, toggle, setDirect }
 }
