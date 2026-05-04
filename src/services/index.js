@@ -365,6 +365,8 @@ export const purchaseService = {
     return ok(gs().purchases, gs().purchases.length)
   },
 
+  
+
   async create(payload) {
     await delay()
     if (USE_API) { const { data } = await api.post('/purchases', payload); return ok(data.data) }
@@ -398,5 +400,311 @@ export const purchaseService = {
 
     useStore.getState().addPurchase(purchase)
     return ok(purchase)
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RETURN SERVICE — Devoluciones / Notas de Crédito
+// ═════════════════════════════════════════════════════════════════════════════
+// Endpoints esperados del backend:
+//   POST   /returns          → crear NC
+//   GET    /returns          → listar NCs (con filtros opcionales)
+//   GET    /returns/:id      → detalle de una NC
+//   PATCH  /returns/:id/anular → anular NC (con motivo)
+// ─────────────────────────────────────────────────────────────────────────────
+export const returnService = {
+
+  /** Crea una Nota de Crédito y actualiza el stock + status de la venta original */
+  async create(payload) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.post('/returns', payload)
+      return ok(data.data)
+    }
+
+    const state = gs()
+
+    // 1. Guardar la NC
+    const creditNote = {
+      ...payload,
+      id:        payload.id        || crypto.randomUUID(),
+      status:    payload.status    || 'completada',
+      createdAt: payload.createdAt || new Date().toISOString(),
+    }
+    state.addReturn(creditNote)
+
+    // 2. Restaurar stock de cada ítem devuelto
+    for (const item of payload.items || []) {
+      const freshState = useStore.getState()
+      const product    = freshState.products.find((p) => p.id === item.productId)
+      if (!product) continue
+
+      const newStock = product.stock + item.quantity
+      freshState.updateProduct(item.productId, { stock: newStock })
+      freshState.addStockMovement({
+        id:            crypto.randomUUID(),
+        productId:     item.productId,
+        productName:   item.productName,
+        type:          'entrada',
+        quantity:      item.quantity,
+        previousStock: product.stock,
+        newStock,
+        reason:        `Devolución NC ${creditNote.ncNumber}`,
+        userId:        payload.userId,
+        createdAt:     creditNote.createdAt,
+      })
+    }
+
+    // 3. Actualizar status de la venta original
+    if (payload.saleId) {
+      const freshState       = useStore.getState()
+      const originalSale     = freshState.sales.find((s) => s.id === payload.saleId)
+      const allReturns       = freshState.returns || []
+
+      if (originalSale) {
+        const totalOriginalQty  = originalSale.items.reduce((a, i) => a + i.quantity, 0)
+        const totalReturnedQty  = [
+          ...allReturns.filter((r) => r.saleId === payload.saleId && r.status !== 'anulada'),
+          creditNote,
+        ].flatMap((r) => r.items).reduce((a, i) => a + i.quantity, 0)
+
+        freshState.updateSale(payload.saleId, {
+          status: totalReturnedQty >= totalOriginalQty ? 'devolucion' : 'dev-parcial',
+        })
+      }
+    }
+
+    return ok(creditNote)
+  },
+
+  /** Lista todas las NCs, con filtros opcionales */
+  async getAll(filters = {}) {
+    await delay(180)
+    if (USE_API) {
+      const { data } = await api.get('/returns', { params: filters })
+      return ok(data.data, data.meta?.total)
+    }
+
+    let returns = gs().returns || []
+    if (filters.status)   returns = returns.filter((r) => r.status === filters.status)
+    if (filters.saleId)   returns = returns.filter((r) => r.saleId === filters.saleId)
+    if (filters.dateFrom) returns = returns.filter((r) => new Date(r.createdAt) >= new Date(filters.dateFrom))
+    if (filters.dateTo)   returns = returns.filter((r) => new Date(r.createdAt) <= new Date(filters.dateTo + 'T23:59:59'))
+
+    return ok(
+      returns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+      returns.length
+    )
+  },
+
+  /** Obtiene una NC por ID */
+  async getById(id) {
+    await delay(100)
+    if (USE_API) {
+      const { data } = await api.get(`/returns/${id}`)
+      return ok(data.data)
+    }
+    const nc = (gs().returns || []).find((r) => r.id === id)
+    return nc ? ok(nc) : fail('Nota de Crédito no encontrada')
+  },
+
+  /** Anula una NC (no la elimina — la marca como anulada con motivo) */
+  async anular(id, motivo, userId) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.patch(`/returns/${id}/anular`, { motivo, userId })
+      return ok(data.data)
+    }
+
+    const state = gs()
+    const nc    = (state.returns || []).find((r) => r.id === id)
+    if (!nc) return fail('Nota de Crédito no encontrada')
+    if (nc.status === 'anulada') return fail('Esta NC ya fue anulada')
+
+    // Revertir el stock que se había restaurado
+    for (const item of nc.items || []) {
+      const freshState = useStore.getState()
+      const product    = freshState.products.find((p) => p.id === item.productId)
+      if (!product) continue
+      const newStock = Math.max(0, product.stock - item.quantity)
+      freshState.updateProduct(item.productId, { stock: newStock })
+    }
+
+    // Revertir el status de la venta original
+    if (nc.saleId) {
+      const freshState = useStore.getState()
+      const sale       = freshState.sales.find((s) => s.id === nc.saleId)
+      if (sale && (sale.status === 'devolucion' || sale.status === 'dev-parcial')) {
+        freshState.updateSale(nc.saleId, { status: 'completada' })
+      }
+    }
+
+    state.anularReturn(id, motivo)
+    return ok({ id, status: 'anulada' })
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DISCOUNT CAMPAIGN SERVICE — Campañas de descuento
+// ═════════════════════════════════════════════════════════════════════════════
+// Endpoints esperados del backend:
+//   GET    /campaigns           → listar campañas (con filtros)
+//   POST   /campaigns           → crear campaña
+//   PUT    /campaigns/:id       → actualizar campaña
+//   DELETE /campaigns/:id       → eliminar campaña
+//   PATCH  /campaigns/:id/toggle → activar/desactivar
+// ─────────────────────────────────────────────────────────────────────────────
+export const discountCampaignService = {
+
+  /** Lista todas las campañas, con filtros opcionales */
+  async getAll(filters = {}) {
+    await delay(150)
+    if (USE_API) {
+      const { data } = await api.get('/campaigns', { params: filters })
+      return ok(data.data, data.meta?.total)
+    }
+
+    let campaigns = gs().discountCampaigns || []
+    if (filters.type)     campaigns = campaigns.filter((c) => c.type === filters.type)
+    if (filters.isActive !== undefined) {
+      campaigns = campaigns.filter((c) => c.isActive === filters.isActive)
+    }
+    return ok(
+      campaigns.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
+      campaigns.length
+    )
+  },
+
+  /** Crea una nueva campaña */
+  async create(payload) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.post('/campaigns', payload)
+      return ok(data.data)
+    }
+    const campaign = {
+      ...payload,
+      id:        payload.id        || crypto.randomUUID(),
+      createdAt: payload.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    gs().addDiscountCampaign(campaign)
+    return ok(campaign)
+  },
+
+  /** Actualiza una campaña existente */
+  async update(id, updates) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.put(`/campaigns/${id}`, updates)
+      return ok(data.data)
+    }
+    gs().updateDiscountCampaign(id, { ...updates, updatedAt: new Date().toISOString() })
+    return ok({ id, ...updates })
+  },
+
+  /** Activa o desactiva una campaña */
+  async toggle(id, isActive) {
+    await delay(150)
+    if (USE_API) {
+      const { data } = await api.patch(`/campaigns/${id}/toggle`, { isActive })
+      return ok(data.data)
+    }
+    gs().updateDiscountCampaign(id, { isActive, updatedAt: new Date().toISOString() })
+    return ok({ id, isActive })
+  },
+
+  /** Elimina una campaña permanentemente */
+  async remove(id) {
+    await delay()
+    if (USE_API) {
+      await api.delete(`/campaigns/${id}`)
+      return ok({ id, deleted: true })
+    }
+    gs().deleteDiscountCampaign(id)
+    return ok({ id, deleted: true })
+  },
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DISCOUNT TICKET SERVICE — Vales / Tickets de descuento
+// ═════════════════════════════════════════════════════════════════════════════
+// Endpoints esperados:
+//   GET    /tickets           → listar tickets
+//   POST   /tickets           → crear ticket
+//   PUT    /tickets/:id       → actualizar ticket
+//   DELETE /tickets/:id       → eliminar ticket
+//   POST   /tickets/:code/redeem → canjear ticket
+// ─────────────────────────────────────────────────────────────────────────────
+export const discountTicketService = {
+
+  async getAll(filters = {}) {
+    await delay(150)
+    if (USE_API) {
+      const { data } = await api.get('/tickets', { params: filters })
+      return ok(data.data, data.meta?.total)
+    }
+    let tickets = gs().discountTickets || []
+    if (filters.used !== undefined) tickets = tickets.filter((t) => t.used === filters.used)
+    if (filters.isActive !== undefined) tickets = tickets.filter((t) => t.isActive === filters.isActive)
+    return ok(tickets, tickets.length)
+  },
+
+  async create(payload) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.post('/tickets', payload)
+      return ok(data.data)
+    }
+    const ticket = { ...payload, id: crypto.randomUUID(), used: false, createdAt: new Date().toISOString() }
+    gs().addDiscountTicket(ticket)
+    return ok(ticket)
+  },
+
+  async update(id, updates) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.put(`/tickets/${id}`, updates)
+      return ok(data.data)
+    }
+    gs().updateDiscountTicket(id, updates)
+    return ok({ id, ...updates })
+  },
+
+  async remove(id) {
+    await delay()
+    if (USE_API) { await api.delete(`/tickets/${id}`); return ok({ id, deleted: true }) }
+    gs().deleteDiscountTicket(id)
+    return ok({ id, deleted: true })
+  },
+
+  /** Valida un código de ticket antes de aplicarlo en el POS */
+  async validate(code) {
+    await delay(100)
+    if (USE_API) {
+      const { data } = await api.get(`/tickets/validate/${code}`)
+      return ok(data.data)
+    }
+    const ticket = (gs().discountTickets || []).find(
+      (t) => t.code?.toUpperCase() === code?.toUpperCase()
+    )
+    if (!ticket)          return fail('Código no encontrado')
+    if (!ticket.isActive) return fail('Ticket desactivado')
+    if (ticket.used)      return fail('Ticket ya fue utilizado')
+    const now = new Date()
+    if (ticket.validFrom && now < new Date(ticket.validFrom))            return fail('Ticket aún no vigente')
+    if (ticket.validTo   && now > new Date(ticket.validTo + 'T23:59:59')) return fail('Ticket vencido')
+    return ok(ticket)
+  },
+
+  /** Canjea un ticket vinculándolo a una venta */
+  async redeem(code, saleId, saleTotal, userId) {
+    await delay()
+    if (USE_API) {
+      const { data } = await api.post(`/tickets/${code}/redeem`, { saleId, saleTotal, userId })
+      return ok(data.data)
+    }
+    gs().redeemDiscountTicket(code, saleId, saleTotal, userId)
+    return ok({ code, saleId, redeemed: true })
   },
 }

@@ -10,6 +10,7 @@ import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
 import { evaluateDiscounts } from '../../shared/utils/discountEngine'
+import { useBarcodeScanner } from '../../shared/hooks/useBarcodeScanner'
 
 export default function POS() {
   const {
@@ -131,6 +132,23 @@ export default function POS() {
     searchRef.current?.focus()
     toast.success(`${product.name} agregado`, { duration: 1000, icon: '✓' })
   }
+
+  // ── F1: BARCODE SCANNER HID ──────────────────────────────────────────────
+  // Detecta lectores USB/Bluetooth: caracteres en ráfaga (<50ms) + Enter.
+  // enabled=false cuando hay modales abiertos para evitar conflictos.
+  // Reutiliza handleSelectProduct sin ningún cambio adicional.
+  useBarcodeScanner({
+    enabled: !showPayment && !showTicket && !showClearConfirm,
+    onScan: (barcode) => {
+      const product = products.find(p => p.barcode === barcode && p.isActive)
+      if (product) {
+        handleSelectProduct(product)
+      } else {
+        toast.error(`Código "${barcode}" no encontrado`, { duration: 2000, icon: '⚠️' })
+      }
+    },
+  })
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleUpdateQty = (key, newQty) => {
     const item    = cart.find(i => i._key===key || i.productId===key)

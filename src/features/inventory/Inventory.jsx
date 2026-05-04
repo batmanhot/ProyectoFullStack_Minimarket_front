@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useStore, selectLowStockProducts } from '../../store/index'
 import { useForm } from 'react-hook-form'
+import Stocktaking from './Stocktaking'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { stockAdjustSchema } from '../../shared/schemas/index'
 import { productService } from '../../services/index'
@@ -141,11 +142,12 @@ export default function Inventory() {
   const [search, setSearch]       = useState('')
   const [categoryFilter, setCatF] = useState('')
   const [tab, setTab]             = useState('products')
+  const [view, setView]           = useState('main')
   const [filters, setFilters]     = useState({ lowStock: false, nearExpiry: false })
   const [modal, setModal]         = useState(null)
   const dq = useDebounce(search, 150)
   const lowCount = useStore(s => selectLowStockProducts(s).length)
-
+   
   const filtered = useMemo(() => {
     let list = products.filter(p => p.isActive)
     if (dq)              { const q = dq.toLowerCase(); list = list.filter(p => p.name.toLowerCase().includes(q) || p.barcode.includes(q) || p.sku?.toLowerCase().includes(q)) }
@@ -185,6 +187,13 @@ export default function Inventory() {
       businessConfig?.name
     )
   }
+  
+  // Cuando el cajero pulsa "Inventario físico", muestra Stocktaking
+  // Al terminar, Stocktaking llama a onBack() y vuelve aquí
+  if (view === 'stocktaking') {
+    return <Stocktaking onBack={() => setView('main')} />
+  }
+
 
   return (
     <div className="p-6 space-y-4">
@@ -196,6 +205,14 @@ export default function Inventory() {
         <div className="flex gap-2 flex-wrap">
           <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
           <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
+          {/* ← AGREGAR ESTE BOTÓN */}
+          <button onClick={() => setView('stocktaking')} 
+            className="px-3 py-2 text-sm border border-blue-200 dark:border-blue-800
+                       text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50
+                       dark:hover:bg-blue-900/20 font-medium">
+            📋 Inventario físico
+          </button>
+
         </div>
       </div>
 

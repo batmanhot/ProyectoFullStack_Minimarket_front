@@ -11,7 +11,7 @@ export const APP_CONFIG = {
 export const ROLES = {
   admin: {
     label: 'Administrador', color: 'bg-blue-100 text-blue-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings'],
+    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns'],
   },
   gerente: {
     label: 'Gerente', color: 'bg-purple-100 text-purple-700',
@@ -19,13 +19,15 @@ export const ROLES = {
   },
   supervisor: {
     label: 'Supervisor', color: 'bg-amber-100 text-amber-700',
-    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets'],
+    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets','returns'],
   },
   cajero: {
     label: 'Cajero', color: 'bg-green-100 text-green-700',
-    pages: ['dashboard','pos','cash'],
+    pages: ['dashboard','pos','cash','returns'],    
   },
 }
+
+
 
 export const canAccess = (role, page) => ROLES[role]?.pages?.includes(page) ?? false
 
