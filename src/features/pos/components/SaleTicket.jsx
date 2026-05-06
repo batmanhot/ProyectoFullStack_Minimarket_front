@@ -32,32 +32,37 @@ function buildTicketHTML(sale, businessConfig) {
        </div>`
     : ''
 
-  // ── Líneas de ítems — 1 ud. por línea con descuento debajo ────────────────
+  // ── Líneas de ítems — datos reales: cantidad, PU, descuento, total ──────────
   const itemsHtml = (sale.items || []).map(item => {
-    const itemDiscount = (item.discount || 0) + (item.campaignDiscount || 0) ||
-                         (item.totalDiscount || 0)
+    const qty          = item.quantity || 1
+    const pu           = item.unitPrice || 0
+    const itemDiscount = parseFloat((
+      (item.totalDiscount || 0) ||
+      ((item.campaignDiscount || 0) + (item.discount || 0))
+    ).toFixed(2))
+    const lineTotal    = item.netTotal ?? item.subtotal ?? parseFloat((qty * pu - itemDiscount).toFixed(2))
     const discDetails  = item.discountDetails || []
 
-    const discHtml = itemDiscount > 0
-      ? discDetails.map(d =>
-          `<div style="font-size:9px;color:#059669;margin-left:2mm">
-             ${d.icon || '🏷️'} ${d.label || 'Descuento campaña'}: -${formatCurrency(d.amount)}
-           </div>`
-        ).join('') +
-        (item.manualDiscount > 0
-          ? `<div style="font-size:9px;color:#6b7280;margin-left:2mm">Dto. manual: -${formatCurrency(item.manualDiscount)}</div>`
-          : '')
-      : ''
+    const discHtml = discDetails.map(d =>
+      `<div style="font-size:9px;color:#059669;margin-left:2mm">
+         ${d.icon || '🏷️'} ${d.label || 'Campaña'}: -${formatCurrency(d.amount)}
+       </div>`
+    ).join('') +
+    (item.manualDiscount > 0
+      ? `<div style="font-size:9px;color:#6b7280;margin-left:2mm">Dto. manual: -${formatCurrency(item.manualDiscount)}</div>`
+      : '')
 
     return `
     <div style="margin-bottom:2.5mm">
-      <div style="font-weight:bold;font-size:10px">${item.productName}${item.lineIndexByProduct > 1 ? ` #${item.lineIndexByProduct}` : ''}</div>
+      <div style="font-weight:bold;font-size:10px">${item.productName}</div>
       <div style="display:flex;justify-content:space-between;font-size:10px">
-        <span>1 ${item.unit || 'u'} × ${formatCurrency(item.unitPrice)}</span>
-        <span>${formatCurrency(item.unitPrice)}</span>
+        <span style="flex:2">${item.unit || 'u'}</span>
+        <span style="width:22px;text-align:center">${qty}</span>
+        <span style="width:38px;text-align:right">${formatCurrency(pu)}</span>
+        <span style="width:32px;text-align:right">${itemDiscount > 0 ? '-'+formatCurrency(itemDiscount) : '—'}</span>
+        <span style="width:38px;text-align:right;font-weight:bold">${formatCurrency(lineTotal)}</span>
       </div>
       ${discHtml}
-      ${itemDiscount > 0 ? `<div style="font-size:9px;color:#dc2626;display:flex;justify-content:space-between"><span>  → Neto línea</span><span>${formatCurrency(item.netTotal || (item.unitPrice - itemDiscount))}</span></div>` : ''}
     </div>`
   }).join('')
 
@@ -125,9 +130,12 @@ function buildTicketHTML(sale, businessConfig) {
   ${sale.clientName ? `<div style="font-size:10px;margin-bottom:1mm"><strong>Cliente:</strong> ${sale.clientName}</div>` : ''}
 
   <hr class="hr">
-  <div class="row bold" style="font-size:10px;margin-bottom:1.5mm">
-    <span style="flex:1">DESCRIPCIÓN</span>
-    <span style="width:45px;text-align:right">PRECIO</span>
+  <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:bold;margin-bottom:1.5mm">
+    <span style="flex:2">PRODUCTO</span>
+    <span style="width:22px;text-align:center">CANT</span>
+    <span style="width:38px;text-align:right">P.U.</span>
+    <span style="width:32px;text-align:right">DSCT.</span>
+    <span style="width:38px;text-align:right">TOTAL</span>
   </div>
   <hr class="hr">
   ${itemsHtml}
@@ -190,9 +198,11 @@ export default function SaleTicket({ sale, onClose }) {
     const intl  = cleaned.startsWith('51') ? cleaned : `51${cleaned}`
 
     const itemLines = sale.items.map(item => {
+      const qty  = item.quantity || 1
+      const pu   = item.unitPrice || 0
       const disc = (item.totalDiscount || 0) || ((item.discount || 0) + (item.campaignDiscount || 0))
-      const net  = item.netTotal || (item.unitPrice - disc)
-      return `• ${item.productName}${item.lineIndexByProduct > 1 ? ` #${item.lineIndexByProduct}` : ''}\n  1 ${item.unit||'u'} × ${formatCurrency(item.unitPrice)}${disc > 0 ? ` → *${formatCurrency(net)}*` : ` = *${formatCurrency(item.unitPrice)}*`}`
+      const net  = item.netTotal ?? item.subtotal ?? parseFloat((qty * pu - disc).toFixed(2))
+      return `• ${item.productName}\n  ${qty} ${item.unit||'u'} × ${formatCurrency(pu)}${disc > 0 ? ` (-${formatCurrency(disc)})` : ''} = *${formatCurrency(net)}*`
     })
 
     const groupLines = groupSummary.map(g =>
@@ -287,16 +297,24 @@ export default function SaleTicket({ sale, onClose }) {
 
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' }}>
-                <span style={{ flex: 1 }}>DESCRIPCIÓN</span>
-                <span style={{ width: '50px', textAlign: 'right' }}>PRECIO</span>
+                <span style={{ flex: 2 }}>PRODUCTO</span>
+                <span style={{ width: '22px', textAlign: 'center' }}>CANT</span>
+                <span style={{ width: '42px', textAlign: 'right' }}>P.U.</span>
+                <span style={{ width: '36px', textAlign: 'right' }}>DSCT.</span>
+                <span style={{ width: '42px', textAlign: 'right' }}>TOTAL</span>
               </div>
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '4px 0' }}/>
 
-              {/* ── ÍTEMS — 1 línea por unidad con descuento debajo ── */}
+              {/* ── ÍTEMS — datos reales: CANT, PRODUCTO, P.U., DSCT., TOTAL ── */}
               {sale.items?.map((item, idx) => {
-                const itemDiscount = (item.totalDiscount || 0) ||
-                                     ((item.discount || 0) + (item.campaignDiscount || 0))
-                const netTotal     = item.netTotal || (item.unitPrice - itemDiscount)
+                const qty          = item.quantity || 1
+                const pu           = item.unitPrice || 0
+                const itemDiscount = parseFloat((
+                  (item.totalDiscount || 0) ||
+                  ((item.campaignDiscount || 0) + (item.discount || 0))
+                ).toFixed(2))
+                const lineTotal    = item.netTotal ?? item.subtotal ??
+                                     parseFloat((qty * pu - itemDiscount).toFixed(2))
                 const discDetails  = item.discountDetails || []
 
                 return (
@@ -304,38 +322,34 @@ export default function SaleTicket({ sale, onClose }) {
                     {/* Nombre del producto */}
                     <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
                       {item.productName}
-                      {item.lineIndexByProduct > 1 && (
-                        <span style={{ fontWeight: 'normal', color: '#888' }}> #{item.lineIndexByProduct}</span>
-                      )}
                     </div>
 
-                    {/* Precio unitario */}
+                    {/* CANT · P.U. · DSCT. · TOTAL */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span>1 {item.unit || 'u'} × {formatCurrency(item.unitPrice)}</span>
-                      <span>{formatCurrency(item.unitPrice)}</span>
+                      <span style={{ flex: 2, color: '#555' }}>{item.unit || 'u'}</span>
+                      <span style={{ width: '22px', textAlign: 'center' }}>{qty}</span>
+                      <span style={{ width: '42px', textAlign: 'right' }}>{formatCurrency(pu)}</span>
+                      <span style={{ width: '36px', textAlign: 'right', color: itemDiscount > 0 ? '#dc2626' : '#999' }}>
+                        {itemDiscount > 0 ? `-${formatCurrency(itemDiscount)}` : '—'}
+                      </span>
+                      <span style={{ width: '42px', textAlign: 'right', fontWeight: 'bold' }}>
+                        {formatCurrency(lineTotal)}
+                      </span>
                     </div>
 
                     {/* Detalle de descuento(s) de campaña */}
                     {discDetails.map((d, di) => (
-                      <div key={di} style={{ fontSize: '9px', color: '#059669', display: 'flex', justifyContent: 'space-between' }}>
+                      <div key={di} style={{ fontSize: '9px', color: '#059669', display: 'flex', justifyContent: 'space-between', marginLeft: '4px' }}>
                         <span>{d.icon || '🏷️'} {d.label}</span>
                         <span>-{formatCurrency(d.amount)}</span>
                       </div>
                     ))}
 
-                    {/* Descuento manual si existe */}
+                    {/* Descuento manual */}
                     {item.manualDiscount > 0 && (
-                      <div style={{ fontSize: '9px', color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: '9px', color: '#6b7280', display: 'flex', justifyContent: 'space-between', marginLeft: '4px' }}>
                         <span>Dto. manual</span>
                         <span>-{formatCurrency(item.manualDiscount)}</span>
-                      </div>
-                    )}
-
-                    {/* Neto de la línea si hubo descuento */}
-                    {itemDiscount > 0 && (
-                      <div style={{ fontSize: '9px', color: '#dc2626', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                        <span>  → Neto</span>
-                        <span>{formatCurrency(netTotal)}</span>
                       </div>
                     )}
                   </div>

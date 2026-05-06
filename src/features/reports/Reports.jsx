@@ -435,16 +435,31 @@ export default function Reports() {
                             </tr>
                           </thead>
                           <tbody>
-                            {s.items?.map((item, idx) => (
+                            {s.items?.map((item, idx) => {
+                              // Descuento real: campaña + manual + totalDiscount (cualquiera que venga)
+                              const itemDiscount = parseFloat((
+                                (item.totalDiscount || 0) ||
+                                ((item.campaignDiscount || 0) + (item.discount || 0))
+                              ).toFixed(2))
+                              // Subtotal real: netTotal > subtotal > calculado
+                              const itemSubtotal = item.netTotal ?? item.subtotal ??
+                                parseFloat(((item.quantity || 1) * item.unitPrice - itemDiscount).toFixed(2))
+
+                              return (
                               <tr key={idx} className="border-t border-gray-100 dark:border-slate-700">
                                 <td className="py-1.5 text-sm text-gray-800 dark:text-slate-100">{item.productName}</td>
                                 <td className="py-1.5 text-xs font-mono text-gray-400 dark:text-slate-500 text-right">{item.barcode}</td>
                                 <td className="py-1.5 text-sm text-right text-gray-600 dark:text-slate-300">{item.quantity} {item.unit || ''}</td>
                                 <td className="py-1.5 text-sm text-right text-gray-600 dark:text-slate-300">{formatCurrency(item.unitPrice)}</td>
-                                <td className="py-1.5 text-sm text-right text-green-600">{item.discount > 0 ? `-${formatCurrency(item.discount)}` : '—'}</td>
-                                <td className="py-1.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">{formatCurrency(item.subtotal)}</td>
+                                <td className="py-1.5 text-sm text-right text-green-600">
+                                  {itemDiscount > 0 ? `-${formatCurrency(itemDiscount)}` : '—'}
+                                </td>
+                                <td className="py-1.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">
+                                  {formatCurrency(itemSubtotal)}
+                                </td>
                               </tr>
-                            ))}
+                              )
+                            })}
                           </tbody>
                         </table>
                         <div className="flex justify-between text-sm font-semibold text-gray-800 dark:text-slate-100 pt-2 border-t border-gray-200 dark:border-slate-600 mt-2">

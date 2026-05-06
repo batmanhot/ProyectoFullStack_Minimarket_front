@@ -312,50 +312,45 @@ export default function Returns() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-full bg-gray-50 dark:bg-gray-900">
+    <div className="p-6 space-y-6">
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-8 py-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xl">↩️</div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">Devoluciones</h1>
-                <p className="text-sm text-gray-400 dark:text-slate-500">Gestión de devoluciones y emisión de Notas de Crédito</p>
-              </div>
-            </div>
-            {step === 'done' && creditNote && (
-              <div className="flex gap-2">
-                <button onClick={() => setShowNC(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-colors">
-                  🖨️ Imprimir NC
-                </button>
-                <button onClick={handleReset}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 text-sm font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-                  + Nueva devolución
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="NCs hoy"         value={kpis.todayCount}               icon="📋" color="purple"
-              sub={kpis.todayCount === 0 ? 'Sin devoluciones hoy' : `${kpis.todayCount} emitida${kpis.todayCount > 1 ? 's' : ''}`}/>
-            <KpiCard label="Reembolsado hoy" value={formatCurrency(kpis.todayAmt)} icon="💸" color="red"
-              sub="Precio neto pagado"/>
-            <KpiCard label="Total histórico" value={kpis.total}                    icon="📂" color="blue"
-              sub="Notas de crédito emitidas"/>
-            <KpiCard label="Monto total"     value={formatCurrency(kpis.totalAmt)} icon="🔢" color="green"
-              sub="Acumulado reembolsado"/>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-xl">↩️</div>
+          <div>
+            <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Devoluciones</h1>
+            <p className="text-sm text-gray-400 dark:text-slate-500">Gestión de devoluciones y emisión de Notas de Crédito</p>
           </div>
         </div>
+        {step === 'done' && creditNote && (
+          <div className="flex gap-2">
+            <button onClick={() => setShowNC(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-colors">
+              🖨️ Imprimir NC
+            </button>
+            <button onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 text-sm font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+              + Nueva devolución
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard label="NCs hoy"         value={kpis.todayCount}               icon="📋" color="purple"
+          sub={kpis.todayCount === 0 ? 'Sin devoluciones hoy' : `${kpis.todayCount} emitida${kpis.todayCount > 1 ? 's' : ''}`}/>
+        <KpiCard label="Reembolsado hoy" value={formatCurrency(kpis.todayAmt)} icon="💸" color="red"
+          sub="Precio neto pagado"/>
+        <KpiCard label="Total histórico" value={kpis.total}                    icon="📂" color="blue"
+          sub="Notas de crédito emitidas"/>
+        <KpiCard label="Monto total"     value={formatCurrency(kpis.totalAmt)} icon="🔢" color="green"
+          sub="Acumulado reembolsado"/>
       </div>
 
       {/* ── CONTENIDO ──────────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-8 py-8">
-        <div className={`flex gap-8 ${isFlowActive ? 'items-start' : ''}`}>
+      <div className={`flex gap-6 ${isFlowActive ? 'items-start' : ''}`}>
 
           {/* ════════════════════════════════════════════════════════════════
               COLUMNA IZQUIERDA — Flujo del proceso
@@ -869,7 +864,6 @@ export default function Returns() {
             </div>
           )}
         </div>
-      </div>
 
       {/* ── MODAL NC ───────────────────────────────────────────────────────── */}
       {showNC && creditNote && (

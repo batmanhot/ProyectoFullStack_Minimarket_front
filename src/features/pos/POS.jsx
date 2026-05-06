@@ -253,7 +253,7 @@ export default function POS() {
         clientId:      clientId || null,
         userId:        currentUser?.id,
         userName:      currentUser?.fullName,
-        items:         cart,
+        items:         mergedCartItems,   // ← FIX: contiene campaignDiscount, totalDiscount, netTotal
         subtotalBruto,
         totalDescuentos,
         total:          totalAPagar,
