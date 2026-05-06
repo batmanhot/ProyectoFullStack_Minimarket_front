@@ -10,7 +10,13 @@ import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
 import { evaluateDiscounts } from '../../shared/utils/discountEngine'
-import { useBarcodeScanner } from '../../shared/hooks/useBarcodeScanner'
+// ── F5: LoyaltyBadge ahora vive dentro de PaymentPanel (donde es visible) ────
+// import LoyaltyBadge from './components/LoyaltyBadge'  ← ya no necesario aquí
+// ─────────────────────────────────────────────────────────────────────────────
+// ── F2: Hold / Suspender venta ───────────────────────────────────────────────
+import { useCartHold }    from './hooks/useCartHold'
+import HeldCartsPanel     from './components/HeldCartsPanel'
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function POS() {
   const {
@@ -24,6 +30,58 @@ export default function POS() {
   const [search, setSearch]               = useState('')
   const [showResults, setShowResults]     = useState(false)
   const [processing, setProcessing]       = useState(false)
+  // ── F5: cliente seleccionado en el panel de pago (para mostrar sus puntos) ─
+  const [selectedClientId, setSelectedClientId] = useState(null)
+  const selectedClient = clients.find(c => c.id === selectedClientId) || null
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // ── F2: Hold / Suspender ventas ─────────────────────────────────────────────
+  // Permite guardar el carrito actual y empezar una nueva venta.
+  // Máximo 5 slots en memoria (se pierden al recargar la página).
+  const { heldCarts, holdCart, recoverCart, discardHold, canHold } = useCartHold()
+  const [showHeldCarts, setShowHeldCarts] = useState(false)
+
+  const handleHoldCart = () => {
+    if (cart.length === 0) { toast('El carrito está vacío', { icon: 'ℹ️' }); return }
+    if (!canHold)          { toast.error('Máximo 5 ventas en espera'); return }
+    // Nombre del cliente activo como label del hold (si hay uno)
+    const label = selectedClient?.name || ''
+    const id    = holdCart(cart, label)
+    if (id) {
+      clearCart()
+      setGlobalDiscount('')
+      setDiscountEdit({})
+      setSelectedClientId(null)
+      toast.success('Venta suspendida — puedes atender otro cliente', { icon: '⏸️', duration: 2500 })
+    }
+  }
+
+  const handleRecoverCart = (holdId) => {
+    // recoverCart (Zustand) es SÍNCRONO — devuelve los ítems en el mismo ciclo
+    // y ya eliminó el hold del store antes de retornar.
+    const items = recoverCart(holdId)
+    if (!items || items.length === 0) {
+      toast.error('No se pudo recuperar la venta')
+      return
+    }
+
+    // Restaurar carrito completo con todos los campos originales
+    // (unitPrice, discount, _key, subtotal, etc.)
+    const restoredItems = items.map(item => ({
+      ...item,
+      _key: item._key || item.productId,
+      id:   crypto.randomUUID(),
+    }))
+
+    useStore.setState({ cart: restoredItems })
+    setShowHeldCarts(false)
+
+    toast.success(
+      `Venta recuperada — ${restoredItems.length} producto(s) cargados al carrito`,
+      { icon: '▶️', duration: 2500 }
+    )
+  }
+  // ──────────────────────────────────────────────────────────────────────────
   const [completedSale, setCompletedSale] = useState(null)
   const [showTicket, setShowTicket]       = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -133,23 +191,6 @@ export default function POS() {
     toast.success(`${product.name} agregado`, { duration: 1000, icon: '✓' })
   }
 
-  // ── F1: BARCODE SCANNER HID ──────────────────────────────────────────────
-  // Detecta lectores USB/Bluetooth: caracteres en ráfaga (<50ms) + Enter.
-  // enabled=false cuando hay modales abiertos para evitar conflictos.
-  // Reutiliza handleSelectProduct sin ningún cambio adicional.
-  useBarcodeScanner({
-    enabled: !showPayment && !showTicket && !showClearConfirm,
-    onScan: (barcode) => {
-      const product = products.find(p => p.barcode === barcode && p.isActive)
-      if (product) {
-        handleSelectProduct(product)
-      } else {
-        toast.error(`Código "${barcode}" no encontrado`, { duration: 2000, icon: '⚠️' })
-      }
-    },
-  })
-  // ─────────────────────────────────────────────────────────────────────────
-
   const handleUpdateQty = (key, newQty) => {
     const item    = cart.find(i => i._key===key || i.productId===key)
     const product = products.find(p => p.id===item?.productId)
@@ -204,27 +245,29 @@ export default function POS() {
 
   const handleRemoveTicket = () => { setAppliedTicket(null); setTicketCode(''); setTicketError('') }
 
-  const handleCompleteSale = useCallback(async ({ payments, clientId, change }) => {
+  const handleCompleteSale = useCallback(async ({ payments, clientId, change, loyaltyDiscount = 0, redeemedPoints = 0 }) => {
     setProcessing(true)
     const { getNextInvoice } = useStore.getState()
     const salePayload = {
-      invoiceNumber: getNextInvoice(),
-      clientId:      clientId || null,
-      userId:        currentUser?.id,
-      userName:      currentUser?.fullName,
-      items:         cart,
-      subtotalBruto,
-      totalDescuentos,
-      total:          totalAPagar,
-      baseImponible,
-      igv:            igvCalculado,
-      igvRate,
-      discount:       totalDescuentos,
-      ticketCode:     appliedTicket?.ticket?.code || null,
-      ticketDiscount: appliedTicket?.discountAmt  || 0,
-      payments,
-      change: change || 0,
-    }
+        invoiceNumber: getNextInvoice(),
+        clientId:      clientId || null,
+        userId:        currentUser?.id,
+        userName:      currentUser?.fullName,
+        items:         cart,
+        subtotalBruto,
+        totalDescuentos,
+        total:          totalAPagar,
+        baseImponible,
+        igv:            igvCalculado,
+        igvRate,
+        discount:       totalDescuentos,
+        ticketCode:     appliedTicket?.ticket?.code || null,
+        ticketDiscount: appliedTicket?.discountAmt  || 0,
+        payments,
+        change: change || 0,
+        loyaltyDiscount,
+        redeemedPoints,
+      }
     const result = await saleService.create(salePayload)
     setProcessing(false)
     if (result.error) { toast.error(result.error); return }
@@ -244,6 +287,7 @@ export default function POS() {
     setShowPayment(false)
     setGlobalDiscount('')
     setDiscountEdit({})
+    setSelectedClientId(null)  // F5: limpiar cliente al completar venta
     setCompletedSale(result.data)
     setShowTicket(true)
     toast.success(`Venta ${result.data.invoiceNumber} completada`, { duration: 3000, icon: '🎉' })
@@ -701,6 +745,30 @@ export default function POS() {
 
   {/* Acciones */}
   <div className="p-4 mt-auto space-y-2">
+
+    {/* ── F2: Botones de hold ────────────────────────────────────────────
+         "⏸️ Suspender" guarda el carrito y lo deja libre para otra venta.
+         "Ventas en espera (N)" abre el panel para recuperar uno guardado. */}
+    <div className="flex gap-2">
+      {cart.length > 0 && (
+        <button
+          onClick={handleHoldCart}
+          disabled={!canHold}
+          title={canHold ? 'Suspender venta y atender otro cliente' : 'Máximo 5 ventas en espera'}
+          className="flex-1 py-2 text-sm text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
+          ⏸️ Suspender
+        </button>
+      )}
+      {heldCarts.length > 0 && (
+        <button
+          onClick={() => setShowHeldCarts(true)}
+          className="flex-1 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-1">
+          ▶️ En espera ({heldCarts.length})
+        </button>
+      )}
+    </div>
+    {/* ─────────────────────────────────────────────────────────────────── */}
+
     {cart.length > 0 && (
       <button
         onClick={() => setShowClearConfirm(true)}
@@ -729,7 +797,14 @@ export default function POS() {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <PaymentPanel total={totalAPagar} clients={clients} onConfirm={handleCompleteSale} processing={processing}/>
+              <PaymentPanel
+                total={totalAPagar}
+                clients={clients}
+                onConfirm={handleCompleteSale}
+                processing={processing}
+                onClientChange={setSelectedClientId}
+                onLoyaltyRedeem={() => {}}
+              />
             </div>
           </div>
         </div>
@@ -744,6 +819,19 @@ export default function POS() {
       {showTicket && completedSale && (
         <SaleTicket sale={completedSale} onClose={() => { setShowTicket(false); setCompletedSale(null) }}/>
       )}
+
+      {/* ── F2: Panel de ventas en espera ──────────────────────────────────
+           Se abre al pulsar "▶️ En espera (N)". Muestra la cola de holds
+           con label, ítems y total. Permite recuperar o descartar cada uno. */}
+      {showHeldCarts && (
+        <HeldCartsPanel
+          heldCarts={heldCarts}
+          onRecover={handleRecoverCart}
+          onDiscard={(id) => { discardHold(id); if (heldCarts.length <= 1) setShowHeldCarts(false) }}
+          onClose={() => setShowHeldCarts(false)}
+        />
+      )}
+      {/* ─────────────────────────────────────────────────────────────────── */}
     </div>
   </div>
 </div>

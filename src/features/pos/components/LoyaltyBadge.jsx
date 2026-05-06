@@ -26,7 +26,8 @@ export default function LoyaltyBadge({ client, saleTotal, onRedeem, loyaltyConfi
 
   const maxRedeem      = Math.min(available, Math.floor(saleTotal / loyaltyConfig.pointsValue))
   const redeemPts      = Math.min(parseInt(pointsToRedeem) || 0, maxRedeem)
-  const redeemDiscount = calcRedemptionValue(redeemPts, loyaltyConfig)
+  const redemption     = calcRedemptionValue(redeemPts, saleTotal, loyaltyConfig)
+  const redeemDiscount = redemption?.discount || 0
   const canRedeem      = available >= loyaltyConfig.minRedeemPoints
 
   const progressPct = useMemo(() => {
@@ -122,13 +123,23 @@ export default function LoyaltyBadge({ client, saleTotal, onRedeem, loyaltyConfi
             </button>
             <button
               onClick={() => {
-                if (redeemPts >= loyaltyConfig.minRedeemPoints && redeemPts <= available && redeemDiscount > 0) {
+                if (
+                  redeemPts >= loyaltyConfig.minRedeemPoints &&
+                  redeemPts <= available &&
+                  redemption?.valid &&
+                  redeemDiscount > 0
+                ) {
                   onRedeem?.(redeemPts, redeemDiscount)
                   setRedeemMode(false)
                   setPointsToRedeem('')
                 }
               }}
-              disabled={redeemPts < loyaltyConfig.minRedeemPoints || redeemPts > available}
+              disabled={
+                redeemPts < loyaltyConfig.minRedeemPoints ||
+                redeemPts > available ||
+                !redemption?.valid ||
+                redeemDiscount <= 0
+              }
               className="flex-1 py-1.5 text-xs bg-amber-500 text-white font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition-colors">
               Aplicar canje
             </button>

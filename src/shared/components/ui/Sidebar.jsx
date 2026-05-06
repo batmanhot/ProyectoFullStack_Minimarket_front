@@ -7,7 +7,7 @@ const NAV_GROUPS = [
   { label:'Principal',   items:[{ key:'dashboard',label:'Dashboard',icon:'📊'},{ key:'pos',label:'Punto de Venta',icon:'🖥️'}] },
   { label:'Operaciones', items:[{ key:'catalog',label:'Catálogo',icon:'🗂️'},{ key:'inventory',label:'Inventario',icon:'📦'},{ key:'suppliers',label:'Proveedores',icon:'🏭'},{ key:'purchases',label:'Compras',icon:'🛍️'}] },
   { label:'Comercial',   items:[{ key:'cash',label:'Caja',icon:'💰'},{ key:'clients',label:'Clientes',icon:'👥'},{ key:'reports',label:'Reportes',icon:'📈'},{ key:'discounts',label:'Gestion Descuentos',icon:'🏷️'},{ key:'tickets',label:'Descuentos por Vales',icon:'🎟️'}, { key: 'returns',   label: 'Devoluciones', icon: '↩️' }, ] },
-  { label:'Sistema',     items:[{ key:'alerts',label:'Alertas',icon:'🔔'},{ key:'audit',label:'Auditoría',icon:'🔍'},{ key:'users',label:'Usuarios',icon:'⚙️'},{ key:'settings',label:'Configuración',icon:'🛠️'}] },
+  { label:'Sistema',     items:[{ key:'alerts',label:'Alertas',icon:'🔔'}, { key: 'loyalty', label: 'Programa de Puntos', icon: '⭐' }, { key:'audit',label:'Auditoría',icon:'🔍'},{ key:'users',label:'Usuarios',icon:'⚙️'},{ key:'settings',label:'Configuración',icon:'🛠️'}] },
 ]
 
 const THEME_OPTIONS = [

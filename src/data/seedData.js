@@ -77,15 +77,23 @@ export const SEED_PRODUCTS = [
   p('prd-052','7750195140019','Pañales Huggies M x20','Pañales talla M','cat-007','sup-004',22.50,32.90,8,4),
 ]
 
+// ─── Helper campos loyalty (todos los clientes los necesitan desde el inicio) ─
+const loyalty = () => ({
+  loyaltyPoints:       0,
+  loyaltyAccumulated:  0,
+  loyaltyLevel:        'Bronce',
+  loyaltyTransactions: [],
+})
+
 // ─── CLIENTES ─────────────────────────────────────────────────────────────────
 export const SEED_CLIENTS = [
-  { id: 'cli-001', name: 'Rosa Quispe Mamani',         documentType: 'DNI', documentNumber: '47832156', phone: '987654321', email: 'rquispe@gmail.com',      address: 'Jr. Las Rosas 234, Los Olivos',     creditLimit: 200,  currentDebt: 0,   isActive: true, createdAt: subtractDays(60) },
-  { id: 'cli-002', name: 'José Huanca Paredes',         documentType: 'DNI', documentNumber: '32145678', phone: '976543218', email: 'jhuanca@hotmail.com',    address: 'Av. Próceres 1560, SJL',           creditLimit: 500,  currentDebt: 85.50, isActive: true, createdAt: subtractDays(55) },
-  { id: 'cli-003', name: 'Rest. El Buen Sabor',         documentType: 'RUC', documentNumber: '20512345678', phone: '01-523-4567', email: 'compras@buensabor.pe', address: 'Av. Universitaria 3400, Comas',  creditLimit: 2000, currentDebt: 350, isActive: true, createdAt: subtractDays(50) },
-  { id: 'cli-004', name: 'María Torres Vilca',          documentType: 'DNI', documentNumber: '52341876', phone: '965432187', email: 'mtorres@gmail.com',      address: 'Calle Los Pinos 89, Puente Piedra', creditLimit: 300,  currentDebt: 0,   isActive: true, createdAt: subtractDays(45) },
-  { id: 'cli-005', name: 'Bodega La Esquina S.R.L.',    documentType: 'RUC', documentNumber: '20498765432', phone: '01-567-8901', email: 'pedidos@laesquina.pe', address: 'Jr. Mercaderes 456, Independencia', creditLimit: 1500, currentDebt: 120, isActive: true, createdAt: subtractDays(40) },
-  { id: 'cli-006', name: 'Luis Mendoza García',         documentType: 'DNI', documentNumber: '61234567', phone: '954321876', email: '', address: 'Av. Naranjal 789, Independencia', creditLimit: 150, currentDebt: 0, isActive: true, createdAt: subtractDays(35) },
-  { id: 'cli-007', name: 'Carmen Soto Llanos',          documentType: 'DNI', documentNumber: '43218765', phone: '943218765', email: '', address: 'Calle Los Sauces 23, Los Olivos', creditLimit: 200, currentDebt: 45, isActive: true, createdAt: subtractDays(30) },
+  { id: 'cli-001', name: 'Rosa Quispe Mamani',         documentType: 'DNI', documentNumber: '47832156',    phone: '987654321',  email: 'rquispe@gmail.com',       address: 'Jr. Las Rosas 234, Los Olivos',       creditLimit: 200,  currentDebt: 0,    isActive: true, createdAt: subtractDays(60), ...loyalty() },
+  { id: 'cli-002', name: 'José Huanca Paredes',         documentType: 'DNI', documentNumber: '32145678',    phone: '976543218',  email: 'jhuanca@hotmail.com',      address: 'Av. Próceres 1560, SJL',              creditLimit: 500,  currentDebt: 85.50, isActive: true, createdAt: subtractDays(55), ...loyalty() },
+  { id: 'cli-003', name: 'Rest. El Buen Sabor',         documentType: 'RUC', documentNumber: '20512345678', phone: '01-523-4567', email: 'compras@buensabor.pe',    address: 'Av. Universitaria 3400, Comas',        creditLimit: 2000, currentDebt: 350,  isActive: true, createdAt: subtractDays(50), ...loyalty() },
+  { id: 'cli-004', name: 'María Torres Vilca',          documentType: 'DNI', documentNumber: '52341876',    phone: '965432187',  email: 'mtorres@gmail.com',        address: 'Calle Los Pinos 89, Puente Piedra',   creditLimit: 300,  currentDebt: 0,    isActive: true, createdAt: subtractDays(45), ...loyalty() },
+  { id: 'cli-005', name: 'Bodega La Esquina S.R.L.',    documentType: 'RUC', documentNumber: '20498765432', phone: '01-567-8901', email: 'pedidos@laesquina.pe',    address: 'Jr. Mercaderes 456, Independencia',   creditLimit: 1500, currentDebt: 120,  isActive: true, createdAt: subtractDays(40), ...loyalty() },
+  { id: 'cli-006', name: 'Luis Mendoza García',         documentType: 'DNI', documentNumber: '61234567',    phone: '954321876',  email: '',                         address: 'Av. Naranjal 789, Independencia',     creditLimit: 150,  currentDebt: 0,    isActive: true, createdAt: subtractDays(35), ...loyalty() },
+  { id: 'cli-007', name: 'Carmen Soto Llanos',          documentType: 'DNI', documentNumber: '43218765',    phone: '943218765',  email: '',                         address: 'Calle Los Sauces 23, Los Olivos',     creditLimit: 200,  currentDebt: 45,   isActive: true, createdAt: subtractDays(30), ...loyalty() },
 ]
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────

@@ -1,33 +1,38 @@
 /**
- * useCartHold.js — Hook para suspender y recuperar carritos
+ * useCartHold.js — Store de Zustand para ventas en espera
  * Ruta: src/features/pos/hooks/useCartHold.js
  *
- * Guarda snapshots del carrito activo en un array temporal (en memoria, no localStorage).
- * Cada "hold" tiene: id, label, items, cliente, timestamp.
- * El cajero puede suspender hasta 5 ventas simultáneas y recuperar cualquiera.
+ * CORRECCIÓN v2: migrado de useState (local, inestable entre renders)
+ * a un mini-store de Zustand sin persistencia.
+ *
+ * Por qué Zustand y no useState:
+ *   - useState en un hook crea estado LOCAL al componente.
+ *     Cuando POS re-renderiza, el updater de recoverCart se ejecuta
+ *     en un batch con setState del carrito, causando que el valor
+ *     recuperado sea null antes de que el hold se elimine del array.
+ *   - Zustand es síncrono: getState() devuelve el valor inmediato,
+ *     sin esperar el próximo ciclo de render.
+ *
+ * No se incluye en persist → los holds se pierden al recargar (comportamiento correcto).
  */
 
-import { useState, useCallback } from 'react'
+import { create } from 'zustand'
 
 const MAX_HOLDS = 5
 
-export function useCartHold() {
-  const [heldCarts, setHeldCarts] = useState([])
+// Mini-store independiente — no se persiste en localStorage
+const useHoldStore = create((set, get) => ({
+  heldCarts: [],
 
-  /**
-   * Suspende el carrito actual y devuelve el array actualizado.
-   * @param {Array}  cart       - Ítems actuales del carrito
-   * @param {string} clientName - Nombre del cliente (opcional, para el label)
-   * @returns {string|null} id del hold creado, o null si el límite fue alcanzado
-   */
-  const holdCart = useCallback((cart, clientName = '') => {
-    if (cart.length === 0) return null
-    if (heldCarts.length >= MAX_HOLDS) return null
+  holdCart: (cart, clientName = '') => {
+    const state = get()
+    if (cart.length === 0)              return null
+    if (state.heldCarts.length >= MAX_HOLDS) return null
 
-    const id    = crypto.randomUUID()
-    const label = clientName
+    const id       = crypto.randomUUID()
+    const label    = clientName
       ? `Cliente: ${clientName}`
-      : `Venta #${heldCarts.length + 1}`
+      : `Venta #${state.heldCarts.length + 1}`
 
     const snapshot = {
       id,
@@ -36,28 +41,35 @@ export function useCartHold() {
       createdAt: new Date().toISOString(),
     }
 
-    setHeldCarts((prev) => [...prev, snapshot])
+    set((s) => ({ heldCarts: [...s.heldCarts, snapshot] }))
     return id
-  }, [heldCarts.length])
+  },
 
-  /**
-   * Recupera un carrito suspendido por su id y lo elimina de la cola.
-   * @returns {Array|null} ítems del carrito recuperado
-   */
-  const recoverCart = useCallback((holdId) => {
-    let recovered = null
-    setHeldCarts((prev) => {
-      const hold = prev.find((h) => h.id === holdId)
-      if (hold) recovered = hold.items
-      return prev.filter((h) => h.id !== holdId)
-    })
-    return recovered
-  }, [])
+  // CORRECCIÓN CLAVE: getState() es SÍNCRONO — devuelve el valor real
+  // antes del próximo render, sin batching ni closures obsoletos.
+  recoverCart: (holdId) => {
+    const state  = get()
+    const hold   = state.heldCarts.find((h) => h.id === holdId)
+    if (!hold) return null
 
-  /** Elimina un hold sin recuperarlo */
-  const discardHold = useCallback((holdId) => {
-    setHeldCarts((prev) => prev.filter((h) => h.id !== holdId))
-  }, [])
+    // Eliminar el hold del array ANTES de devolver los ítems
+    set((s) => ({ heldCarts: s.heldCarts.filter((h) => h.id !== holdId) }))
+
+    // Devolver copia profunda de los ítems para evitar mutaciones
+    return structuredClone(hold.items)
+  },
+
+  discardHold: (holdId) => {
+    set((s) => ({ heldCarts: s.heldCarts.filter((h) => h.id !== holdId) }))
+  },
+}))
+
+// Hook público — misma API que la versión anterior, sin cambios en POS.jsx
+export function useCartHold() {
+  const heldCarts  = useHoldStore((s) => s.heldCarts)
+  const holdCart   = useHoldStore((s) => s.holdCart)
+  const recoverCart = useHoldStore((s) => s.recoverCart)
+  const discardHold = useHoldStore((s) => s.discardHold)
 
   return {
     heldCarts,

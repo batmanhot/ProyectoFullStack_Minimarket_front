@@ -170,6 +170,7 @@ export const saleService = {
     await delay()
     if (USE_API) { const { data } = await api.post('/sales', payload); return ok(data.data) }
 
+    const state = gs()
     // Descontar stock de CADA producto — leemos siempre estado fresco dentro del loop
     for (const item of payload.items) {
       const freshState  = useStore.getState()
@@ -202,39 +203,21 @@ export const saleService = {
 
     const sale = { ...payload, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
 
-    // ── Programa de Puntos — canje + acumulación consistente al completar venta ─
+    // ── F5: Programa de Puntos — acumular puntos al completar venta ────────
+    // FIX: se usa useStore.setState directamente sobre el array de clients
+    // para garantizar que el persist de Zustand capture los campos loyalty
+    // incluso en clientes que no tenían esos campos en el seed original.
     if (payload.clientId) {
-      const freshState = useStore.getState()
-      const client = freshState.clients.find(c => c.id === payload.clientId)
+      const currentClients = useStore.getState().clients
+      const clientIdx      = currentClients.findIndex(c => c.id === payload.clientId)
 
-      if (client) {
+      if (clientIdx !== -1) {
+        const client = currentClients[clientIdx]
+
+        // Inicializar campos loyalty si el cliente no los tiene (clientes del seed)
         const accumulated = client.loyaltyAccumulated || 0
-        const available   = client.loyaltyPoints || 0
+        const available   = client.loyaltyPoints      || 0
         const transactions = client.loyaltyTransactions || []
-
-        const redeemedPoints   = Math.max(0, Math.floor(payload.redeemedPoints || 0))
-        const loyaltyDiscount  = Math.max(0, Number(payload.loyaltyDiscount || 0))
-
-        let nextPoints = available
-        let nextTransactions = [...transactions]
-
-        if (redeemedPoints > 0) {
-          const safeRedeemed = Math.min(redeemedPoints, nextPoints)
-          if (safeRedeemed > 0) {
-            nextPoints = Math.max(0, nextPoints - safeRedeemed)
-            nextTransactions = [{
-              id:             crypto.randomUUID(),
-              type:           'redeemed',
-              points:         safeRedeemed,
-              saleId:         sale.id,
-              invoiceNumber:  sale.invoiceNumber,
-              saleTotal:      sale.total,
-              discountAmount: loyaltyDiscount,
-              createdAt:      sale.createdAt,
-              description:    `Canje en venta ${sale.invoiceNumber} · -${safeRedeemed} pts → S/${loyaltyDiscount.toFixed(2)} desc.`,
-            }, ...nextTransactions]
-          }
-        }
 
         const multiplier = accumulated >= 4000 ? 2.0
                          : accumulated >= 1500 ? 1.5
@@ -243,14 +226,13 @@ export const saleService = {
         const basePoints = Math.floor(sale.total / 10)
         const earned     = Math.floor(basePoints * multiplier)
 
-        const newAccumulated = accumulated + Math.max(0, earned)
-        const newLevel = newAccumulated >= 4000 ? 'Platino'
-                       : newAccumulated >= 1500 ? 'Oro'
-                       : newAccumulated >= 500  ? 'Plata' : 'Bronce'
-
         if (earned > 0) {
-          nextPoints += earned
-          nextTransactions = [{
+          const newAccumulated = accumulated + earned
+          const newLevel = newAccumulated >= 4000 ? 'Platino'
+                         : newAccumulated >= 1500 ? 'Oro'
+                         : newAccumulated >= 500  ? 'Plata' : 'Bronce'
+
+          const txn = {
             id:            crypto.randomUUID(),
             type:          'earned',
             points:        earned,
@@ -261,18 +243,26 @@ export const saleService = {
             multiplier,
             createdAt:     sale.createdAt,
             description:   `Compra ${sale.invoiceNumber} · S/${sale.total}`,
-          }, ...nextTransactions]
-        }
+          }
 
-        freshState.updateClient(payload.clientId, {
-          loyaltyPoints:       nextPoints,
-          loyaltyAccumulated:  newAccumulated,
-          loyaltyLevel:        newLevel,
-          loyaltyTransactions: nextTransactions,
-        })
+          // FIX: actualizar el array de clients directamente con setState
+          // para que Zustand lo incluya en el próximo persist correctamente
+          const updatedClients = currentClients.map((c, i) =>
+            i === clientIdx
+              ? {
+                  ...c,
+                  loyaltyPoints:       available + earned,
+                  loyaltyAccumulated:  newAccumulated,
+                  loyaltyLevel:        newLevel,
+                  loyaltyTransactions: [txn, ...transactions],
+                }
+              : c
+          )
+          useStore.setState({ clients: updatedClients })
+        }
       }
     }
-    // ──────────────────────────────────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────────────────────
 
     useStore.getState().addSale(sale)
     useStore.getState().clearCart()
@@ -384,7 +374,19 @@ export const clientService = {
   async create(payload) {
     await delay()
     if (USE_API) { const { data } = await api.post('/clients', payload); return ok(data.data) }
-    const client = { ...payload, id: crypto.randomUUID(), currentDebt: 0, isActive: true, createdAt: new Date().toISOString() }
+    const client = {
+      ...payload,
+      id: crypto.randomUUID(),
+      currentDebt: 0,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      // ── F5: Programa de Puntos — campos de lealtad ──────────────────────
+      loyaltyPoints:       0,     // puntos actuales canjeables
+      loyaltyAccumulated:  0,     // total histórico (determina el nivel)
+      loyaltyLevel:        'Bronce',
+      loyaltyTransactions: [],    // historial de acumulación/canje
+      // ────────────────────────────────────────────────────────────────────
+    }
     gs().addClient(client)
     return ok(client)
   },
@@ -437,8 +439,6 @@ export const purchaseService = {
     return ok(gs().purchases, gs().purchases.length)
   },
 
-  
-
   async create(payload) {
     await delay()
     if (USE_API) { const { data } = await api.post('/purchases', payload); return ok(data.data) }
@@ -472,310 +472,5 @@ export const purchaseService = {
 
     useStore.getState().addPurchase(purchase)
     return ok(purchase)
-  },
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// RETURN SERVICE — Devoluciones / Notas de Crédito
-// ═════════════════════════════════════════════════════════════════════════════
-// Endpoints esperados del backend:
-//   POST   /returns          → crear NC
-//   GET    /returns          → listar NCs (con filtros opcionales)
-//   GET    /returns/:id      → detalle de una NC
-//   PATCH  /returns/:id/anular → anular NC (con motivo)
-// ─────────────────────────────────────────────────────────────────────────────
-export const returnService = {
-
-  /** Crea una Nota de Crédito y actualiza el stock + status de la venta original */
-  async create(payload) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.post('/returns', payload)
-      return ok(data.data)
-    }
-
-    const state = gs()
-
-    // 1. Guardar la NC
-    const creditNote = {
-      ...payload,
-      id:        payload.id        || crypto.randomUUID(),
-      status:    payload.status    || 'completada',
-      createdAt: payload.createdAt || new Date().toISOString(),
-    }
-    state.addReturn(creditNote)
-
-    // 2. Restaurar stock de cada ítem devuelto
-    for (const item of payload.items || []) {
-      const freshState = useStore.getState()
-      const product    = freshState.products.find((p) => p.id === item.productId)
-      if (!product) continue
-
-      const newStock = product.stock + item.quantity
-      freshState.updateProduct(item.productId, { stock: newStock })
-      freshState.addStockMovement({
-        id:            crypto.randomUUID(),
-        productId:     item.productId,
-        productName:   item.productName,
-        type:          'entrada',
-        quantity:      item.quantity,
-        previousStock: product.stock,
-        newStock,
-        reason:        `Devolución NC ${creditNote.ncNumber}`,
-        userId:        payload.userId,
-        createdAt:     creditNote.createdAt,
-      })
-    }
-
-    // 3. Actualizar status de la venta original
-    if (payload.saleId) {
-      const freshState       = useStore.getState()
-      const originalSale     = freshState.sales.find((s) => s.id === payload.saleId)
-      const allReturns       = freshState.returns || []
-
-      if (originalSale) {
-        const totalOriginalQty  = originalSale.items.reduce((a, i) => a + i.quantity, 0)
-        const totalReturnedQty  = [
-          ...allReturns.filter((r) => r.saleId === payload.saleId && r.status !== 'anulada'),
-          creditNote,
-        ].flatMap((r) => r.items).reduce((a, i) => a + i.quantity, 0)
-
-        freshState.updateSale(payload.saleId, {
-          status: totalReturnedQty >= totalOriginalQty ? 'devolucion' : 'dev-parcial',
-        })
-      }
-    }
-
-    return ok(creditNote)
-  },
-
-  /** Lista todas las NCs, con filtros opcionales */
-  async getAll(filters = {}) {
-    await delay(180)
-    if (USE_API) {
-      const { data } = await api.get('/returns', { params: filters })
-      return ok(data.data, data.meta?.total)
-    }
-
-    let returns = gs().returns || []
-    if (filters.status)   returns = returns.filter((r) => r.status === filters.status)
-    if (filters.saleId)   returns = returns.filter((r) => r.saleId === filters.saleId)
-    if (filters.dateFrom) returns = returns.filter((r) => new Date(r.createdAt) >= new Date(filters.dateFrom))
-    if (filters.dateTo)   returns = returns.filter((r) => new Date(r.createdAt) <= new Date(filters.dateTo + 'T23:59:59'))
-
-    return ok(
-      returns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-      returns.length
-    )
-  },
-
-  /** Obtiene una NC por ID */
-  async getById(id) {
-    await delay(100)
-    if (USE_API) {
-      const { data } = await api.get(`/returns/${id}`)
-      return ok(data.data)
-    }
-    const nc = (gs().returns || []).find((r) => r.id === id)
-    return nc ? ok(nc) : fail('Nota de Crédito no encontrada')
-  },
-
-  /** Anula una NC (no la elimina — la marca como anulada con motivo) */
-  async anular(id, motivo, userId) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.patch(`/returns/${id}/anular`, { motivo, userId })
-      return ok(data.data)
-    }
-
-    const nc    = (gs().returns || []).find((r) => r.id === id)
-    if (!nc) return fail('Nota de Crédito no encontrada')
-    if (nc.status === 'anulada') return fail('Esta NC ya fue anulada')
-
-    // Revertir el stock que se había restaurado
-    for (const item of nc.items || []) {
-      const freshState = useStore.getState()
-      const product    = freshState.products.find((p) => p.id === item.productId)
-      if (!product) continue
-      const newStock = Math.max(0, product.stock - item.quantity)
-      freshState.updateProduct(item.productId, { stock: newStock })
-    }
-
-    // Revertir el status de la venta original
-    if (nc.saleId) {
-      const freshState = useStore.getState()
-      const sale       = freshState.sales.find((s) => s.id === nc.saleId)
-      if (sale && (sale.status === 'devolucion' || sale.status === 'dev-parcial')) {
-        freshState.updateSale(nc.saleId, { status: 'completada' })
-      }
-    }
-
-    gs().anularReturn(id, motivo)
-    return ok({ id, status: 'anulada' })
-  },
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// DISCOUNT CAMPAIGN SERVICE — Campañas de descuento
-// ═════════════════════════════════════════════════════════════════════════════
-// Endpoints esperados del backend:
-//   GET    /campaigns           → listar campañas (con filtros)
-//   POST   /campaigns           → crear campaña
-//   PUT    /campaigns/:id       → actualizar campaña
-//   DELETE /campaigns/:id       → eliminar campaña
-//   PATCH  /campaigns/:id/toggle → activar/desactivar
-// ─────────────────────────────────────────────────────────────────────────────
-export const discountCampaignService = {
-
-  /** Lista todas las campañas, con filtros opcionales */
-  async getAll(filters = {}) {
-    await delay(150)
-    if (USE_API) {
-      const { data } = await api.get('/campaigns', { params: filters })
-      return ok(data.data, data.meta?.total)
-    }
-
-    let campaigns = gs().discountCampaigns || []
-    if (filters.type)     campaigns = campaigns.filter((c) => c.type === filters.type)
-    if (filters.isActive !== undefined) {
-      campaigns = campaigns.filter((c) => c.isActive === filters.isActive)
-    }
-    return ok(
-      campaigns.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
-      campaigns.length
-    )
-  },
-
-  /** Crea una nueva campaña */
-  async create(payload) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.post('/campaigns', payload)
-      return ok(data.data)
-    }
-    const campaign = {
-      ...payload,
-      id:        payload.id        || crypto.randomUUID(),
-      createdAt: payload.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    gs().addDiscountCampaign(campaign)
-    return ok(campaign)
-  },
-
-  /** Actualiza una campaña existente */
-  async update(id, updates) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.put(`/campaigns/${id}`, updates)
-      return ok(data.data)
-    }
-    gs().updateDiscountCampaign(id, { ...updates, updatedAt: new Date().toISOString() })
-    return ok({ id, ...updates })
-  },
-
-  /** Activa o desactiva una campaña */
-  async toggle(id, isActive) {
-    await delay(150)
-    if (USE_API) {
-      const { data } = await api.patch(`/campaigns/${id}/toggle`, { isActive })
-      return ok(data.data)
-    }
-    gs().updateDiscountCampaign(id, { isActive, updatedAt: new Date().toISOString() })
-    return ok({ id, isActive })
-  },
-
-  /** Elimina una campaña permanentemente */
-  async remove(id) {
-    await delay()
-    if (USE_API) {
-      await api.delete(`/campaigns/${id}`)
-      return ok({ id, deleted: true })
-    }
-    gs().deleteDiscountCampaign(id)
-    return ok({ id, deleted: true })
-  },
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// DISCOUNT TICKET SERVICE — Vales / Tickets de descuento
-// ═════════════════════════════════════════════════════════════════════════════
-// Endpoints esperados:
-//   GET    /tickets           → listar tickets
-//   POST   /tickets           → crear ticket
-//   PUT    /tickets/:id       → actualizar ticket
-//   DELETE /tickets/:id       → eliminar ticket
-//   POST   /tickets/:code/redeem → canjear ticket
-// ─────────────────────────────────────────────────────────────────────────────
-export const discountTicketService = {
-
-  async getAll(filters = {}) {
-    await delay(150)
-    if (USE_API) {
-      const { data } = await api.get('/tickets', { params: filters })
-      return ok(data.data, data.meta?.total)
-    }
-    let tickets = gs().discountTickets || []
-    if (filters.used !== undefined) tickets = tickets.filter((t) => t.used === filters.used)
-    if (filters.isActive !== undefined) tickets = tickets.filter((t) => t.isActive === filters.isActive)
-    return ok(tickets, tickets.length)
-  },
-
-  async create(payload) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.post('/tickets', payload)
-      return ok(data.data)
-    }
-    const ticket = { ...payload, id: crypto.randomUUID(), used: false, createdAt: new Date().toISOString() }
-    gs().addDiscountTicket(ticket)
-    return ok(ticket)
-  },
-
-  async update(id, updates) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.put(`/tickets/${id}`, updates)
-      return ok(data.data)
-    }
-    gs().updateDiscountTicket(id, updates)
-    return ok({ id, ...updates })
-  },
-
-  async remove(id) {
-    await delay()
-    if (USE_API) { await api.delete(`/tickets/${id}`); return ok({ id, deleted: true }) }
-    gs().deleteDiscountTicket(id)
-    return ok({ id, deleted: true })
-  },
-
-  /** Valida un código de ticket antes de aplicarlo en el POS */
-  async validate(code) {
-    await delay(100)
-    if (USE_API) {
-      const { data } = await api.get(`/tickets/validate/${code}`)
-      return ok(data.data)
-    }
-    const ticket = (gs().discountTickets || []).find(
-      (t) => t.code?.toUpperCase() === code?.toUpperCase()
-    )
-    if (!ticket)          return fail('Código no encontrado')
-    if (!ticket.isActive) return fail('Ticket desactivado')
-    if (ticket.used)      return fail('Ticket ya fue utilizado')
-    const now = new Date()
-    if (ticket.validFrom && now < new Date(ticket.validFrom))            return fail('Ticket aún no vigente')
-    if (ticket.validTo   && now > new Date(ticket.validTo + 'T23:59:59')) return fail('Ticket vencido')
-    return ok(ticket)
-  },
-
-  /** Canjea un ticket vinculándolo a una venta */
-  async redeem(code, saleId, saleTotal, userId) {
-    await delay()
-    if (USE_API) {
-      const { data } = await api.post(`/tickets/${code}/redeem`, { saleId, saleTotal, userId })
-      return ok(data.data)
-    }
-    gs().redeemDiscountTicket(code, saleId, saleTotal, userId)
-    return ok({ code, saleId, redeemed: true })
   },
 }

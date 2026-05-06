@@ -11,15 +11,15 @@ export const APP_CONFIG = {
 export const ROLES = {
   admin: {
     label: 'Administrador', color: 'bg-blue-100 text-blue-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns'],
+    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns', 'loyalty'],
   },
   gerente: {
     label: 'Gerente', color: 'bg-purple-100 text-purple-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets'],
+    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets', 'loyalty'],
   },
   supervisor: {
     label: 'Supervisor', color: 'bg-amber-100 text-amber-700',
-    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets','returns'],
+    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets','returns', 'loyalty'],
   },
   cajero: {
     label: 'Cajero', color: 'bg-green-100 text-green-700',

@@ -1,14 +1,17 @@
-# Tareas - CRUD Categorías/Marcas + Limpieza Descuentos
+# TODO - Corrección Programa de Puntos (POS)
 
-## ✅ Tarea Anterior Completada
-Promoción NxM implementada correctamente
+- [x] Actualizar `src/features/pos/components/PaymentPanel.jsx`
+  - [x] Mantener canje de puntos en estado local (sin mutar store inmediatamente)
+  - [x] Enviar `redeemedPoints` y `loyaltyDiscount` en `onConfirm`
 
-## 🔄 Nueva Implementación (Progreso)
-- [ ] 1. Quitar "Línea de Productos" (Discounts.jsx + discountEngine.js)
-- [ ] 2. Crear CRUD Categorías (Categories.jsx + store + seedData)
-- [ ] 3. Crear CRUD Marcas (Brands.jsx + store + seedData)
-- [ ] 4. Integrar en Catalog.jsx + datos iniciales
-- [ ] 5. Actualizar referencias (POS, Reports)
-- [ ] 6. Testing + limpieza
+- [ ] Actualizar `src/features/pos/POS.jsx`
+  - [ ] Quitar mutación directa de cliente en `onLoyaltyRedeem`
+  - [ ] Incluir datos de canje en `salePayload` al confirmar venta
 
-## 📋 Próximo: Paso 1 - Remover "Línea de Productos"
+- [ ] Actualizar `src/services/index.js` (`saleService.create`)
+  - [ ] Aplicar canje y acumulación en una sola actualización consistente del cliente
+  - [ ] Registrar transacciones `redeemed` y `earned`
+  - [ ] Persistir con `updateClient(...)` para robustez
+
+- [ ] Validar compilación
+  - [ ] Ejecutar build/lint

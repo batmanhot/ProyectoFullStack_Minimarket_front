@@ -29,6 +29,7 @@ const Discounts  = lazy(() => import('./features/discounts/Discounts'))
 const Tickets    = lazy(() => import('./features/tickets/Tickets'))
 const Returns  = lazy(() => import('./features/returns/Returns'))   // ← AGREGA
 const Settings   = lazy(() => import('./features/settings/Settings'))
+const LoyaltyConsulta  = lazy(() => import('./features/loyalty/LoyaltyConsulta'))   // ← AGREGA
 
 const PAGES = {
   dashboard: Dashboard, pos: POS,
@@ -36,7 +37,7 @@ const PAGES = {
   suppliers: Suppliers, purchases: Purchases,
   cash: Cash, clients: Clients, reports: Reports,
   users: Users, audit: Audit, alerts: Alerts,
-  discounts: Discounts, tickets: Tickets, returns: Returns, settings: Settings,
+  discounts: Discounts, tickets: Tickets, returns: Returns, settings: Settings, loyalty: LoyaltyConsulta
 }
 
 function PageFallback() {
