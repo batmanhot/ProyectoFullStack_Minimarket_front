@@ -632,6 +632,9 @@ export default function Stocktaking({ onBack }) {
         reason:        `Inventario físico ${ref} · ${diff > 0 ? 'sobrante' : 'faltante'}`,
         userId:        currentUser?.id,
         userName:      currentUser?.fullName,
+        unitCost:      parseFloat((product.priceBuy || 0).toFixed(4)),
+        totalValue:    parseFloat(((product.priceBuy || 0) * Math.abs(diff)).toFixed(2)),
+        refNumber:     ref,
         createdAt:     now,
       })
     }

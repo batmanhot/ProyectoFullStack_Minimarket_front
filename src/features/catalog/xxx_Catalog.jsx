@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useStore } from '../../store/index'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,44 +13,37 @@ import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import toast from 'react-hot-toast'
 
-// ─── Estilos reutilizables ────────────────────────────────────────────────────
-const inputCls = 'w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-const labelCls = 'block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1'
-const btnSecondary = 'flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-slate-700'
-const btnPrimary   = 'flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700'
-
-// ─── Color Dot ────────────────────────────────────────────────────────────────
-function ColorDot({ color, size = 'sm' }) {
-  const s = size === 'lg' ? 'w-5 h-5' : 'w-3 h-3'
-  return <span className={`${s} rounded-full inline-block flex-shrink-0`} style={{ backgroundColor: color || '#94a3b8' }}/>
+// ── Preview de imagen en formulario de producto ───────────────────────────────
+function ProductImagePreview({ url }) {
+  const [err, setErr] = useState(false)
+  if (!url || err) {
+    return (
+      <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-600 flex items-center justify-center bg-gray-50 dark:bg-slate-700 shrink-0">
+        <span className="text-2xl opacity-30">🖼️</span>
+      </div>
+    )
+  }
+  return (
+    <img
+      src={url}
+      alt="preview"
+      onError={() => setErr(true)}
+      className="w-16 h-16 rounded-xl border border-gray-200 dark:border-slate-600 object-cover shrink-0"
+    />
+  )
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
+// ── Generador de etiquetas de precio 58mm ─────────────────────────────────────
 function buildLabelHTML(products, businessConfig) {
-  const labels = products.map((p) => {
-    const businessName = escapeHtml(businessConfig?.name || 'MI NEGOCIO').substring(0, 22)
-    const productName = escapeHtml(p.name).substring(0, 32)
-    const price = Number(p.priceSell || 0).toFixed(2)
-    const barcode = escapeHtml(p.barcode)
-    const sku = p.sku ? ` · ${escapeHtml(p.sku)}` : ''
-
-    return `
+  const labels = products.map(p => `
     <div class="label">
-      <div class="biz">${businessName}</div>
-      <div class="name">${productName}</div>
-      <div class="price">S/ ${price}</div>
-      <svg class="bc" data-barcode="${barcode}"></svg>
-      <div class="sku">${barcode}${sku}</div>
+      <div class="biz">${(businessConfig?.name || 'MI NEGOCIO').substring(0, 22)}</div>
+      <div class="name">${p.name.substring(0, 32)}</div>
+      <div class="price">S/ ${p.priceSell.toFixed(2)}</div>
+      <svg class="bc" data-barcode="${p.barcode}"></svg>
+      <div class="sku">${p.barcode}${p.sku ? ' · ' + p.sku : ''}</div>
     </div>`
-  }).join('')
+  ).join('')
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquetas</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
@@ -69,7 +62,7 @@ function buildLabelHTML(products, businessConfig) {
 </style></head>
 <body>
 <div class="grid">${labels}</div>
-<button class="fab" onclick="window.print()">Imprimir etiquetas</button>
+<button class="fab" onclick="window.print()">🖨️ Imprimir etiquetas</button>
 <script>
   document.querySelectorAll('.bc').forEach(el => {
     try { JsBarcode(el, el.dataset.barcode, {format:'CODE128',width:1.2,height:30,displayValue:false,margin:0}) }
@@ -78,333 +71,136 @@ function buildLabelHTML(products, businessConfig) {
 </script></body></html>`
 }
 
-function printPriceLabels(products, businessConfig) {
+export function printPriceLabels(products, businessConfig) {
   if (!products?.length) { toast.error('Selecciona al menos un producto'); return }
-  const width = 900
-  const height = 700
-  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2))
-  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2))
-  const features = `width=${width},height=${height},left=${left},top=${top},menubar=yes,scrollbars=yes`
-  const win = window.open('', '_blank', features)
+  const win = window.open('', '_blank', 'width=900,height=700,menubar=yes,scrollbars=yes')
   if (!win) { toast.error('Activa las ventanas emergentes para imprimir'); return }
   win.document.write(buildLabelHTML(products, businessConfig))
   win.document.close()
 }
 
+// ─── Estilos reutilizables ────────────────────────────────────────────────────
+const inputCls = 'w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+const labelCls = 'block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1'
+const btnSecondary = 'flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-slate-700'
+const btnPrimary   = 'flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700'
+
+// ─── Color Dot ────────────────────────────────────────────────────────────────
+function ColorDot({ color, size = 'sm' }) {
+  const s = size === 'lg' ? 'w-5 h-5' : 'w-3 h-3'
+  return <span className={`${s} rounded-full inline-block flex-shrink-0`} style={{ backgroundColor: color || '#94a3b8' }}/>
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // FORM — PRODUCTO
 // ══════════════════════════════════════════════════════════════════════════════
-function ProductForm({ product, onClose }) {
-  // ── Leer del store directamente ──────────────────────────────────────────
-  // Esto es clave: si se recibieran como props, los nuevos registros creados
-  // desde el mini-modal NO aparecerían en los selects hasta cerrar y reabrir.
-  // Al leer del store directamente, React re-renderiza automáticamente al
-  // agregar una categoría/marca/proveedor nuevo.
-  const {
-    categories, brands, suppliers,
-    addCategory, addBrand, addSupplier,
-  } = useStore()
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
+function ProductForm({ product, categories, brands, suppliers, onClose }) {
+  const { register, handleSubmit, formState: { errors }, watch } = useForm({
     resolver: zodResolver(productSchema),
-    defaultValues: product || {
-      unit: 'unidad', stockMin: 5, stockMax: 100,
-      isActive: true, hasVariants: false, useBatches: false,
-      imageUrl: '', brand: '', categoryId: '', supplierId: '',
-    },
+    defaultValues: product || { unit: 'unidad', stockMin: 5, stockMax: 100, isActive: true, hasVariants: false },
   })
 
-  // Preview de imagen en tiempo real
-  const imageUrl  = watch('imageUrl')
-  const useBatches = watch('useBatches')
-  const [imgError, setImgError] = useState(false)
-
-  // Modales de creación rápida dentro del formulario
-  const [quickModal, setQuickModal] = useState(null) // 'brand' | 'category' | 'supplier'
-  const [quickName,  setQuickName]  = useState('')
-  const [quickColor, setQuickColor] = useState('#3b82f6')
-
-  const handleQuickCreate = () => {
-    const name = quickName.trim()
-    if (!name) { toast.error('Ingresa un nombre'); return }
-
-    if (quickModal === 'brand') {
-      const id = crypto.randomUUID()
-      addBrand?.({ id, name, color: quickColor, isActive: true, createdAt: new Date().toISOString() })
-      setValue('brand', name, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
-      toast.success(`Marca "${name}" creada`)
-    } else if (quickModal === 'category') {
-      const id = crypto.randomUUID()
-      addCategory({ id, name, color: quickColor, description: '', isActive: true, createdAt: new Date().toISOString() })
-      setValue('categoryId', id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
-      toast.success(`Categoría "${name}" creada`)
-    } else if (quickModal === 'supplier') {
-      const id = crypto.randomUUID()
-      addSupplier?.({ id, name, isActive: true, createdAt: new Date().toISOString() })
-      setValue('supplierId', id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
-      toast.success(`Proveedor "${name}" creado`)
-    }
-    setQuickModal(null)
-    setQuickName('')
-  }
-
   const onSubmit = async (data) => {
-    // Asegurar que imageUrl vacío quede como string vacío (no undefined)
-    const payload = { ...data, imageUrl: data.imageUrl?.trim() || '' }
-    const result  = product
-      ? await productService.update(product.id, payload)
-      : await productService.create(payload)
+    const result = product
+      ? await productService.update(product.id, data)
+      : await productService.create(data)
     if (result.error) { toast.error(result.error); return }
     toast.success(product ? 'Producto actualizado' : 'Producto creado')
     onClose()
   }
 
-  // Colores para creación rápida
-  const QUICK_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899']
+  const field = (label, name, extra = {}) => (
+    <div className={extra.col2 ? 'col-span-2' : ''}>
+      <label className={labelCls}>{label}{extra.required ? ' *' : ''}</label>
+      {extra.children || <input type={extra.type || 'text'} step={extra.step} {...register(name)} className={inputCls}/>}
+      {errors[name] && <p className="text-xs text-red-500 mt-1">{errors[name].message}</p>}
+    </div>
+  )
 
   return (
-    <>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-
-          {/* Nombre */}
-          <div className="col-span-2">
-            <label className={labelCls}>Nombre del producto *</label>
-            <input {...register('name')} className={inputCls}/>
-            {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
-          </div>
-
-          {/* Barcode */}
-          <div>
-            <label className={labelCls}>Código de barras *</label>
-            <input {...register('barcode')} className={inputCls}/>
-            {errors.barcode && <p className="text-xs text-red-500 mt-1">{errors.barcode.message}</p>}
-          </div>
-
-          {/* SKU */}
-          <div>
-            <label className={labelCls}>SKU / Código interno</label>
-            <input {...register('sku')} className={inputCls}/>
-          </div>
-
-          {/* ── MARCA con botón crear rápido ───────────────────────────────── */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className={labelCls}>Marca</label>
-              <button type="button"
-                onClick={() => { setQuickModal('brand'); setQuickName('') }}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
-                <span>+</span> Nueva marca
-              </button>
-            </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        {field('Nombre del producto', 'name', { required: true, col2: true })}
+        {field('Código de barras', 'barcode', { required: true })}
+        {field('SKU / Código interno', 'sku')}
+        {field('Marca', 'brand', {
+          children: (
             <select {...register('brand')} className={inputCls}>
               <option value="">Sin marca</option>
               {brands?.filter(b => b.isActive).map(b => (
                 <option key={b.id} value={b.name}>{b.name}</option>
               ))}
             </select>
-          </div>
-
-          {/* ── CATEGORÍA con botón crear rápido ───────────────────────────── */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className={labelCls}>Categoría *</label>
-              <button type="button"
-                onClick={() => { setQuickModal('category'); setQuickName('') }}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
-                <span>+</span> Nueva categoría
-              </button>
-            </div>
+          )
+        })}
+        {field('Categoría', 'categoryId', {
+          required: true,
+          children: (
             <select {...register('categoryId')} className={inputCls}>
               <option value="">Seleccionar...</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {errors.categoryId && <p className="text-xs text-red-500 mt-1">{errors.categoryId.message}</p>}
-          </div>
-
-          {/* ── PROVEEDOR con botón crear rápido ───────────────────────────── */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className={labelCls}>Proveedor *</label>
-              <button type="button"
-                onClick={() => { setQuickModal('supplier'); setQuickName('') }}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
-                <span>+</span> Nuevo proveedor
-              </button>
-            </div>
+          )
+        })}
+        {field('Proveedor', 'supplierId', {
+          required: true,
+          children: (
             <select {...register('supplierId')} className={inputCls}>
               <option value="">Seleccionar...</option>
               {suppliers.filter(s => s.isActive !== false).map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            {errors.supplierId && <p className="text-xs text-red-500 mt-1">{errors.supplierId.message}</p>}
-          </div>
-
-          {/* Unidad */}
-          <div>
-            <label className={labelCls}>Unidad de medida *</label>
+          )
+        })}
+        {field('Unidad de medida', 'unit', {
+          required: true,
+          children: (
             <select {...register('unit')} className={inputCls}>
               {['unidad','kg','g','litro','ml','metro','cm','docena','caja','paquete'].map(u => (
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>
-          </div>
+          )
+        })}
+        {field('Ubicación en almacén', 'location')}
+        {field('Precio de compra (S/)', 'priceBuy',  { required: true, type: 'number', step: '0.01' })}
+        {field('Precio de venta (S/)',  'priceSell', { required: true, type: 'number', step: '0.01' })}
+        {field('Stock actual',          'stock',     { type: 'number' })}
+        {field('Stock mínimo',          'stockMin',  { type: 'number' })}
+        {field('Fecha de vencimiento',  'expiryDate',{ type: 'date' })}
 
-          {/* Precios */}
-          <div>
-            <label className={labelCls}>Precio de compra (S/) *</label>
-            <input type="number" step="0.01" {...register('priceBuy')} className={inputCls}/>
-            {errors.priceBuy && <p className="text-xs text-red-500 mt-1">{errors.priceBuy.message}</p>}
+        {/* ── Imagen del producto ─────────────────────────────────────────── */}
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">
+            URL de imagen del producto
+          </label>
+          <div className="flex gap-3 items-start">
+            <input
+              type="url"
+              {...register('imageUrl')}
+              placeholder="https://... (URL de imagen JPG, PNG o WebP)"
+              className={inputCls + ' flex-1'}
+            />
+            {/* Preview en tiempo real */}
+            <ProductImagePreview url={watch('imageUrl')}/>
           </div>
-          <div>
-            <label className={labelCls}>Precio de venta (S/) *</label>
-            <input type="number" step="0.01" {...register('priceSell')} className={inputCls}/>
-            {errors.priceSell && <p className="text-xs text-red-500 mt-1">{errors.priceSell.message}</p>}
-          </div>
-
-          {/* Stock */}
-          <div>
-            <label className={labelCls}>Stock actual</label>
-            <input type="number" {...register('stock')} className={inputCls}/>
-          </div>
-          <div>
-            <label className={labelCls}>Stock mínimo</label>
-            <input type="number" {...register('stockMin')} className={inputCls}/>
-          </div>
-
-          {/* Ubicación */}
-          <div>
-            <label className={labelCls}>Ubicación en almacén</label>
-            <input {...register('location')} placeholder="Ej: Pasillo A, Estante 3" className={inputCls}/>
-          </div>
-
-          {/* Fecha vencimiento */}
-          <div>
-            <label className={labelCls}>Fecha de vencimiento</label>
-            <input type="date" {...register('expiryDate')} className={inputCls}/>
-          </div>
-
-          {/* ── URL de imagen con preview en tiempo real ────────────────────── */}
-          <div className="col-span-2">
-            <label className={labelCls}>URL de imagen del producto</label>
-            <div className="flex gap-3 items-start">
-              <div className="flex-1">
-                <input
-                  {...register('imageUrl')}
-                  onChange={e => { setValue('imageUrl', e.target.value, { shouldValidate: true }); setImgError(false) }}
-                  placeholder="https://... (JPG, PNG o WebP)"
-                  className={inputCls}
-                />
-                {errors.imageUrl && <p className="text-xs text-red-500 mt-1">{errors.imageUrl.message}</p>}
-                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                  Opcional · Se muestra en el POS al buscar y en el catálogo
-                </p>
-              </div>
-              {/* Preview */}
-              <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-600 flex items-center justify-center overflow-hidden shrink-0 bg-gray-50 dark:bg-slate-700">
-                {imageUrl && !imgError ? (
-                  <img src={imageUrl} alt="preview"
-                    onError={() => setImgError(true)}
-                    className="w-full h-full object-cover rounded-xl"/>
-                ) : (
-                  <span className="text-2xl opacity-30">🖼️</span>
-                )}
-              </div>
-            </div>
-          </div>
-          {/* ────────────────────────────────────────────────────────────────── */}
-
-          {/* ── Gestión por lotes ────────────────────────────────────────────── */}
-          <div className="col-span-2">
-            <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-              <button type="button"
-                onClick={() => setValue('useBatches', !useBatches)}
-                className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${useBatches ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'}`}>
-                <span className={`inline-block h-3 w-3 mt-1 rounded-full bg-white transition-transform ${useBatches ? 'translate-x-5' : 'translate-x-1'}`}/>
-              </button>
-              <div>
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                  Gestión por lotes
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  Activa el control de lotes para este producto — permite registrar N° de lote, fecha de vencimiento y costo por lote
-                </p>
-              </div>
-            </div>
-          </div>
-          {/* ────────────────────────────────────────────────────────────────── */}
-
-          {/* Descripción */}
-          <div className="col-span-2">
-            <label className={labelCls}>Descripción</label>
-            <textarea {...register('description')} rows={2} className={inputCls + ' resize-none'}/>
-          </div>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+            Opcional · Se muestra en el POS al buscar el producto y en la boleta
+          </p>
         </div>
-
-        <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose} className={btnSecondary}>Cancelar</button>
-          <button type="submit" className={btnPrimary}>{product ? 'Guardar cambios' : 'Crear producto'}</button>
-        </div>
-      </form>
-
-      {/* ── Modal de creación rápida ─────────────────────────────────────────── */}
-      {quickModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4">
-            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100">
-              {quickModal === 'brand'    && '✨ Nueva marca'}
-              {quickModal === 'category' && '📂 Nueva categoría'}
-              {quickModal === 'supplier' && '🏭 Nuevo proveedor'}
-            </h3>
-
-            <div>
-              <label className={labelCls}>Nombre *</label>
-              <input
-                autoFocus
-                value={quickName}
-                onChange={e => setQuickName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleQuickCreate()}
-                placeholder={
-                  quickModal === 'brand'    ? 'Ej: Nestlé, Gloria, Alicorp...' :
-                  quickModal === 'category' ? 'Ej: Lácteos, Snacks...' :
-                  'Ej: Distribuidora García SAC'
-                }
-                className={inputCls}
-              />
-            </div>
-
-            {/* Color solo para marca y categoría */}
-            {quickModal !== 'supplier' && (
-              <div>
-                <label className={labelCls}>Color de identificación</label>
-                <div className="flex gap-2 flex-wrap mt-1">
-                  {QUICK_COLORS.map(col => (
-                    <button key={col} type="button"
-                      onClick={() => setQuickColor(col)}
-                      className={`w-7 h-7 rounded-full transition-all ${quickColor === col ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : ''}`}
-                      style={{ background: col }}/>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button type="button"
-                onClick={() => { setQuickModal(null); setQuickName('') }}
-                className={btnSecondary + ' flex-1'}>
-                Cancelar
-              </button>
-              <button type="button"
-                onClick={handleQuickCreate}
-                disabled={!quickName.trim()}
-                className={btnPrimary + ' flex-1'}>
-                Crear y seleccionar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+        {/* ──────────────────────────────────────────────────────────────────── */}
+        {field('N° de serie',           'serialNumber')}
+        {field('Descripción', 'description', {
+          col2: true,
+          children: <textarea {...register('description')} rows={2} className={inputCls + ' resize-none'}/>
+        })}
+      </div>
+      <div className="flex gap-3 pt-2">
+        <button type="button" onClick={onClose} className={btnSecondary}>Cancelar</button>
+        <button type="submit" className={btnPrimary}>{product ? 'Guardar cambios' : 'Crear producto'}</button>
+      </div>
+    </form>
   )
 }
 
@@ -644,13 +440,14 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
           className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
           📊 Excel
         </button>
+        {/* ── Etiquetas de precio 58mm ─────────────────────────────────────── */}
         <button
           onClick={() => printPriceLabels(filtered.filter(p => p.isActive), businessConfig)}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20"
+          className="px-3 py-2 text-sm border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20"
           title="Imprimir etiquetas de precio 58mm con código de barras">
-          <span aria-hidden="true">🏷️</span>
-          Etiquetas
+          🏷️ Etiquetas
         </button>
+        {/* ──────────────────────────────────────────────────────────────────── */}
         <button onClick={() => setModal({ type: 'form', data: null })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
@@ -668,7 +465,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
-                {['Producto','Código','Categoría','Proveedor','P. Compra','P. Venta','Margen','Stock','Acciones'].map(h => (
+                {['','Producto','Código','Categoría','P. Compra','P. Venta','Margen','Stock','Acciones'].map(h => (
                   <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-3 ${
                     ['P. Compra','P. Venta','Margen'].includes(h) ? 'text-right' :
                     h === 'Acciones' ? 'text-center' : 'text-left'}`}>{h}</th>
@@ -683,6 +480,18 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
                 const margin = p.priceBuy > 0 ? ((p.priceSell - p.priceBuy) / p.priceBuy * 100).toFixed(1) : 0
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${!p.isActive ? 'opacity-50' : ''}`}>
+                    {/* Imagen del producto */}
+                    <td className="px-2 py-2 w-12">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name}
+                          className="w-10 h-10 rounded-lg object-cover border border-gray-100 dark:border-slate-600"
+                          onError={e => e.target.style.display='none'}/>
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-lg">
+                          📦
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-3">
                       <div className="text-sm font-medium text-gray-800 dark:text-slate-100 max-w-[180px] truncate">{p.name}</div>
                       {p.brand && (
@@ -741,7 +550,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
 
       {modal?.type === 'form' && (
         <Modal title={modal.data ? 'Editar producto' : 'Nuevo producto'} size="lg" onClose={() => setModal(null)}>
-          <ProductForm product={modal.data} onClose={() => setModal(null)}/>
+          <ProductForm product={modal.data} categories={categories} brands={brands} suppliers={suppliers} onClose={() => setModal(null)}/>
         </Modal>
       )}
       {deleteTarget && (
@@ -1065,7 +874,6 @@ export default function Catalog() {
     { key: 'products',   label: 'Productos',   icon: '📦', count: products.filter(p => p.isActive).length },
     { key: 'categories', label: 'Categorías',  icon: '🗂️', count: categories.length },
     { key: 'brands',     label: 'Marcas',      icon: '🏷️', count: (brands || []).filter(b => b.isActive).length },
-    { key: 'batches',    label: 'Lotes',        icon: '🔢', count: products.filter(p => p.useBatches).length },
   ]
 
   return (
@@ -1111,293 +919,6 @@ export default function Catalog() {
       )}
       {tab === 'brands' && (
         <BrandsView brands={brands || []} products={products}/>
-      )}
-      {tab === 'batches' && (
-        <BatchesView products={products} suppliers={suppliers} onEditProduct={(p) => setModal({ type: 'form', data: p })}/>
-      )}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// VIEW — GESTIÓN DE LOTES
-// ══════════════════════════════════════════════════════════════════════════════
-function BatchesView({ products, suppliers, onEditProduct }) {
-  const { addBatch, updateBatch, deleteBatch } = useStore()
-  const [search,       setSearch]       = useState('')
-  const [selectedProd, setSelectedProd] = useState(null)
-  const [modal,        setModal]        = useState(null) // { type:'form', batch }
-  const [batchForm,    setBatchForm]    = useState({ batchNumber:'', quantity:0, priceBuy:0, expiryDate:'', notes:'' })
-
-  // Productos con gestión de lotes activada
-  const batchProducts = useMemo(() => {
-    const q = search.toLowerCase()
-    return products.filter(p => p.useBatches && p.isActive &&
-      (!q || p.name.toLowerCase().includes(q) || p.barcode.includes(q)))
-  }, [products, search])
-
-  const prodBatches = useMemo(() =>
-    selectedProd ? (selectedProd.batches || []).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
-  , [selectedProd])
-
-  const handleSaveBatch = () => {
-    if (!batchForm.batchNumber.trim()) { toast.error('El N° de lote es requerido'); return }
-    if (!selectedProd) return
-
-    const batch = {
-      id:          modal?.batch?.id || crypto.randomUUID(),
-      ...batchForm,
-      quantity:    parseFloat(batchForm.quantity) || 0,
-      priceBuy:    parseFloat(batchForm.priceBuy) || 0,
-      productId:   selectedProd.id,
-      productName: selectedProd.name,
-      status:      'activo',
-      createdAt:   modal?.batch?.createdAt || new Date().toISOString(),
-    }
-
-    const current = selectedProd.batches || []
-    const updated  = modal?.batch
-      ? current.map(b => b.id === batch.id ? batch : b)
-      : [batch, ...current]
-
-    updateBatch?.(selectedProd.id, updated)
-    // También actualizar el producto directamente en el store
-    useStore.getState().updateProduct(selectedProd.id, { batches: updated })
-    setSelectedProd(prev => ({ ...prev, batches: updated }))
-    toast.success(modal?.batch ? 'Lote actualizado' : 'Lote registrado')
-    setModal(null)
-    setBatchForm({ batchNumber:'', quantity:0, priceBuy:0, expiryDate:'', notes:'' })
-  }
-
-  const handleDeleteBatch = (batchId) => {
-    const updated = (selectedProd.batches || []).filter(b => b.id !== batchId)
-    useStore.getState().updateProduct(selectedProd.id, { batches: updated })
-    setSelectedProd(prev => ({ ...prev, batches: updated }))
-    toast.success('Lote eliminado')
-  }
-
-  const getDaysToExpiry = (date) => {
-    if (!date) return null
-    return Math.ceil((new Date(date) - new Date()) / (1000*60*60*24))
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      {/* Panel izquierdo — lista de productos con lotes */}
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
-            Productos con gestión de lotes ({batchProducts.length})
-          </p>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar producto..."
-            className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"/>
-        </div>
-
-        {batchProducts.length === 0 ? (
-          <div className="text-center py-10 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
-            <div className="text-3xl mb-2">🔢</div>
-            <p className="text-sm text-gray-500 dark:text-slate-400">Sin productos con lotes activos</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-              Activa "Gestión por lotes" al crear o editar un producto
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {batchProducts.map(p => {
-              const lotes    = p.batches || []
-              const activos  = lotes.filter(b => b.status === 'activo').length
-              const proxVenc = lotes.some(b => {
-                const d = getDaysToExpiry(b.expiryDate)
-                return d !== null && d <= 30 && d >= 0
-              })
-              const isSelected = selectedProd?.id === p.id
-
-              return (
-                <button key={p.id} onClick={() => setSelectedProd(p)}
-                  className={`w-full text-left p-3 rounded-xl border transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-200 dark:hover:border-blue-800'
-                  }`}>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate max-w-[160px]">{p.name}</p>
-                    <div className="flex gap-1">
-                      {proxVenc && <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-full font-semibold">⚠️ Vence</span>}
-                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-full font-semibold">{activos} lotes</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 font-mono mt-0.5">{p.barcode}</p>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Panel derecho — lotes del producto seleccionado */}
-      <div className="lg:col-span-2">
-        {!selectedProd ? (
-          <div className="flex items-center justify-center h-64 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl">
-            <div className="text-center">
-              <div className="text-4xl mb-3 opacity-20">🔢</div>
-              <p className="text-gray-400 dark:text-slate-500 text-sm">Selecciona un producto para ver sus lotes</p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Header del producto */}
-            <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {selectedProd.imageUrl ? (
-                  <img src={selectedProd.imageUrl} alt={selectedProd.name}
-                    className="w-12 h-12 rounded-lg object-cover border border-gray-100 dark:border-slate-600"
-                    onError={e => e.target.style.display='none'}/>
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-2xl">📦</div>
-                )}
-                <div>
-                  <p className="font-semibold text-gray-800 dark:text-slate-100">{selectedProd.name}</p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 font-mono">{selectedProd.barcode} · Stock total: {selectedProd.stock} {selectedProd.unit}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => { setBatchForm({ batchNumber:'', quantity:0, priceBuy:selectedProd.priceBuy||0, expiryDate:'', notes:'' }); setModal({ type:'form', batch:null }) }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700">
-                + Registrar lote
-              </button>
-            </div>
-
-            {/* Tabla de lotes */}
-            {prodBatches.length === 0 ? (
-              <div className="text-center py-12 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl">
-                <div className="text-3xl mb-2">📋</div>
-                <p className="text-sm text-gray-400 dark:text-slate-500">Sin lotes registrados</p>
-                <p className="text-xs text-gray-300 dark:text-slate-600 mt-1">Registra el primer lote con el botón de arriba</p>
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-slate-700/50">
-                      {['N° Lote','Cantidad','P. Compra','Vencimiento','Notas','Estado','Acc.'].map(h => (
-                        <th key={h} className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-3 py-2.5 text-left">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
-                    {prodBatches.map(b => {
-                      const days = getDaysToExpiry(b.expiryDate)
-                      const expired = days !== null && days < 0
-                      const nearExp = days !== null && days >= 0 && days <= 30
-
-                      return (
-                        <tr key={b.id} className={`hover:bg-gray-50 dark:hover:bg-slate-700/30 ${expired ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
-                          <td className="px-3 py-2.5">
-                            <span className="text-sm font-mono font-semibold text-gray-800 dark:text-slate-100">{b.batchNumber}</span>
-                          </td>
-                          <td className="px-3 py-2.5 text-sm text-gray-600 dark:text-slate-300">{b.quantity} {selectedProd.unit}</td>
-                          <td className="px-3 py-2.5 text-sm text-gray-600 dark:text-slate-300">{b.priceBuy > 0 ? formatCurrency(b.priceBuy) : '—'}</td>
-                          <td className="px-3 py-2.5">
-                            {b.expiryDate ? (
-                              <div>
-                                <span className={`text-xs font-semibold ${expired ? 'text-red-600 dark:text-red-400' : nearExp ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-slate-300'}`}>
-                                  {new Date(b.expiryDate).toLocaleDateString('es-PE')}
-                                </span>
-                                {days !== null && (
-                                  <span className={`ml-1 text-xs ${expired ? 'text-red-500' : nearExp ? 'text-amber-500' : 'text-gray-400 dark:text-slate-500'}`}>
-                                    {expired ? `(vencido hace ${Math.abs(days)}d)` : `(${days}d)`}
-                                  </span>
-                                )}
-                              </div>
-                            ) : <span className="text-xs text-gray-400 dark:text-slate-500">—</span>}
-                          </td>
-                          <td className="px-3 py-2.5 text-xs text-gray-400 dark:text-slate-500 max-w-[120px] truncate">{b.notes || '—'}</td>
-                          <td className="px-3 py-2.5">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              expired ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                              nearExp ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
-                              'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            }`}>
-                              {expired ? 'Vencido' : nearExp ? 'Próx. vencer' : 'Activo'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex gap-1">
-                              <button onClick={() => { setBatchForm({ batchNumber:b.batchNumber, quantity:b.quantity, priceBuy:b.priceBuy, expiryDate:b.expiryDate||'', notes:b.notes||'' }); setModal({ type:'form', batch:b }) }}
-                                className="p-1 text-gray-400 hover:text-amber-600 rounded transition-colors">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                              </button>
-                              <button onClick={() => handleDeleteBatch(b.id)}
-                                className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Modal de registro de lote */}
-      {modal?.type === 'form' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
-            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100">
-              {modal.batch ? '✏️ Editar lote' : '+ Registrar nuevo lote'}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-slate-400">Producto: <strong>{selectedProd?.name}</strong></p>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className={labelCls}>N° de lote *</label>
-                <input value={batchForm.batchNumber}
-                  onChange={e => setBatchForm(p => ({...p, batchNumber: e.target.value}))}
-                  placeholder="Ej: LOT-2024-001, L240506..."
-                  className={inputCls}/>
-              </div>
-              <div>
-                <label className={labelCls}>Cantidad</label>
-                <input type="number" min="0" step="0.01" value={batchForm.quantity}
-                  onChange={e => setBatchForm(p => ({...p, quantity: e.target.value}))}
-                  className={inputCls}/>
-              </div>
-              <div>
-                <label className={labelCls}>Precio de compra (S/)</label>
-                <input type="number" min="0" step="0.01" value={batchForm.priceBuy}
-                  onChange={e => setBatchForm(p => ({...p, priceBuy: e.target.value}))}
-                  className={inputCls}/>
-              </div>
-              <div className="col-span-2">
-                <label className={labelCls}>Fecha de vencimiento</label>
-                <input type="date" value={batchForm.expiryDate}
-                  onChange={e => setBatchForm(p => ({...p, expiryDate: e.target.value}))}
-                  className={inputCls}/>
-              </div>
-              <div className="col-span-2">
-                <label className={labelCls}>Notas / Observaciones</label>
-                <textarea rows={2} value={batchForm.notes}
-                  onChange={e => setBatchForm(p => ({...p, notes: e.target.value}))}
-                  placeholder="Proveedor, condiciones de almacenamiento..."
-                  className={inputCls + ' resize-none'}/>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => setModal(null)} className={btnSecondary + ' flex-1'}>Cancelar</button>
-              <button type="button" onClick={handleSaveBatch} className={btnPrimary + ' flex-1'}>
-                {modal.batch ? 'Guardar cambios' : 'Registrar lote'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

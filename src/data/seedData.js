@@ -105,63 +105,130 @@ export const SEED_USERS = [
   { id: 'usr-005', username: 'gerente',    fullName: 'Carlos Rimac Paredes',     email: 'crimac@negocio.pe',     role: 'gerente',    isActive: true, createdAt: subtractDays(120) },
 ]
 
-// ─── VENTAS HISTÓRICAS (30 días, con payments array) ─────────────────────────
-function generateSales() {
+// ─── GENERADOR DE VENTAS HISTÓRICAS RICAS (30 días) ──────────────────────────
+// Genera datos realistas para que el dashboard y reportes se vean completos
+// desde el primer momento del demo.
+function generateRichSales() {
   const sales = []
-  const activePrds = SEED_PRODUCTS.filter(p => p.isActive && p.stock > 0)
-  const methods = ['efectivo','efectivo','efectivo','yape','plin','tarjeta','transferencia']
-  const users = ['usr-002','usr-002','usr-003']
-  const clients = [null,null,null,'cli-001','cli-002','cli-003']
-  let invoice = 1000
+  const methods   = ['efectivo','efectivo','efectivo','yape','yape','tarjeta','credito']
+  const clientIds = ['cli-001','cli-002','cli-003','cli-004','cli-005','cli-006','cli-007', null, null, null]
+  const userIds   = ['usr-001','usr-001','usr-001','usr-002']
 
-  for (let dayOff = 30; dayOff >= 1; dayOff--) {
-    const cnt = Math.floor(Math.random() * 14) + 4
-    for (let s = 0; s < cnt; s++) {
+  // Campañas de descuento activas en el seed
+  const campaignIds = ['camp-001','camp-002', null, null, null]
+
+  // Productos más vendidos (para que el top productos se vea bien)
+  const popularProducts = [
+    { id:'prd-001', name:'Arroz Costeño Extra 5kg',   price:19.90, cost:15.50, unit:'unidad' },
+    { id:'prd-002', name:'Aceite Primor 1L',           price:9.50,  cost:6.80,  unit:'unidad' },
+    { id:'prd-003', name:'Azúcar Rubia 1kg',           price:4.50,  cost:3.20,  unit:'unidad' },
+    { id:'prd-005', name:'Fideos Don Vittorio 500g',   price:4.20,  cost:2.80,  unit:'unidad' },
+    { id:'prd-011', name:'Inca Kola 500ml',            price:2.50,  cost:1.80,  unit:'unidad' },
+    { id:'prd-013', name:'Coca-Cola 500ml',            price:2.50,  cost:1.80,  unit:'unidad' },
+    { id:'prd-016', name:'Agua San Luis 625ml',        price:1.50,  cost:0.90,  unit:'unidad' },
+    { id:'prd-021', name:'Leche Gloria Entera 1L',     price:5.20,  cost:3.80,  unit:'unidad' },
+    { id:'prd-031', name:'Jabón Camay',                price:2.80,  cost:1.90,  unit:'unidad' },
+    { id:'prd-041', name:'Papas Lays Clásicas 42g',    price:2.50,  cost:1.60,  unit:'unidad' },
+    { id:'prd-012', name:'Inca Kola 1.5L',             price:5.90,  cost:4.20,  unit:'unidad' },
+    { id:'prd-017', name:'Agua San Luis 2.5L',         price:3.50,  cost:2.20,  unit:'unidad' },
+  ]
+
+  // Horarios realistas de venta por hora del día
+  const hourWeights = [0,0,0,0,0,0,1,3,5,6,5,6,8,7,6,5,6,7,8,6,4,3,2,1]
+  const pickHour = () => {
+    const total = hourWeights.reduce((a,b) => a+b, 0)
+    let r = Math.random() * total
+    for (let h = 0; h < 24; h++) { r -= hourWeights[h]; if (r <= 0) return h }
+    return 12
+  }
+
+  // Generar entre 15 y 35 ventas por día
+  let invoiceNum = 1200
+  for (let daysAgo = 30; daysAgo >= 0; daysAgo--) {
+    const salesPerDay = 15 + Math.floor(Math.random() * 20)
+
+    for (let s = 0; s < salesPerDay; s++) {
+      invoiceNum++
+      const date = new Date()
+      date.setDate(date.getDate() - daysAgo)
+      date.setHours(pickHour(), Math.floor(Math.random()*60), Math.floor(Math.random()*60))
+
+      const method   = methods[Math.floor(Math.random() * methods.length)]
+      const clientId = clientIds[Math.floor(Math.random() * clientIds.length)]
+      const userId   = userIds[Math.floor(Math.random() * userIds.length)]
+
+      // 2-5 ítems por venta
+      const numItems = 2 + Math.floor(Math.random() * 4)
+      const usedProds = new Set()
       const items = []
-      const used = new Set()
-      const itemCount = Math.floor(Math.random() * 4) + 1
-      for (let i = 0; i < itemCount; i++) {
-        let prd
-        do { prd = activePrds[Math.floor(Math.random() * activePrds.length)] }
-        while (used.has(prd.id))
-        used.add(prd.id)
-        const qty = Math.floor(Math.random() * 3) + 1
+
+      for (let i = 0; i < numItems; i++) {
+        let prod
+        do { prod = popularProducts[Math.floor(Math.random() * popularProducts.length)] }
+        while (usedProds.has(prod.id))
+        usedProds.add(prod.id)
+
+        const qty = 1 + Math.floor(Math.random() * 5)
+        const hasCampaignDisc = Math.random() < 0.2 // 20% de ítems con descuento campaña
+        const campaignDiscount = hasCampaignDisc ? parseFloat((prod.price * qty * 0.05).toFixed(2)) : 0
+        const manualDiscount   = Math.random() < 0.05 ? parseFloat((prod.price * 0.10).toFixed(2)) : 0
+        const totalDiscount    = campaignDiscount + manualDiscount
+        const subtotal         = parseFloat((qty * prod.price).toFixed(2))
+        const netTotal         = parseFloat((subtotal - totalDiscount).toFixed(2))
+
         items.push({
-          id: crypto.randomUUID(),
-          productId: prd.id,
-          productName: prd.name,
-          barcode: prd.barcode,
-          quantity: qty,
-          unitPrice: prd.priceSell,
-          discount: 0,
-          subtotal: parseFloat((qty * prd.priceSell).toFixed(2)),
-          unit: prd.unit,
+          id:             crypto.randomUUID(),
+          productId:      prod.id,
+          productName:    prod.name,
+          barcode:        `775000000${invoiceNum}`,
+          unit:           prod.unit,
+          quantity:       qty,
+          unitPrice:      prod.price,
+          subtotal,
+          campaignDiscount,
+          manualDiscount,
+          discount:       manualDiscount,
+          totalDiscount,
+          netTotal,
+          discountDetails: hasCampaignDisc
+            ? [{ label: 'Promo semana', amount: campaignDiscount, icon: '🏷️' }]
+            : [],
         })
       }
-      const total = parseFloat(items.reduce((a, i) => a + i.subtotal, 0).toFixed(2))
-      const method = methods[Math.floor(Math.random() * methods.length)]
-      const date = new Date()
-      date.setDate(date.getDate() - dayOff)
-      date.setHours(Math.floor(Math.random() * 13) + 8, Math.floor(Math.random() * 60))
+
+      const subtotalBruto  = parseFloat(items.reduce((a,i) => a+i.subtotal, 0).toFixed(2))
+      const totalDescuentos = parseFloat(items.reduce((a,i) => a+i.totalDiscount, 0).toFixed(2))
+      const total           = parseFloat((subtotalBruto - totalDescuentos).toFixed(2))
+      const igv             = parseFloat((total / 1.18 * 0.18).toFixed(2))
+      const base            = parseFloat((total - igv).toFixed(2))
 
       sales.push({
-        id: crypto.randomUUID(),
-        invoiceNumber: formatInvoice(invoice++),
-        clientId: clients[Math.floor(Math.random() * clients.length)],
-        userId: users[Math.floor(Math.random() * users.length)],
+        id:             crypto.randomUUID(),
+        invoiceNumber:  formatInvoice(invoiceNum),
+        clientId,
+        userId,
+        userName:       userId === 'usr-001' ? 'Administrador General' : 'María Cajera',
         items,
-        subtotal: total, discount: 0, tax: parseFloat((total - total / 1.18).toFixed(2)), total,
-        payments: [{ method, amount: total, reference: method !== 'efectivo' ? String(Math.floor(Math.random() * 900000) + 100000) : '' }],
-        status: 'completada',
-        notes: '',
-        createdAt: date.toISOString(),
+        subtotalBruto,
+        totalDescuentos,
+        total,
+        baseImponible:  base,
+        igv,
+        igvRate:        0.18,
+        discount:       totalDescuentos,
+        payments:       [{ method, amount: total, reference: '' }],
+        change:         0,
+        status:         'completada',
+        note:           '',
+        createdAt:      date.toISOString(),
       })
     }
   }
+
   return sales
 }
 
-export const SEED_SALES = generateSales()
+export const SEED_SALES = generateRichSales()
 
 // ─── ESTADO INICIAL ───────────────────────────────────────────────────────────
 export function getInitialDemoState() {

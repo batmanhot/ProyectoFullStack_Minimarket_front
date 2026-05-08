@@ -25,85 +25,11 @@ function ColorDot({ color, size = 'sm' }) {
   return <span className={`${s} rounded-full inline-block flex-shrink-0`} style={{ backgroundColor: color || '#94a3b8' }}/>
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-function buildLabelHTML(products, businessConfig) {
-  const labels = products.map((p) => {
-    const businessName = escapeHtml(businessConfig?.name || 'MI NEGOCIO').substring(0, 22)
-    const productName = escapeHtml(p.name).substring(0, 32)
-    const price = Number(p.priceSell || 0).toFixed(2)
-    const barcode = escapeHtml(p.barcode)
-    const sku = p.sku ? ` · ${escapeHtml(p.sku)}` : ''
-
-    return `
-    <div class="label">
-      <div class="biz">${businessName}</div>
-      <div class="name">${productName}</div>
-      <div class="price">S/ ${price}</div>
-      <svg class="bc" data-barcode="${barcode}"></svg>
-      <div class="sku">${barcode}${sku}</div>
-    </div>`
-  }).join('')
-
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquetas</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{font-family:'Courier New',monospace;background:#fff;}
-  .grid{display:flex;flex-wrap:wrap;gap:4px;padding:8px;}
-  .label{width:56mm;border:1px solid #ccc;border-radius:3px;padding:4px 6px;text-align:center;page-break-inside:avoid;}
-  .biz{font-size:7px;color:#555;margin-bottom:1px;}
-  .name{font-size:9px;font-weight:bold;margin-bottom:2px;min-height:20px;display:flex;align-items:center;justify-content:center;}
-  .price{font-size:20px;font-weight:900;margin:3px 0;}
-  .bc{width:100%;height:30px;}
-  .sku{font-size:7px;color:#777;margin-top:1px;}
-  .fab{position:fixed;bottom:16px;right:16px;background:#185FA5;color:#fff;border:none;padding:10px 18px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;}
-  @media print{.fab{display:none}@page{size:A4;margin:5mm;}}
-</style></head>
-<body>
-<div class="grid">${labels}</div>
-<button class="fab" onclick="window.print()">Imprimir etiquetas</button>
-<script>
-  document.querySelectorAll('.bc').forEach(el => {
-    try { JsBarcode(el, el.dataset.barcode, {format:'CODE128',width:1.2,height:30,displayValue:false,margin:0}) }
-    catch(e) { el.style.display='none' }
-  })
-</script></body></html>`
-}
-
-function printPriceLabels(products, businessConfig) {
-  if (!products?.length) { toast.error('Selecciona al menos un producto'); return }
-  const width = 900
-  const height = 700
-  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2))
-  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2))
-  const features = `width=${width},height=${height},left=${left},top=${top},menubar=yes,scrollbars=yes`
-  const win = window.open('', '_blank', features)
-  if (!win) { toast.error('Activa las ventanas emergentes para imprimir'); return }
-  win.document.write(buildLabelHTML(products, businessConfig))
-  win.document.close()
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // FORM — PRODUCTO
 // ══════════════════════════════════════════════════════════════════════════════
-function ProductForm({ product, onClose }) {
-  // ── Leer del store directamente ──────────────────────────────────────────
-  // Esto es clave: si se recibieran como props, los nuevos registros creados
-  // desde el mini-modal NO aparecerían en los selects hasta cerrar y reabrir.
-  // Al leer del store directamente, React re-renderiza automáticamente al
-  // agregar una categoría/marca/proveedor nuevo.
-  const {
-    categories, brands, suppliers,
-    addCategory, addBrand, addSupplier,
-  } = useStore()
+function ProductForm({ product, categories, brands, suppliers, onClose }) {
+  const { addCategory, addBrand, addSupplier } = useStore()
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(productSchema),
     defaultValues: product || {
@@ -130,17 +56,17 @@ function ProductForm({ product, onClose }) {
     if (quickModal === 'brand') {
       const id = crypto.randomUUID()
       addBrand?.({ id, name, color: quickColor, isActive: true, createdAt: new Date().toISOString() })
-      setValue('brand', name, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+      setValue('brand', name)
       toast.success(`Marca "${name}" creada`)
     } else if (quickModal === 'category') {
       const id = crypto.randomUUID()
       addCategory({ id, name, color: quickColor, description: '', isActive: true, createdAt: new Date().toISOString() })
-      setValue('categoryId', id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+      setValue('categoryId', id)
       toast.success(`Categoría "${name}" creada`)
     } else if (quickModal === 'supplier') {
       const id = crypto.randomUUID()
       addSupplier?.({ id, name, isActive: true, createdAt: new Date().toISOString() })
-      setValue('supplierId', id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+      setValue('supplierId', id)
       toast.success(`Proveedor "${name}" creado`)
     }
     setQuickModal(null)
@@ -644,13 +570,6 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
           className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
           📊 Excel
         </button>
-        <button
-          onClick={() => printPriceLabels(filtered.filter(p => p.isActive), businessConfig)}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20"
-          title="Imprimir etiquetas de precio 58mm con código de barras">
-          <span aria-hidden="true">🏷️</span>
-          Etiquetas
-        </button>
         <button onClick={() => setModal({ type: 'form', data: null })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
@@ -741,7 +660,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
 
       {modal?.type === 'form' && (
         <Modal title={modal.data ? 'Editar producto' : 'Nuevo producto'} size="lg" onClose={() => setModal(null)}>
-          <ProductForm product={modal.data} onClose={() => setModal(null)}/>
+          <ProductForm product={modal.data} categories={categories} brands={brands} suppliers={suppliers} onClose={() => setModal(null)}/>
         </Modal>
       )}
       {deleteTarget && (

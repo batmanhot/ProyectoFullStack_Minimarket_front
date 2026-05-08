@@ -173,9 +173,12 @@ function TrackingForm({ alert, tracking, onSave, onClose }) {
 
 // ─── Página principal de Alertas ──────────────────────────────────────────────
 export default function Alerts() {
-  const { products, clients, sales, cashSessions, systemConfig } = useStore()
+  const { products, clients, sales, cashSessions, systemConfig, activeCashSession } = useStore()
   const [tracking, setTracking]   = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_alert_tracking') || '{}') } catch { return {} }
+  })
+  const [alertEmittedAt, setAlertEmittedAt] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pos_alert_emitted_at') || '{}') } catch { return {} }
   })
   const [selectedAlert, setSelectedAlert] = useState(null)
   const [filterStatus, setFilterStatus]   = useState('todas')
@@ -186,21 +189,76 @@ export default function Alerts() {
     localStorage.setItem('pos_alert_tracking', JSON.stringify(tracking))
   }, [tracking])
 
+  useEffect(() => {
+    localStorage.setItem('pos_alert_emitted_at', JSON.stringify(alertEmittedAt))
+  }, [alertEmittedAt])
+
+  // ── Resumen diario al abrir el módulo ────────────────────────────────────
+  // Muestra un toast resumen si hay alertas críticas no atendidas
+  useEffect(() => {
+    const key = `alert_summary_${new Date().toDateString()}`
+    if (localStorage.getItem(key)) return // Solo una vez por día
+
+    const allA    = detectAlerts(products, clients, sales, cashSessions, systemConfig)
+    const criticas = allA.filter(a => {
+      const def = ALERT_DEFS.find(d => d.type === a.type)
+      const tr  = tracking[a.id]
+      return def?.severity === 'alta' && tr?.status !== 'subsanada'
+    })
+
+    if (criticas.length > 0) {
+      toast.error(
+        `⚠️ ${criticas.length} alerta(s) crítica(s) sin atender — revisa el módulo de Alertas`,
+        { duration: 6000 }
+      )
+    }
+    localStorage.setItem(key, '1')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Guardar tracking en localStorage
+  useEffect(() => {
+    localStorage.setItem('pos_alert_tracking', JSON.stringify(tracking))
+  }, [tracking])
+
   const allAlerts = useMemo(() =>
     detectAlerts(products, clients, sales, cashSessions, systemConfig)
   , [products, clients, sales, cashSessions, systemConfig])
 
+  useEffect(() => {
+    if (!allAlerts.length) return
+    setAlertEmittedAt(prev => {
+      let changed = false
+      const next = { ...prev }
+      const now = new Date().toISOString()
+
+      allAlerts.forEach(alert => {
+        if (!next[alert.id]) {
+          next[alert.id] = alert.createdAt || now
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [allAlerts])
+
   const enriched = useMemo(() => allAlerts.map(a => ({
     ...a,
+    emittedAt: alertEmittedAt[a.id] || a.createdAt,
     status:  tracking[a.id]?.status  || 'activa',
     history: tracking[a.id]?.history || [],
-  })), [allAlerts, tracking])
+  })), [allAlerts, alertEmittedAt, tracking])
 
-  const filtered = useMemo(() => enriched.filter(a => {
-    if (filterStatus !== 'todas' && a.status !== filterStatus) return false
-    if (filterType   !== 'todas' && a.type   !== filterType)   return false
-    return true
-  }), [enriched, filterStatus, filterType])
+  const filtered = useMemo(() => enriched
+    .filter(a => {
+      if (filterStatus !== 'todas' && a.status !== filterStatus) return false
+      if (filterType   !== 'todas' && a.type   !== filterType)   return false
+      return true
+    })
+    .sort((a, b) => new Date(b.emittedAt || 0) - new Date(a.emittedAt || 0))
+  , [enriched, filterStatus, filterType])
 
   const counts = useMemo(() => ({
     total:      enriched.length,
@@ -299,7 +357,12 @@ export default function Alerts() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="font-semibold text-gray-800 dark:text-slate-100 text-sm">{alert.title}</div>
+                      <div>
+                        <div className="font-semibold text-gray-800 dark:text-slate-100 text-sm">{alert.title}</div>
+                        <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+                          Emitida: {formatDateTime(alert.emittedAt)}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${def?.color.badge}`}>{def?.label}</span>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stat?.bg}`}>{stat?.icon} {stat?.label}</span>

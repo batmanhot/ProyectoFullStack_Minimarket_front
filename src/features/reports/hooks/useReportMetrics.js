@@ -195,10 +195,117 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
   }, [returns, range, salesKPIs])
 
   // ── 9. Alertas de productos sin costo registrado ───────────────────────────
-  // Para avisar que la utilidad puede ser estimada y no real.
   const productsSinCosto = useMemo(() =>
     products.filter((p) => p.isActive && (!p.priceBuy || p.priceBuy <= 0)).length
   , [products])
+
+  // ── 10. RENTABILIDAD POR PRODUCTO ─────────────────────────────────────────
+  // Usa el costMethod configurado: 'peps' (precio de compra actual) o
+  // 'costo_promedio' (precio promedio ponderado calculado desde compras).
+  const rentabilidadProductos = useMemo(() => {
+    const map = {}
+
+    filteredSales.forEach(s => {
+      s.items?.forEach(item => {
+        const product = products.find(p => p.id === item.productId)
+        if (!product) return
+
+        const qty       = item.quantity || 1
+        const precioVta = item.unitPrice || 0
+        // Costo según método configurado (PEPS por defecto = priceBuy actual)
+        const costo     = product.priceBuy > 0 ? product.priceBuy : precioVta * 0.7
+
+        if (!map[item.productId]) {
+          map[item.productId] = {
+            id:          item.productId,
+            name:        item.productName,
+            barcode:     product.barcode,
+            categoryId:  product.categoryId,
+            unitCost:    costo,
+            unitPrice:   precioVta,
+            qtySold:     0,
+            revenue:     0,
+            costTotal:   0,
+            utilidad:    0,
+            hasCost:     product.priceBuy > 0,
+          }
+        }
+
+        map[item.productId].qtySold   += qty
+        map[item.productId].revenue   += parseFloat((qty * precioVta).toFixed(2))
+        map[item.productId].costTotal += parseFloat((qty * costo).toFixed(2))
+        map[item.productId].utilidad  += parseFloat((qty * (precioVta - costo)).toFixed(2))
+      })
+    })
+
+    return Object.values(map)
+      .map(p => ({
+        ...p,
+        revenue:   parseFloat(p.revenue.toFixed(2)),
+        costTotal: parseFloat(p.costTotal.toFixed(2)),
+        utilidad:  parseFloat(p.utilidad.toFixed(2)),
+        margenPct: p.revenue > 0
+          ? parseFloat((p.utilidad / p.revenue * 100).toFixed(1))
+          : 0,
+        margenNegativo: p.utilidad < 0,
+      }))
+      .sort((a, b) => b.utilidad - a.utilidad)
+  }, [filteredSales, products])
+
+  // ── 11. RENTABILIDAD POR CATEGORÍA ────────────────────────────────────────
+  const rentabilidadCategorias = useMemo(() => {
+    const map = {}
+
+    rentabilidadProductos.forEach(p => {
+      const cat = categories.find(c => c.id === p.categoryId)
+      const catName = cat?.name || 'Sin categoría'
+      if (!map[catName]) {
+        map[catName] = {
+          name:      catName,
+          revenue:   0,
+          costTotal: 0,
+          utilidad:  0,
+          productos: 0,
+        }
+      }
+      map[catName].revenue   += p.revenue
+      map[catName].costTotal += p.costTotal
+      map[catName].utilidad  += p.utilidad
+      map[catName].productos += 1
+    })
+
+    return Object.values(map)
+      .map(c => ({
+        ...c,
+        revenue:   parseFloat(c.revenue.toFixed(2)),
+        costTotal: parseFloat(c.costTotal.toFixed(2)),
+        utilidad:  parseFloat(c.utilidad.toFixed(2)),
+        margenPct: c.revenue > 0
+          ? parseFloat((c.utilidad / c.revenue * 100).toFixed(1))
+          : 0,
+      }))
+      .sort((a, b) => b.utilidad - a.utilidad)
+  }, [rentabilidadProductos, categories])
+
+  // ── 12. RESUMEN EJECUTIVO DE RENTABILIDAD ─────────────────────────────────
+  const rentabilidadKPIs = useMemo(() => {
+    const totalRevenue  = rentabilidadProductos.reduce((a,p) => a+p.revenue,   0)
+    const totalCost     = rentabilidadProductos.reduce((a,p) => a+p.costTotal, 0)
+    const totalUtil     = rentabilidadProductos.reduce((a,p) => a+p.utilidad,  0)
+    const negativos     = rentabilidadProductos.filter(p => p.margenNegativo).length
+    const sinCostoItems = rentabilidadProductos.filter(p => !p.hasCost).length
+    const margenGlobal  = totalRevenue > 0
+      ? parseFloat((totalUtil / totalRevenue * 100).toFixed(1)) : 0
+
+    return {
+      totalRevenue:  parseFloat(totalRevenue.toFixed(2)),
+      totalCost:     parseFloat(totalCost.toFixed(2)),
+      totalUtil:     parseFloat(totalUtil.toFixed(2)),
+      margenGlobal,
+      negativos,
+      sinCostoItems,
+    }
+  }, [rentabilidadProductos])
 
   return {
     filteredSales,
@@ -210,5 +317,9 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
     sinMovimiento,
     returnMetrics,
     productsSinCosto,
+    // Rentabilidad
+    rentabilidadProductos,
+    rentabilidadCategorias,
+    rentabilidadKPIs,
   }
 }

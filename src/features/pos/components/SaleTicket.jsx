@@ -243,15 +243,15 @@ export default function SaleTicket({ sale, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-800 text-base">Comprobante de venta</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{sale.invoiceNumber} · {formatDateTime(sale.createdAt)}</p>
+            <h2 className="font-bold text-gray-800 dark:text-slate-100 text-base">Comprobante de venta</h2>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sale.invoiceNumber} · {formatDateTime(sale.createdAt)}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+          <button onClick={onClose} className="p-2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
             </svg>
@@ -259,12 +259,12 @@ export default function SaleTicket({ sale, onClose }) {
         </div>
 
         {/* Vista previa del ticket */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-100 dark:bg-slate-900" style={{ colorScheme: 'light' }}>
           <div className="flex justify-center">
             <div style={{
               fontFamily: "'Courier New', monospace",
               fontSize: '11px', width: '300px', maxWidth: '100%',
-              background: '#fff', padding: '12px',
+              background: '#ffffff', color: '#000000', WebkitTextFillColor: '#000000', padding: '12px',
               boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
               borderRadius: '4px', border: '1px solid #e5e7eb',
             }}>
@@ -283,8 +283,8 @@ export default function SaleTicket({ sale, onClose }) {
                 {(businessConfig?.name || 'MI NEGOCIO').toUpperCase()}
               </div>
               {businessConfig?.ruc     && <div style={{ textAlign: 'center', fontSize: '10px' }}>R.U.C.: {businessConfig.ruc}</div>}
-              {businessConfig?.address && <div style={{ textAlign: 'center', fontSize: '9px', color: '#555' }}>{businessConfig.address}</div>}
-              {businessConfig?.phone   && <div style={{ textAlign: 'center', fontSize: '9px', color: '#555' }}>Tel: {businessConfig.phone}</div>}
+              {businessConfig?.address && <div style={{ textAlign: 'center', fontSize: '9px', color: '#333333' }}>{businessConfig.address}</div>}
+              {businessConfig?.phone   && <div style={{ textAlign: 'center', fontSize: '9px', color: '#333333' }}>Tel: {businessConfig.phone}</div>}
 
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
               <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '11px', marginBottom: '1px' }}>BOLETA DE VENTA ELECTRÓNICA</div>
@@ -326,10 +326,10 @@ export default function SaleTicket({ sale, onClose }) {
 
                     {/* CANT · P.U. · DSCT. · TOTAL */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span style={{ flex: 2, color: '#555' }}>{item.unit || 'u'}</span>
+                      <span style={{ flex: 2, color: '#333333' }}>{item.unit || 'u'}</span>
                       <span style={{ width: '22px', textAlign: 'center' }}>{qty}</span>
                       <span style={{ width: '42px', textAlign: 'right' }}>{formatCurrency(pu)}</span>
-                      <span style={{ width: '36px', textAlign: 'right', color: itemDiscount > 0 ? '#dc2626' : '#999' }}>
+                      <span style={{ width: '36px', textAlign: 'right', color: itemDiscount > 0 ? '#dc2626' : '#666666' }}>
                         {itemDiscount > 0 ? `-${formatCurrency(itemDiscount)}` : '—'}
                       </span>
                       <span style={{ width: '42px', textAlign: 'right', fontWeight: 'bold' }}>
@@ -411,21 +411,21 @@ export default function SaleTicket({ sale, onClose }) {
               {/* QR SUNAT */}
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
               <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '60px', height: '60px', border: '1px solid #999', fontSize: '7px', textAlign: 'center', padding: '4px', color: '#666' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '60px', height: '60px', border: '1px solid #999', fontSize: '7px', textAlign: 'center', padding: '4px', color: '#444444' }}>
                   QR<br/>SUNAT<br/>{sale.invoiceNumber?.slice(-6)}
                 </div>
               </div>
-              <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', marginBottom: '2px' }}>
+              <div style={{ textAlign: 'center', fontSize: '8px', color: '#444444', marginBottom: '2px' }}>
                 Representación impresa de Boleta de Venta Electrónica
               </div>
-              <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', marginBottom: '4px' }}>
+              <div style={{ textAlign: 'center', fontSize: '8px', color: '#444444', marginBottom: '4px' }}>
                 Consulte en: <strong>www.sunat.gob.pe</strong>
               </div>
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }}/>
               <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold' }}>
                 {businessConfig?.ticketFooter || '¡Gracias por su compra!'}
               </div>
-              <div style={{ textAlign: 'center', fontSize: '9px', color: '#888', marginTop: '2px' }}>
+              <div style={{ textAlign: 'center', fontSize: '9px', color: '#555555', marginTop: '2px' }}>
                 Conserve este comprobante
               </div>
             </div>
@@ -434,8 +434,8 @@ export default function SaleTicket({ sale, onClose }) {
 
         {/* Panel WhatsApp */}
         {showPhone && (
-          <div className="px-5 py-4 border-t border-blue-100 bg-green-50 flex-shrink-0">
-            <p className="text-sm font-semibold text-gray-700 mb-2">📱 Enviar comprobante por WhatsApp</p>
+          <div className="px-5 py-4 border-t border-green-100 dark:border-green-900/50 bg-green-50 dark:bg-green-900/20 flex-shrink-0">
+            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">📱 Enviar comprobante por WhatsApp</p>
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">+51</span>
@@ -443,7 +443,7 @@ export default function SaleTicket({ sale, onClose }) {
                   type="tel" value={phone}
                   onChange={e => { setPhone(e.target.value); setPhoneError('') }}
                   placeholder="999 999 999" autoFocus maxLength={9}
-                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-100"
                   onKeyDown={e => e.key === 'Enter' && handleWhatsAppSubmit()}/>
               </div>
               <button onClick={handleWhatsAppSubmit}
@@ -451,7 +451,7 @@ export default function SaleTicket({ sale, onClose }) {
                 Enviar
               </button>
               <button onClick={() => { setShowPhone(false); setPhone(''); setPhoneError('') }}
-                className="px-3 py-2.5 border border-gray-200 text-gray-500 text-sm rounded-lg hover:bg-gray-50">
+                className="px-3 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
                 Cancelar
               </button>
             </div>
@@ -460,27 +460,27 @@ export default function SaleTicket({ sale, onClose }) {
         )}
 
         {/* Botones de acción */}
-        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-slate-700 flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
           <div className="grid grid-cols-3 gap-2">
             <button onClick={() => setShowPhone(p => !p)}
-              className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-xs font-semibold transition-all ${showPhone ? 'bg-green-500 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}`}>
+              className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-xs font-semibold transition-all ${showPhone ? 'bg-green-500 text-white' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 border border-green-200 dark:border-green-800'}`}>
               <span className="text-xl">📱</span>
               <span>WhatsApp</span>
             </button>
             <button onClick={handlePrint}
-              className="flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-all">
+              className="flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 transition-all">
               <span className="text-xl">🖨️</span>
               <span>Imprimir</span>
               <span className="text-xs font-normal opacity-60">80mm</span>
             </button>
             <button onClick={onClose}
-              className="flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-xs font-semibold bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all">
+              className="flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-xs font-semibold bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 transition-all">
               <span className="text-xl">✓</span>
               <span>Cerrar</span>
               <span className="text-xs font-normal opacity-60">Nueva venta</span>
             </button>
           </div>
-          <p className="text-center text-xs text-gray-400 mt-2">
+          <p className="text-center text-xs text-gray-400 dark:text-slate-500 mt-2">
             Formato SUNAT · Impresión optimizada 58mm/80mm
           </p>
         </div>

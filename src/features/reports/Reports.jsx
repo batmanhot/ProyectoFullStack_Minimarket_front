@@ -10,15 +10,16 @@
  *  5. Componente queda solo con UI — sin lógica de negocio
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '../../store/index'
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
-import { exportToExcel, exportToPDF }                 from '../../shared/utils/export'
+import { downloadExcel, exportToExcel, exportToPDF }  from '../../shared/utils/export'
 import { useReportMetrics }                            from './hooks/useReportMetrics'
+import Modal                                            from '../../shared/components/ui/Modal'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const COLORS = ['#378ADD', '#5DCAA5', '#EF9F27', '#D85A30', '#7F77DD', '#D4537E']
@@ -31,13 +32,14 @@ const RANGES = [
 ]
 
 const TABS = [
-  { key: 'ventas',        label: 'Ventas por día'            },
-  { key: 'productos',     label: 'Productos top'             },
-  { key: 'categorias',    label: 'Por categoría'             },
-  { key: 'detalle_venta', label: 'Detalle ventas'            },
-  { key: 'devoluciones',  label: 'Devoluciones'              },
-  { key: 'deuda',         label: 'Cuentas por cobrar'        },
-  { key: 'inmovilizado',  label: 'Sin movimiento'            },
+  { key: 'ventas',          label: 'Ventas por día'     },
+  { key: 'productos',       label: 'Productos top'      },
+  { key: 'categorias',      label: 'Por categoría'      },
+  { key: 'rentabilidad',    label: '📈 Rentabilidad'    },
+  { key: 'detalle_venta',   label: 'Detalle ventas'     },
+  { key: 'devoluciones',    label: 'Devoluciones'       },
+  { key: 'deuda',           label: 'Cuentas por cobrar' },
+  { key: 'inmovilizado',    label: 'Sin movimiento'     },
 ]
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
@@ -60,12 +62,92 @@ function NoData({ msg = 'Sin datos en el período' }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
+function ExcelPreviewModal({ title, rows, filename, onClose, onDownload }) {
+  const columns = rows.length ? Object.keys(rows[0]) : []
+
+  return (
+    <Modal
+      title={title}
+      subtitle={`${rows.length} registro(s) listos para descargar`}
+      size="xl"
+      onClose={onClose}
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400 dark:text-slate-500">
+            Vista de solo lectura. El archivo se descargara como {filename}.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
+              Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={!rows.length}
+              className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              Descargar Excel
+            </button>
+          </div>
+        </div>
+      }>
+      <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+        <div className="flex items-center justify-between px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-800">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Hoja: Operaciones</span>
+          </div>
+          <span className="text-xs text-emerald-700/70 dark:text-emerald-300/70">Solo lectura</span>
+        </div>
+
+        <div className="max-h-[56vh] overflow-auto">
+          <table className="w-full min-w-[980px] border-collapse text-xs">
+            <thead className="sticky top-0 z-10">
+              <tr>
+                <th className="w-10 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2 py-2 text-right text-gray-400 font-medium">#</th>
+                {columns.map((col) => (
+                  <th key={col} className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-3 py-2 text-left text-gray-600 dark:text-slate-300 font-semibold whitespace-nowrap">
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="px-4 py-10 text-center text-sm text-gray-400 dark:text-slate-500">
+                    No hay operaciones para mostrar en el periodo seleccionado.
+                  </td>
+                </tr>
+              ) : rows.map((row, rowIndex) => (
+                <tr key={`${row.Comprobante}-${rowIndex}`} className="hover:bg-blue-50/60 dark:hover:bg-slate-800/70">
+                  <td className="bg-gray-50 dark:bg-slate-800/70 border border-gray-200 dark:border-slate-700 px-2 py-2 text-right text-gray-400 tabular-nums">
+                    {rowIndex + 1}
+                  </td>
+                  {columns.map((col) => (
+                    <td key={col} className="border border-gray-200 dark:border-slate-700 px-3 py-2 text-gray-700 dark:text-slate-200 whitespace-nowrap">
+                      {row[col]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function Reports() {
-  const { sales, products, clients, categories, returns = [], businessConfig, addAuditLog } = useStore()
+  const { sales, products, clients, categories, returns = [], businessConfig, systemConfig, addAuditLog } = useStore()
 
   const [range, setRange]           = useState('month')
   const [activeTab, setActiveTab]   = useState('ventas')
   const [expandedSale, setExpandedSale] = useState(null)
+  const [excelPreview, setExcelPreview] = useState(null)
 
   // ── Todas las métricas vienen del hook ────────────────────────────────────
   const {
@@ -78,7 +160,29 @@ export default function Reports() {
     sinMovimiento,
     returnMetrics,
     productsSinCosto,
+    rentabilidadProductos,
+    rentabilidadCategorias,
+    rentabilidadKPIs,
   } = useReportMetrics({ sales, products, categories, returns, range })
+
+  const operacionesRows = useMemo(() => filteredSales.map((s) => {
+    const descuentos    = s.totalDescuentos || s.discount || 0
+    const baseImponible = parseFloat(Math.max(0, (s.subtotal || s.total) - descuentos).toFixed(2))
+    const igv           = parseFloat((baseImponible * 0.18).toFixed(2))
+
+    return {
+      Comprobante: s.invoiceNumber,
+      Fecha:       formatDate(s.createdAt),
+      Usuario:     s.userName || '—',
+      Items:       s.items?.length || 0,
+      Subtotal:    formatCurrency(s.subtotal || s.total),
+      Descuentos:  descuentos > 0 ? `-${formatCurrency(descuentos)}` : '—',
+      'Base Imp.': formatCurrency(baseImponible),
+      IGV:         formatCurrency(igv),
+      Total:       formatCurrency(s.total),
+      Metodo:      s.payments?.map((p) => p.method).join(' + ') || '—',
+    }
+  }), [filteredSales])
 
   // ─── Exportaciones ────────────────────────────────────────────────────────
   const handleExportExcel = (tab) => {
@@ -108,7 +212,26 @@ export default function Reports() {
       )
       exportToExcel(rows, 'detalle_productos_ventas')
 
-    } else if (tab === 'devoluciones') {
+    } else if (tab === 'rentabilidad') {
+      exportToExcel(
+        rentabilidadProductos.map(p => {
+          const cat = categories.find(c => c.id === p.categoryId)
+          return {
+            Producto:      p.name,
+            Categoría:     cat?.name || '—',
+            Código:        p.barcode,
+            'Uds. vendidas': p.qtySold,
+            'Costo unit.': p.unitCost.toFixed(2),
+            'P. Venta':    p.unitPrice.toFixed(2),
+            'Ingresos':    p.revenue.toFixed(2),
+            'Costo total': p.costTotal.toFixed(2),
+            'Utilidad':    p.utilidad.toFixed(2),
+            'Margen %':    `${p.margenPct}%`,
+            'Alerta':      p.margenNegativo ? 'VENTA A PÉRDIDA' : p.hasCost ? '' : 'SIN COSTO',
+          }
+        }),
+        'rentabilidad_productos'
+      )
       exportToExcel(returnMetrics.list.map((r) => ({
         NC: r.ncNumber, BolOrigen: r.invoiceNumber, Cajero: r.userName,
         Motivo: r.reasonLabel, Reembolso: r.totalRefund,
@@ -133,24 +256,17 @@ export default function Reports() {
   }
 
   const handleExportOperaciones = () => {
-    addAuditLog({ action: 'EXPORT', module: 'Reportes', detail: `Excel operaciones · ${filteredSales.length} ventas` })
-    exportToExcel(filteredSales.map((s) => {
-      const descuentos    = s.totalDescuentos || s.discount || 0
-      const baseImponible = parseFloat(Math.max(0, (s.subtotal || s.total) - descuentos).toFixed(2))
-      const igv           = parseFloat((baseImponible * 0.18).toFixed(2))
-      return {
-        Comprobante: s.invoiceNumber,
-        Fecha:       formatDate(s.createdAt),
-        Usuario:     s.userName || '—',
-        Items:       s.items?.length || 0,
-        Subtotal:    formatCurrency(s.subtotal || s.total),
-        Descuentos:  descuentos > 0 ? `-${formatCurrency(descuentos)}` : '—',
-        'Base Imp.': formatCurrency(baseImponible),
-        IGV:         formatCurrency(igv),
-        Total:       formatCurrency(s.total),
-        Método:      s.payments?.map((p) => p.method).join(' + ') || '—',
-      }
-    }), 'operaciones_ventas')
+    addAuditLog({ action: 'PREVIEW', module: 'Reportes', detail: `Vista Excel operaciones · ${operacionesRows.length} ventas` })
+    setExcelPreview({
+      title: 'Excel operaciones',
+      filename: 'operaciones_ventas.xls',
+      rows: operacionesRows,
+    })
+  }
+
+  const handleDownloadOperaciones = () => {
+    addAuditLog({ action: 'EXPORT', module: 'Reportes', detail: `Excel operaciones · ${operacionesRows.length} ventas` })
+    downloadExcel(operacionesRows, 'operaciones_ventas')
   }
 
   const handleExportPDF = (tab) => {
@@ -358,6 +474,192 @@ export default function Reports() {
               </BarChart>
             </ResponsiveContainer>
           ) : <NoData/>}
+        </div>
+      )}
+
+      {/* ══ TAB: RENTABILIDAD ════════════════════════════════════════════════ */}
+      {activeTab === 'rentabilidad' && (
+        <div className="space-y-5">
+
+          {/* Método activo */}
+          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border ${
+            (systemConfig?.costMethod || 'peps') === 'peps'
+              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
+              : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+          }`}>
+            <span>{(systemConfig?.costMethod || 'peps') === 'peps' ? '🕐' : '⚖️'}</span>
+            <span>
+              Método de valorización activo:
+              <strong className="ml-1">
+                {(systemConfig?.costMethod || 'peps') === 'peps'
+                  ? 'PEPS — Primero en entrar, primero en salir'
+                  : 'Costo Promedio Ponderado (CPP)'}
+              </strong>
+            </span>
+            <span className="ml-auto text-gray-400 dark:text-slate-500">
+              Configurable en Ajustes → Inventario
+            </span>
+          </div>
+
+          {/* Alerta productos sin costo */}
+          {rentabilidadKPIs.sinCostoItems > 0 && (
+            <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+              <span className="text-amber-500 mt-0.5">⚠️</span>
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                <strong>{rentabilidadKPIs.sinCostoItems} producto(s)</strong> sin precio de costo registrado.
+                Su utilidad se calcula con un estimado del 30% del precio de venta.
+                Actualiza el precio de compra en el Catálogo para mayor precisión.
+              </p>
+            </div>
+          )}
+
+          {/* Alerta productos con margen negativo */}
+          {rentabilidadKPIs.negativos > 0 && (
+            <div className="flex items-start gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+              <span className="text-red-500 mt-0.5">🚨</span>
+              <p className="text-sm text-red-700 dark:text-red-400">
+                <strong>{rentabilidadKPIs.negativos} producto(s) con margen negativo</strong> —
+                estás vendiendo por debajo del costo. Revisa los precios de venta o los costos registrados.
+              </p>
+            </div>
+          )}
+
+          {/* KPIs de rentabilidad */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard label="Ingresos totales"  value={formatCurrency(rentabilidadKPIs.totalRevenue)} color="text-blue-600 dark:text-blue-400"/>
+            <KpiCard label="Costo total"        value={formatCurrency(rentabilidadKPIs.totalCost)}    color="text-gray-600 dark:text-slate-300"/>
+            <KpiCard label="Utilidad bruta"     value={formatCurrency(rentabilidadKPIs.totalUtil)}    color="text-emerald-600 dark:text-emerald-400"/>
+            <KpiCard
+              label="Margen bruto global"
+              value={`${rentabilidadKPIs.margenGlobal}%`}
+              color={
+                rentabilidadKPIs.margenGlobal >= 30 ? 'text-green-600 dark:text-green-400' :
+                rentabilidadKPIs.margenGlobal >= 15 ? 'text-amber-600 dark:text-amber-400' :
+                'text-red-500 dark:text-red-400'
+              }
+              sub={
+                rentabilidadKPIs.margenGlobal >= 30 ? '✓ Margen saludable' :
+                rentabilidadKPIs.margenGlobal >= 15 ? '⚠ Margen ajustado' :
+                '🚨 Margen bajo'
+              }
+            />
+          </div>
+
+          {/* Rentabilidad por categoría */}
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Rentabilidad por categoría</h3>
+              <span className="text-xs text-gray-400 dark:text-slate-500">{rentabilidadCategorias.length} categorías</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-700/40">
+                    {['Categoría','Ingresos','Costo total','Utilidad','Margen %','Productos'].map(h => (
+                      <th key={h} className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-4 py-2.5 text-left">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                  {rentabilidadCategorias.map((cat, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-100">{cat.name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">{formatCurrency(cat.revenue)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{formatCurrency(cat.costTotal)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(cat.utilidad)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden w-16">
+                            <div
+                              className={`h-1.5 rounded-full ${cat.margenPct >= 30 ? 'bg-green-500' : cat.margenPct >= 15 ? 'bg-amber-400' : 'bg-red-500'}`}
+                              style={{ width: `${Math.min(100, Math.max(0, cat.margenPct))}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-bold ${cat.margenPct >= 30 ? 'text-green-600 dark:text-green-400' : cat.margenPct >= 15 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
+                            {cat.margenPct}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400 text-center">{cat.productos}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Rentabilidad por producto */}
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">
+                Rentabilidad por producto — top {Math.min(rentabilidadProductos.length, 50)}
+              </h3>
+              <button
+                onClick={() => handleExportExcel('rentabilidad')}
+                className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
+                📊 Excel completo
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-700/40">
+                    {['Producto','Uds. vendidas','Costo unit.','P. Venta','Ingresos','Costo total','Utilidad','Margen %'].map(h => (
+                      <th key={h} className={`text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-4 py-2.5 ${
+                        ['Uds. vendidas','Costo unit.','P. Venta','Ingresos','Costo total','Utilidad','Margen %'].includes(h) ? 'text-right' : 'text-left'
+                      }`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                  {rentabilidadProductos.slice(0, 50).map((p, i) => (
+                    <tr key={i} className={`hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors ${p.margenNegativo ? 'bg-red-50/40 dark:bg-red-900/10' : ''}`}>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-medium text-gray-800 dark:text-slate-100 max-w-[200px] truncate">{p.name}</div>
+                          {p.margenNegativo && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full shrink-0">
+                              PÉRDIDA
+                            </span>
+                          )}
+                          {!p.hasCost && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 rounded-full shrink-0">
+                              est.
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500 font-mono">{p.barcode}</div>
+                      </td>
+                      <td className="px-4 py-2.5 text-sm text-right text-gray-600 dark:text-slate-300">{p.qtySold}</td>
+                      <td className="px-4 py-2.5 text-sm text-right text-gray-500 dark:text-slate-400">{formatCurrency(p.unitCost)}</td>
+                      <td className="px-4 py-2.5 text-sm text-right text-gray-600 dark:text-slate-300">{formatCurrency(p.unitPrice)}</td>
+                      <td className="px-4 py-2.5 text-sm text-right text-gray-700 dark:text-slate-200">{formatCurrency(p.revenue)}</td>
+                      <td className="px-4 py-2.5 text-sm text-right text-gray-500 dark:text-slate-400">{formatCurrency(p.costTotal)}</td>
+                      <td className="px-4 py-2.5 text-sm text-right font-semibold">
+                        <span className={p.utilidad >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                          {formatCurrency(p.utilidad)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          p.margenPct >= 30 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          p.margenPct >= 15 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
+                          {p.margenPct}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rentabilidadProductos.length > 50 && (
+              <div className="px-5 py-3 border-t border-gray-100 dark:border-slate-700 text-center text-xs text-gray-400 dark:text-slate-500">
+                Mostrando 50 de {rentabilidadProductos.length} productos · Exporta a Excel para ver todos
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -617,6 +919,16 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {excelPreview && (
+        <ExcelPreviewModal
+          title={excelPreview.title}
+          rows={excelPreview.rows}
+          filename={excelPreview.filename}
+          onClose={() => setExcelPreview(null)}
+          onDownload={handleDownloadOperaciones}
+        />
       )}
     </div>
   )

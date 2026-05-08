@@ -18,9 +18,9 @@ import { useCartHold }    from './hooks/useCartHold'
 import HeldCartsPanel     from './components/HeldCartsPanel'
 // ────────────────────────────────────────────────────────────────────────────
 
-export default function POS() {
+export default function POS({ onNavigate }) {
   const {
-    products, cart, clients, discountCampaigns, currentUser, activeCashSession, systemConfig, businessConfig,
+    products, productVariants, cart, clients, discountCampaigns, currentUser, activeCashSession, systemConfig, businessConfig,
     redeemDiscountTicket,
     addToCart, updateCartItem, removeFromCart, clearCart,
   } = useStore()
@@ -149,12 +149,37 @@ export default function POS() {
   const igvFactor        = 1 + igvRate
   const baseImponible    = parseFloat((totalAPagar / igvFactor).toFixed(2))
   const igvCalculado     = parseFloat((totalAPagar - baseImponible).toFixed(2))
-  const totalFinal       = totalAPagar   // Total a Pagar ya incluye IGV
+  const totalFinal       = totalAPagar
 
+  // ── Búsqueda: productos + variantes ──────────────────────────────────────
   const activeProducts = products.filter(p => p.isActive)
   const searchResults  = debouncedQ.trim()
-    ? fuzzySearch(debouncedQ, activeProducts, ['name','barcode','sku','description']).slice(0, 8)
+    ? (() => {
+        // 1. Buscar en productos normales
+        const prodResults = fuzzySearch(debouncedQ, activeProducts, ['name','barcode','sku','description'])
+
+        // 2. Buscar en variantes de producto (por barcode o sku de variante)
+        const variantResults = []
+        if (productVariants?.length > 0) {
+          const q = debouncedQ.toLowerCase()
+          productVariants.forEach(v => {
+            if (v.barcode?.includes(debouncedQ) || v.sku?.toLowerCase().includes(q)) {
+              const parent = activeProducts.find(p => p.id === v.productId)
+              if (parent && !prodResults.find(r => r.id === parent.id)) {
+                // Agregar el producto padre con info de la variante
+                variantResults.push({ ...parent, _variant: v, name: `${parent.name} (${Object.values(v.attributes||{}).join(' · ')})`, barcode: v.barcode || parent.barcode, stock: v.stock ?? parent.stock, priceSell: v.priceSell || parent.priceSell })
+              }
+            }
+          })
+        }
+
+        return [...prodResults, ...variantResults].slice(0, 8)
+      })()
     : []
+
+  // ── Estado nota de venta ──────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars -- se usa en salePayload
+  const [saleNote, setSaleNote] = useState('')
 
   const { sales } = useStore()
   const sessionSales = activeCashSession
@@ -267,6 +292,7 @@ export default function POS() {
         change: change || 0,
         loyaltyDiscount,
         redeemedPoints,
+        note: saleNote.trim() || null,   // ← nota de venta opcional
       }
     const result = await saleService.create(salePayload)
     setProcessing(false)
@@ -288,6 +314,7 @@ export default function POS() {
     setGlobalDiscount('')
     setDiscountEdit({})
     setSelectedClientId(null)  // F5: limpiar cliente al completar venta
+    setSaleNote('')             // limpiar nota de venta
     setCompletedSale(result.data)
     setShowTicket(true)
     toast.success(`Venta ${result.data.invoiceNumber} completada`, { duration: 3000, icon: '🎉' })
@@ -310,7 +337,7 @@ export default function POS() {
   if (!activeCashSession) {
     return (
       <EmptyState icon="🔐" title="Caja no abierta" message="Debes aperturar la caja antes de realizar ventas."
-        action={{ label: 'Ir a Caja', onClick: () => {} }}/>
+        action={{ label: 'Ir a Caja', onClick: () => onNavigate?.('cash') }}/>
     )
   }
 
@@ -776,12 +803,24 @@ export default function POS() {
         Vaciar carrito
       </button>
     )}
+    {/* ── Nota de venta opcional ─────────────────────────────────────────── */}
+    <div className="px-1">
+      <input
+        value={saleNote}
+        onChange={e => setSaleNote(e.target.value)}
+        placeholder="📝 Nota de venta (opcional)..."
+        maxLength={200}
+        className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
+      />
+    </div>
+    {/* ─────────────────────────────────────────────────────────────────────── */}
+
     <button
       onClick={() => setShowPayment(true)}
       disabled={cart.length === 0}
       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
       <span>Cobrar</span>
-      <span className="opacity-60 text-xs">F </span>
+      <span className="opacity-60 text-xs">F8</span>
     </button>
   
 

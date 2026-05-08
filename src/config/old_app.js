@@ -11,25 +11,69 @@ export const APP_CONFIG = {
 export const ROLES = {
   admin: {
     label: 'Administrador', color: 'bg-blue-100 text-blue-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings','returns','loyalty','quotations'],
+    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns', 'loyalty'],
   },
   gerente: {
     label: 'Gerente', color: 'bg-purple-100 text-purple-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets','loyalty','quotations'],
+    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets', 'loyalty'],
   },
   supervisor: {
     label: 'Supervisor', color: 'bg-amber-100 text-amber-700',
-    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets','returns','loyalty','quotations'],
+    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets','returns', 'loyalty'],
   },
   cajero: {
     label: 'Cajero', color: 'bg-green-100 text-green-700',
-    pages: ['dashboard','pos','cash','returns'],
+    pages: ['dashboard','pos','cash','returns'],    
   },
 }
+export const APP_MODULES = [
+  { key:'dashboard', label:'Dashboard', group:'Principal' },
+  { key:'pos', label:'Punto de Venta', group:'Principal' },
+  { key:'catalog', label:'Catalogo', group:'Operaciones' },
+  { key:'inventory', label:'Inventario', group:'Operaciones' },
+  { key:'suppliers', label:'Proveedores', group:'Operaciones' },
+  { key:'purchases', label:'Compras', group:'Operaciones' },
+  { key:'cash', label:'Caja', group:'Comercial' },
+  { key:'clients', label:'Clientes', group:'Comercial' },
+  { key:'reports', label:'Reportes', group:'Comercial' },
+  { key:'discounts', label:'Gestion Descuentos', group:'Comercial' },
+  { key:'tickets', label:'Descuentos por Vales', group:'Comercial' },
+  { key:'returns', label:'Devoluciones', group:'Comercial' },
+  { key:'alerts', label:'Alertas', group:'Sistema' },
+  { key:'loyalty', label:'Programa de Puntos', group:'Sistema' },
+  { key:'audit', label:'Auditoria', group:'Sistema' },
+  { key:'users', label:'Usuarios', group:'Sistema' },
+  { key:'settings', label:'Configuracion', group:'Sistema' },
+]
 
+const ROLE_PERMISSIONS_KEY = 'pos_role_permissions'
 
+const readRolePermissions = () => {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(localStorage.getItem(ROLE_PERMISSIONS_KEY) || '{}') } catch { return {} }
+}
 
-export const canAccess = (role, page) => ROLES[role]?.pages?.includes(page) ?? false
+export const getRolePages = (role) => {
+  const saved = readRolePermissions()
+  return saved[role] || ROLES[role]?.pages || []
+}
+
+export const saveRolePages = (role, pages) => {
+  if (typeof window === 'undefined') return
+  const saved = readRolePermissions()
+  localStorage.setItem(ROLE_PERMISSIONS_KEY, JSON.stringify({ ...saved, [role]: pages }))
+  window.dispatchEvent(new CustomEvent('role-permissions-changed'))
+}
+
+export const resetRolePages = (role) => {
+  if (typeof window === 'undefined') return
+  const saved = readRolePermissions()
+  delete saved[role]
+  localStorage.setItem(ROLE_PERMISSIONS_KEY, JSON.stringify(saved))
+  window.dispatchEvent(new CustomEvent('role-permissions-changed'))
+}
+
+export const canAccess = (role, page) => getRolePages(role).includes(page)
 
 export const PAYMENT_METHODS = [
   { value: 'efectivo',      label: 'Efectivo',     icon: '💵', requiresRef: false },

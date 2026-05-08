@@ -69,27 +69,87 @@ function StockAdjustForm({ product, currentUser, onClose }) {
   )
 }
 
-// ── Kardex por producto ────────────────────────────────────────────────────────
+// ── Kardex por producto — con valorización ────────────────────────────────────
 function ProductKardex({ product, movements, onClose }) {
   const productMovements = movements
     .filter(m => m.productId === product.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) // cronológico para saldo
+
+  // Calcular saldo de stock y valor acumulado por movimiento (de más antiguo a más nuevo)
+  let saldoStock = 0
+  let saldoValor = 0
+  const movimientosValorizados = productMovements.map(m => {
+    const esEntrada  = m.type === 'entrada'
+    const unitCost   = m.unitCost ?? product.priceBuy ?? 0
+    const totalValue = m.totalValue ?? parseFloat((unitCost * m.quantity).toFixed(2))
+
+    saldoStock += esEntrada ? m.quantity : -m.quantity
+    saldoValor += esEntrada ? totalValue : -totalValue
+
+    return {
+      ...m,
+      unitCost,
+      totalValue,
+      saldoStock: parseFloat(saldoStock.toFixed(2)),
+      saldoValor: parseFloat(saldoValor.toFixed(2)),
+      esEntrada,
+    }
+  }).reverse() // mostrar más recientes arriba en la tabla
 
   const totales = productMovements.reduce((acc, m) => {
-    if (m.type === 'entrada') acc.entradas += m.quantity
-    else if (m.type === 'salida') acc.salidas += m.quantity
-    else if (m.type === 'merma') acc.merma += m.quantity
+    if (m.type === 'entrada') {
+      acc.entradas += m.quantity
+      acc.valorEntradas += m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
+    } else if (m.type === 'salida') {
+      acc.salidas += m.quantity
+      acc.valorSalidas += m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
+    } else if (m.type === 'merma') {
+      acc.merma += m.quantity
+      acc.valorMerma += m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
+    }
     return acc
-  }, { entradas: 0, salidas: 0, merma: 0 })
+  }, { entradas: 0, salidas: 0, merma: 0, valorEntradas: 0, valorSalidas: 0, valorMerma: 0 })
+
+  const valorInventario = parseFloat((product.stock * (product.priceBuy || 0)).toFixed(2))
+  const hasCost = (m) => m.unitCost != null && m.unitCost > 0
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 text-center"><p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Stock actual</p><p className="text-lg font-bold text-gray-800 dark:text-slate-100">{product.stock}</p><p className="text-xs text-gray-400 dark:text-slate-500">{product.unit}</p></div>
-        <div className="bg-green-50 rounded-xl p-3 text-center"><p className="text-xs text-green-500 mb-1">Total entradas</p><p className="text-lg font-bold text-green-700">+{totales.entradas.toFixed(2)}</p></div>
-        <div className="bg-red-50 rounded-xl p-3 text-center"><p className="text-xs text-red-500 mb-1">Total salidas</p><p className="text-lg font-bold text-red-600">-{totales.salidas.toFixed(2)}</p></div>
-        <div className="bg-amber-50 rounded-xl p-3 text-center"><p className="text-xs text-amber-500 mb-1">Total merma</p><p className="text-lg font-bold text-amber-600">-{totales.merma.toFixed(2)}</p></div>
+
+      {/* KPIs de stock y valor */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 text-center">
+          <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Stock actual</p>
+          <p className="text-xl font-bold text-gray-800 dark:text-slate-100">{product.stock}</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500">{product.unit}</p>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
+          <p className="text-xs text-blue-500 dark:text-blue-400 mb-1">Valor en inventario</p>
+          <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(valorInventario)}</p>
+          <p className="text-xs text-blue-400 dark:text-blue-500">@ {formatCurrency(product.priceBuy || 0)}/u</p>
+        </div>
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
+          <p className="text-xs text-green-500 mb-1">Entradas valorizadas</p>
+          <p className="text-lg font-bold text-green-700 dark:text-green-400">+{totales.entradas.toFixed(2)}</p>
+          <p className="text-xs text-green-500">{formatCurrency(totales.valorEntradas)}</p>
+        </div>
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-center">
+          <p className="text-xs text-red-500 mb-1">Salidas valorizadas</p>
+          <p className="text-lg font-bold text-red-600 dark:text-red-400">-{totales.salidas.toFixed(2)}</p>
+          <p className="text-xs text-red-400">{formatCurrency(totales.valorSalidas)}</p>
+        </div>
       </div>
+
+      {/* Aviso de movimientos sin costo histórico */}
+      {movimientosValorizados.some(m => !hasCost(m)) && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-700 dark:text-amber-400">
+          <span>⚠️</span>
+          <span>
+            Algunos movimientos anteriores a la Opción B no tienen costo registrado.
+            Se muestra el costo actual del producto como referencia.
+          </span>
+        </div>
+      )}
 
       {productMovements.length === 0 ? (
         <EmptyState icon="📋" title="Sin movimientos" message="Este producto no tiene movimientos registrados."/>
@@ -98,37 +158,95 @@ function ProductKardex({ product, movements, onClose }) {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Fecha</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Tipo</th>
-                <th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Cantidad</th>
-                <th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Stock ant.</th>
-                <th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Stock nuevo</th>
-                <th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Motivo</th>
+                {[
+                  { label: 'Fecha',        align: 'left'  },
+                  { label: 'Tipo',         align: 'left'  },
+                  { label: 'Cantidad',     align: 'right' },
+                  { label: 'Costo unit.',  align: 'right' },
+                  { label: 'Valor mov.',   align: 'right' },
+                  { label: 'Stock ant.',   align: 'right' },
+                  { label: 'Stock nuevo',  align: 'right' },
+                  { label: 'Saldo valor',  align: 'right' },
+                  { label: 'Motivo',       align: 'left'  },
+                ].map(h => (
+                  <th key={h.label}
+                    className={`text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-${h.align}`}>
+                    {h.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
-              {productMovements.map(m => (
-                <tr key={m.id} className="hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">
-                  <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(m.createdAt)}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      m.type === 'entrada' ? 'bg-green-100 text-green-700' :
-                      m.type === 'salida'  ? 'bg-red-100 text-red-600' :
-                      m.type === 'merma'   ? 'bg-amber-100 text-amber-600' :
-                      'bg-blue-100 text-blue-600'
-                    }`}>{m.type}</span>
+              {movimientosValorizados.map(m => (
+                <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                  <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">
+                    {formatDateTime(m.createdAt)}
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-right font-medium">
-                    <span className={m.type === 'entrada' ? 'text-green-600' : 'text-red-500'}>
-                      {m.type === 'entrada' ? '+' : '-'}{m.quantity}
+                  <td className="px-3 py-2.5">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      m.type === 'entrada' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      m.type === 'salida'  ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                      m.type === 'merma'   ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                      'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                    }`}>
+                      {m.type}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-right text-gray-500 dark:text-slate-400">{m.previousStock}</td>
-                  <td className="px-4 py-2.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">{m.newStock}</td>
-                  <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400 max-w-[200px] truncate">{m.reason}</td>
+                  <td className="px-3 py-2.5 text-sm text-right font-medium">
+                    <span className={m.esEntrada ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
+                      {m.esEntrada ? '+' : '-'}{m.quantity}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-sm text-right text-gray-600 dark:text-slate-300">
+                    {m.unitCost > 0
+                      ? formatCurrency(m.unitCost)
+                      : <span className="text-gray-300 dark:text-slate-600 text-xs">—</span>
+                    }
+                  </td>
+                  <td className="px-3 py-2.5 text-sm text-right font-semibold">
+                    <span className={m.esEntrada ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
+                      {m.esEntrada ? '+' : '-'}{formatCurrency(m.totalValue)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-sm text-right text-gray-400 dark:text-slate-500">
+                    {m.previousStock}
+                  </td>
+                  <td className="px-3 py-2.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">
+                    {m.newStock}
+                  </td>
+                  <td className="px-3 py-2.5 text-sm text-right">
+                    <span className={m.saldoValor >= 0 ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-red-500 dark:text-red-400 font-semibold'}>
+                      {formatCurrency(m.saldoValor)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400 max-w-[180px] truncate">
+                    {m.reason}
+                    {m.invoiceNumber && (
+                      <span className="ml-1 font-mono text-gray-400 dark:text-slate-500">· {m.invoiceNumber}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
+            {/* Fila de totales */}
+            <tfoot>
+              <tr className="bg-gray-50 dark:bg-slate-800/50 border-t border-gray-200 dark:border-slate-700">
+                <td colSpan={3} className="px-3 py-2.5 text-xs font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wide">
+                  TOTALES
+                </td>
+                <td className="px-3 py-2.5"/>
+                <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-800 dark:text-slate-100">
+                  {formatCurrency(totales.valorEntradas - totales.valorSalidas - totales.valorMerma)}
+                </td>
+                <td colSpan={2} className="px-3 py-2.5"/>
+                <td className="px-3 py-2.5 text-right text-sm font-bold text-blue-600 dark:text-blue-400">
+                  {formatCurrency(valorInventario)}
+                </td>
+                <td className="px-3 py-2.5 text-xs text-gray-400 dark:text-slate-500">
+                  Valor inventario actual
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

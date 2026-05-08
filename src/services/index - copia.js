@@ -200,35 +200,7 @@ export const saleService = {
       }
     }
 
-    // Normalizar ítems antes de guardar — garantiza que los campos de descuento
-    // y totales por línea estén presentes para la boleta y los reportes
-    const normalizedItems = payload.items.map(item => {
-      const qty           = item.quantity || 1
-      const pu            = item.unitPrice || 0
-      const campaignDisc  = parseFloat((item.campaignDiscount || 0).toFixed(2))
-      const manualDisc    = parseFloat((item.manualDiscount   || item.discount || 0).toFixed(2))
-      const totalDiscount = parseFloat((item.totalDiscount    || campaignDisc + manualDisc).toFixed(2))
-      const subtotal      = parseFloat((qty * pu).toFixed(2))
-      const netTotal      = item.netTotal ?? parseFloat((subtotal - totalDiscount).toFixed(2))
-
-      return {
-        ...item,
-        campaignDiscount: campaignDisc,
-        manualDiscount:   manualDisc,
-        discount:         manualDisc,       // compatibilidad con código legacy
-        totalDiscount,
-        subtotal,
-        netTotal,
-      }
-    })
-
-    const sale = {
-      ...payload,
-      items: normalizedItems,
-      id: crypto.randomUUID(),
-      status: 'completada',
-      createdAt: new Date().toISOString(),
-    }
+    const sale = { ...payload, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
 
     // ── Programa de Puntos — canje + acumulación consistente al completar venta ─
     if (payload.clientId) {

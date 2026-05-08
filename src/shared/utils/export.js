@@ -11,11 +11,10 @@
  */
 
 // ─── EXPORTAR EXCEL (sin cambios — ya funciona) ───────────────────────────────
-export function exportToExcel(data, filename) {
+function createExcelBlob(data) {
   if (!data?.length) return
 
   const keys = Object.keys(data[0])
-  const now  = new Date().toLocaleDateString('es-PE').replaceAll('/', '-')
   const isNum = (v) => v !== '' && v !== null && v !== undefined && !isNaN(Number(String(v).replace(/[S/,% ]/g, '')))
 
   const headerRow = keys.map((k) =>
@@ -39,12 +38,35 @@ export function exportToExcel(data, filename) {
 <style>body{font-family:Calibri,Arial,sans-serif;}table{border-collapse:collapse;width:100%;}</style></head>
 <body><table><thead><tr>${headerRow}</tr></thead><tbody>${dataRows}</tbody></table></body></html>`
 
-  const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+  return new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+}
+
+export function downloadExcel(data, filename) {
+  const blob = createExcelBlob(data)
+  if (!blob) return
+
+  const now  = new Date().toLocaleDateString('es-PE').replaceAll('/', '-')
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href = url; a.download = `${filename}_${now}.xls`
   document.body.appendChild(a); a.click()
   document.body.removeChild(a); URL.revokeObjectURL(url)
+}
+
+export function exportToExcel(data, filename, options = {}) {
+  if (!data?.length) return
+  if (options.preview === false) {
+    downloadExcel(data, filename)
+    return
+  }
+
+  window.dispatchEvent(new CustomEvent('excel-preview', {
+    detail: {
+      rows: data,
+      filename,
+      title: options.title || filename,
+    },
+  }))
 }
 
 // ─── EXPORTAR PDF — versión mejorada ─────────────────────────────────────────

@@ -21,10 +21,6 @@ export const productSchema = z.object({
   location:     z.string().max(100).optional().default(''),
   attributes:   z.record(z.string()).optional().default({}),
   isActive:     z.boolean().default(true),
-  // ── Imagen del producto ───────────────────────────────────────────────────
-  imageUrl:     z.string().url('URL de imagen inválida').optional().or(z.literal('')).default(''),
-  // ── Gestión de lotes ─────────────────────────────────────────────────────
-  useBatches:   z.boolean().default(false),
 }).refine(d => d.priceSell >= d.priceBuy, {
   message: 'El precio de venta debe ser ≥ al precio de compra',
   path: ['priceSell'],

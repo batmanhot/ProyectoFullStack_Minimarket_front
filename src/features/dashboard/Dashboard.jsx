@@ -1,48 +1,42 @@
 /**
- * Dashboard.jsx — Dashboard v2 con comparativo de períodos
+ * Dashboard.jsx — Dashboard adaptativo por rol v3
  * Ruta: src/features/dashboard/Dashboard.jsx
  *
- * NUEVO vs v1:
- *  1. Selector de período (Hoy / 7 días / Mes / Todo)
- *  2. Selector de período de comparación (período anterior equivalente)
- *  3. Cada KPI muestra variación % respecto al período anterior
- *  4. Gráficas de área (ventas diarias) y barras (top 5 productos)
- *  5. Métricas de devoluciones integradas en el dashboard
+ * VISTAS POR ROL:
+ *  admin / gerente  → Vista ejecutiva: rentabilidad, comparativo períodos,
+ *                     gráficas de tendencia, top productos, cuentas por cobrar,
+ *                     alertas críticas del negocio
+ *  supervisor       → Vista operativa: ventas del día, stock bajo, devoluciones,
+ *                     rendimiento por cajero, alertas de inventario
+ *  cajero           → Vista de turno: ventas propias del turno actual,
+ *                     contador de transacciones, caja abierta/cerrada,
+ *                     acceso rápido a POS
  */
 
 import { useMemo, useState } from 'react'
 import { useStore }          from '../../store/index'
-import { formatCurrency }    from '../../shared/utils/helpers'
+import { formatCurrency, formatDateTime } from '../../shared/utils/helpers'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts'
 
 const COLORS = ['#378ADD','#5DCAA5','#EF9F27','#D85A30','#7F77DD','#D4537E']
 
-const RANGES = [
-  { key: 'today', label: 'Hoy'     },
-  { key: 'week',  label: '7 días'  },
-  { key: 'month', label: 'Mes'     },
-  { key: 'all',   label: 'Todo'    },
-]
-
-// ─── Helpers de fecha ─────────────────────────────────────────────────────────
-function getDateRange(key) {
-  const now   = new Date()
-  const start = new Date(now)
-  if (key === 'today') { start.setHours(0,0,0,0); return { from: start, to: now } }
-  if (key === 'week')  { start.setDate(start.getDate()-6); start.setHours(0,0,0,0); return { from: start, to: now } }
-  if (key === 'month') { start.setDate(1); start.setHours(0,0,0,0); return { from: start, to: now } }
+// ─── Helpers comunes ──────────────────────────────────────────────────────────
+function getRange(key) {
+  const now = new Date(), s = new Date(now)
+  if (key === 'today') { s.setHours(0,0,0,0); return { from: s, to: now } }
+  if (key === 'week')  { s.setDate(s.getDate()-6); s.setHours(0,0,0,0); return { from: s, to: now } }
+  if (key === 'month') { s.setDate(1); s.setHours(0,0,0,0); return { from: s, to: now } }
   return { from: new Date(0), to: now }
 }
 
-function getPreviousRange(key) {
+function getPrevRange(key) {
   const now = new Date()
   if (key === 'today') {
-    const yd = new Date(now); yd.setDate(yd.getDate()-1); yd.setHours(0,0,0,0)
-    const ye = new Date(yd); ye.setHours(23,59,59,999)
-    return { from: yd, to: ye }
+    const d = new Date(now); d.setDate(d.getDate()-1)
+    return { from: new Date(d.setHours(0,0,0,0)), to: new Date(d.setHours(23,59,59,999)) }
   }
   if (key === 'week') {
     const e = new Date(now); e.setDate(e.getDate()-7); e.setHours(23,59,59,999)
@@ -50,138 +44,387 @@ function getPreviousRange(key) {
     return { from: s, to: e }
   }
   if (key === 'month') {
-    const e = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
-    const s = new Date(now.getFullYear(), now.getMonth()-1, 1, 0, 0, 0)
+    const e = new Date(now.getFullYear(), now.getMonth(), 0, 23,59,59)
+    const s = new Date(now.getFullYear(), now.getMonth()-1, 1, 0,0,0)
     return { from: s, to: e }
   }
   return null
 }
 
-function filterSales(sales, range) {
-  if (!range) return []
-  return sales.filter(s => s.status === 'completada' &&
-    new Date(s.createdAt) >= range.from && new Date(s.createdAt) <= range.to)
-}
+const filterSales = (sales, range) =>
+  range ? sales.filter(s => s.status === 'completada' &&
+    new Date(s.createdAt) >= range.from && new Date(s.createdAt) <= range.to) : []
 
-function calcMetrics(sales, products) {
-  const total     = parseFloat(sales.reduce((a,s) => a + s.total, 0).toFixed(2))
-  const count     = sales.length
-  const avgTicket = count > 0 ? parseFloat((total/count).toFixed(2)) : 0
-  const utilidad  = parseFloat(sales.reduce((acc,s) =>
-    acc + s.items.reduce((a2, item) => {
-      const p = products.find(pr => pr.id === item.productId)
-      const cost = p?.priceBuy > 0 ? p.priceBuy : item.unitPrice * 0.7
-      return a2 + (item.unitPrice - cost) * item.quantity
-    }, 0), 0).toFixed(2))
-  return { total, count, avgTicket, utilidad }
-}
-
-function pct(curr, prev) {
+const pct = (curr, prev) => {
   if (!prev || prev === 0) return curr > 0 ? 100 : 0
   return parseFloat(((curr - prev) / prev * 100).toFixed(1))
 }
 
-// ─── KPI Card con tendencia ───────────────────────────────────────────────────
-function KPICard({ label, value, trend, sub, icon, color = 'text-gray-800 dark:text-slate-100' }) {
-  const trendColor = trend === null || trend === undefined ? '' :
-    trend >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
-  const trendIcon  = trend === null || trend === undefined ? '' : trend >= 0 ? '↑' : '↓'
-
+// ─── Sub-componentes compartidos ──────────────────────────────────────────────
+function KPI({ label, value, trend, icon, color = 'text-gray-800 dark:text-slate-100', sub }) {
+  const up = trend >= 0
   return (
-    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
       <div className="flex items-start justify-between mb-1">
         <p className="text-xs text-gray-500 dark:text-slate-400">{label}</p>
-        {icon && <span className="text-xl opacity-50">{icon}</span>}
+        {icon && <span className="text-xl opacity-40">{icon}</span>}
       </div>
       <p className={`text-2xl font-semibold ${color}`}>{value}</p>
-      {(sub || trend !== undefined) && (
-        <div className="flex items-center gap-2 mt-1">
-          {trend !== null && trend !== undefined && (
-            <span className={`text-xs font-semibold ${trendColor}`}>
-              {trendIcon} {Math.abs(trend)}% vs período anterior
-            </span>
-          )}
-          {sub && <p className="text-xs text-gray-400 dark:text-slate-500">{sub}</p>}
+      {trend !== undefined && trend !== null && (
+        <p className={`text-xs font-medium mt-1 ${up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+          {up ? '↑' : '↓'} {Math.abs(trend)}% vs período anterior
+        </p>
+      )}
+      {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function SectionTitle({ children }) {
+  return <h2 className="text-sm font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-widest">{children}</h2>
+}
+
+// ─── VISTA CAJERO ─────────────────────────────────────────────────────────────
+function DashboardCajero({ currentUser, sales, activeCashSession, products }) {
+  const turnoSales = useMemo(() => {
+    if (!activeCashSession) return []
+    return sales.filter(s =>
+      s.status === 'completada' &&
+      s.userId === currentUser?.id &&
+      new Date(s.createdAt) >= new Date(activeCashSession.openedAt)
+    ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  }, [sales, activeCashSession, currentUser])
+
+  const turnoTotal  = turnoSales.reduce((a, s) => a + s.total, 0)
+  const turnoCount  = turnoSales.length
+  const turnoAvg    = turnoCount > 0 ? turnoTotal / turnoCount : 0
+  const efectivo    = turnoSales.reduce((a, s) => a + (s.payments?.find(p => p.method === 'efectivo')?.amount || 0), 0)
+
+  const horaInicio  = activeCashSession ? new Date(activeCashSession.openedAt) : null
+  const duracion    = horaInicio
+    ? Math.floor((Date.now() - horaInicio) / 60000)
+    : 0
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header personalizado */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">
+            Buen día, {currentUser?.fullName?.split(' ')[0]} 👋
+          </h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500">
+            {activeCashSession
+              ? `Turno activo desde ${horaInicio?.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })} · ${duracion} min.`
+              : 'No hay caja abierta — ve a Caja para aperturar'}
+          </p>
+        </div>
+        {!activeCashSession && (
+          <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-400 font-medium">
+            ⚠️ Caja cerrada
+          </div>
+        )}
+      </div>
+
+      {/* KPIs del turno */}
+      <div>
+        <SectionTitle>Mi turno actual</SectionTitle>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-3">
+          <KPI label="Ventas del turno"     value={formatCurrency(turnoTotal)} icon="💰" color="text-blue-600 dark:text-blue-400"/>
+          <KPI label="Transacciones"         value={turnoCount}                 icon="🧾"/>
+          <KPI label="Ticket promedio"       value={formatCurrency(turnoAvg)}  icon="📊"/>
+          <KPI label="Efectivo en turno"     value={formatCurrency(efectivo)}  icon="💵" color="text-emerald-600 dark:text-emerald-400"/>
+        </div>
+      </div>
+
+      {/* Últimas ventas del turno */}
+      {turnoSales.length > 0 ? (
+        <div>
+          <SectionTitle>Mis últimas ventas</SectionTitle>
+          <div className="mt-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-slate-700/50">
+                  {['Boleta','Hora','Productos','Método','Total'].map(h => (
+                    <th key={h} className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-4 py-2.5 text-left">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                {turnoSales.slice(0, 10).map(s => {
+                  const method = s.payments?.[0]?.method || '—'
+                  const methodLabels = { efectivo: '💵 Efectivo', yape: '💜 Yape', tarjeta: '💳 Tarjeta', credito: '📒 Crédito' }
+                  return (
+                    <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                      <td className="px-4 py-2.5 text-xs font-mono text-gray-500 dark:text-slate-400">{s.invoiceNumber}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400">
+                        {new Date(s.createdAt).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}
+                      </td>
+                      <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300">{s.items?.length || 0}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400">{methodLabels[method] || method}</td>
+                      <td className="px-4 py-2.5 text-sm font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(s.total)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-16 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl">
+          <div className="text-5xl mb-3 opacity-20">🧾</div>
+          <p className="text-gray-400 dark:text-slate-500 font-medium">Sin ventas en este turno aún</p>
+          <p className="text-xs text-gray-300 dark:text-slate-600 mt-1">Ve al Punto de Venta para comenzar a atender</p>
         </div>
       )}
     </div>
   )
 }
 
-// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
-export default function Dashboard() {
-  const { sales, products, stockMovements, returns = [], clients } = useStore()
-  const [range, setRange] = useState('month')
+// ─── VISTA SUPERVISOR ─────────────────────────────────────────────────────────
+function DashboardSupervisor({ sales, products, categories, returns, currentUser, users }) {
+  const todayRange = useMemo(() => getRange('today'), [])
+  const todaySales = useMemo(() => filterSales(sales, todayRange), [sales, todayRange])
 
-  const currRange = useMemo(() => getDateRange(range), [range])
-  const prevRange = useMemo(() => getPreviousRange(range), [range])
+  const totalHoy      = todaySales.reduce((a, s) => a + s.total, 0)
+  const countHoy      = todaySales.length
+  const lowStock      = products.filter(p => p.isActive && p.stock <= p.stockMin && p.stock > 0)
+  const outOfStock    = products.filter(p => p.isActive && p.stock <= 0)
+  const devHoy        = (returns || []).filter(r => {
+    const d = new Date(r.createdAt)
+    return d >= todayRange.from && d <= todayRange.to
+  })
 
-  const currSales = useMemo(() => filterSales(sales, currRange), [sales, currRange])
-  const prevSales = useMemo(() => filterSales(sales, prevRange), [sales, prevRange])
-
-  const currM = useMemo(() => calcMetrics(currSales, products), [currSales, products])
-  const prevM = useMemo(() => calcMetrics(prevSales, products), [prevSales, products])
-
-  // Devoluciones del período actual
-  const currReturns = useMemo(() => (returns||[]).filter(r =>
-    r.status !== 'anulada' &&
-    new Date(r.createdAt) >= currRange.from && new Date(r.createdAt) <= currRange.to
-  ), [returns, currRange])
-  const totalReembolsado = parseFloat(currReturns.reduce((a,r) => a + r.totalRefund, 0).toFixed(2))
-  const ventasNetas      = parseFloat((currM.total - totalReembolsado).toFixed(2))
-
-  // Tendencias
-  const trends = {
-    total:     pct(currM.total,     prevM.total),
-    count:     pct(currM.count,     prevM.count),
-    avgTicket: pct(currM.avgTicket, prevM.avgTicket),
-    utilidad:  pct(currM.utilidad,  prevM.utilidad),
-  }
-
-  // Gráficas
-  const dailyChart = useMemo(() => {
+  // Ventas por cajero hoy
+  const byCajero = useMemo(() => {
     const map = {}
-    currSales.forEach(s => {
-      const day = new Date(s.createdAt).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit' })
-      map[day] = parseFloat(((map[day]||0) + s.total).toFixed(2))
+    todaySales.forEach(s => {
+      if (!map[s.userId]) map[s.userId] = { name: s.userName || s.userId, total: 0, count: 0 }
+      map[s.userId].total += s.total
+      map[s.userId].count++
     })
-    return Object.entries(map)
-      .sort((a,b) => new Date(a[0]) - new Date(b[0]))
-      .map(([dia, total]) => ({ dia, total }))
-  }, [currSales])
+    return Object.values(map).sort((a, b) => b.total - a.total)
+  }, [todaySales])
 
-  const top5 = useMemo(() => {
+  // Ventas por hora (hoy)
+  const byHour = useMemo(() => {
     const map = {}
-    currSales.forEach(s => s.items?.forEach(item => {
-      if (!map[item.productId]) map[item.productId] = { name: item.productName, qty: 0 }
-      map[item.productId].qty += item.quantity
-    }))
-    return Object.values(map).sort((a,b) => b.qty - a.qty).slice(0,5)
-      .map(p => ({ name: p.name.length > 20 ? p.name.slice(0,18)+'…' : p.name, unidades: p.qty }))
-  }, [currSales])
-
-  const paymentData = useMemo(() => {
-    const map = {}
-    currSales.forEach(s => s.payments?.forEach(p => {
-      map[p.method] = parseFloat(((map[p.method]||0) + p.amount).toFixed(2))
-    }))
-    return Object.entries(map).map(([name, value]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1), value,
-    }))
-  }, [currSales])
-
-  const lowStock    = products.filter(p => p.isActive && p.stock <= p.stockMin).length
-  const clientsDebt = clients.filter(c => c.isActive && (c.currentDebt||0) > 0).length
+    for (let h = 6; h <= 22; h++) map[`${h}:00`] = 0
+    todaySales.forEach(s => {
+      const h = new Date(s.createdAt).getHours()
+      const key = `${h}:00`
+      if (map[key] !== undefined) map[key] += s.total
+    })
+    return Object.entries(map).map(([hora, total]) => ({ hora, total: parseFloat(total.toFixed(2)) }))
+  }, [todaySales])
 
   return (
     <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Panel Operativo</h1>
+        <p className="text-sm text-gray-400 dark:text-slate-500">Supervisión del día · {new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' })}</p>
+      </div>
 
-      {/* Header + selector de período */}
+      {/* KPIs del día */}
+      <div>
+        <SectionTitle>Operaciones del día</SectionTitle>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-3">
+          <KPI label="Ventas del día"  value={formatCurrency(totalHoy)}    icon="💰" color="text-blue-600 dark:text-blue-400"/>
+          <KPI label="Transacciones"    value={countHoy}                    icon="🧾"/>
+          <KPI label="Devoluciones"     value={devHoy.length}               icon="↩️" color={devHoy.length > 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-800 dark:text-slate-100'}/>
+          <KPI label="Cajeros activos"  value={byCajero.length}             icon="👤"/>
+        </div>
+      </div>
+
+      {/* Alertas de inventario */}
+      {(outOfStock.length > 0 || lowStock.length > 0) && (
+        <div>
+          <SectionTitle>Alertas de inventario</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            {outOfStock.length > 0 && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">❌ Sin stock ({outOfStock.length})</p>
+                <div className="space-y-1">
+                  {outOfStock.slice(0, 5).map(p => (
+                    <p key={p.id} className="text-xs text-red-600 dark:text-red-400">• {p.name} — 0 {p.unit}</p>
+                  ))}
+                  {outOfStock.length > 5 && <p className="text-xs text-red-400">+{outOfStock.length - 5} más</p>}
+                </div>
+              </div>
+            )}
+            {lowStock.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">⚠️ Stock bajo ({lowStock.length})</p>
+                <div className="space-y-1">
+                  {lowStock.slice(0, 5).map(p => (
+                    <p key={p.id} className="text-xs text-amber-600 dark:text-amber-400">• {p.name} — {p.stock}/{p.stockMin} {p.unit}</p>
+                  ))}
+                  {lowStock.length > 5 && <p className="text-xs text-amber-400">+{lowStock.length - 5} más</p>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Ventas por hora */}
+      <div>
+        <SectionTitle>Flujo de ventas por hora</SectionTitle>
+        <div className="mt-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-4">
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={byHour} margin={{ top:5, right:10, left:0, bottom:5 }}>
+              <defs>
+                <linearGradient id="gradGreen" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#5DCAA5" stopOpacity={0.15}/>
+                  <stop offset="95%" stopColor="#5DCAA5" stopOpacity={0.01}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
+              <XAxis dataKey="hora" tick={{ fontSize:10, fill:'#9ca3af' }}/>
+              <YAxis tick={{ fontSize:10, fill:'#9ca3af' }} tickFormatter={v=>`S/${v}`} width={50}/>
+              <Tooltip formatter={v=>[formatCurrency(v),'Ventas']} contentStyle={{ fontSize:12, borderRadius:8 }}/>
+              <Area type="monotone" dataKey="total" stroke="#5DCAA5" fill="url(#gradGreen)" strokeWidth={2}/>
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Rendimiento por cajero */}
+      {byCajero.length > 0 && (
+        <div>
+          <SectionTitle>Rendimiento por cajero — hoy</SectionTitle>
+          <div className="mt-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-slate-700/50">
+                  {['Cajero','Transacciones','Total vendido','Ticket prom.'].map(h => (
+                    <th key={h} className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-4 py-2.5 text-left">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                {byCajero.map((c, i) => (
+                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-100">{c.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">{c.count}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(c.total)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">{formatCurrency(c.count > 0 ? c.total/c.count : 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── VISTA ADMIN / GERENTE ────────────────────────────────────────────────────
+function DashboardEjecutivo({ sales, products, categories, returns, clients }) {
+  const [range, setRange] = useState('month')
+
+  const currRange = useMemo(() => getRange(range), [range])
+  const prevRange = useMemo(() => getPrevRange(range), [range])
+  const currSales = useMemo(() => filterSales(sales, currRange), [sales, currRange])
+  const prevSales = useMemo(() => filterSales(sales, prevRange), [sales, prevRange])
+
+  // Métricas
+  const currTotal   = parseFloat(currSales.reduce((a,s) => a+s.total, 0).toFixed(2))
+  const prevTotal   = parseFloat(prevSales.reduce((a,s) => a+s.total, 0).toFixed(2))
+  const currCount   = currSales.length
+  const prevCount   = prevSales.length
+  const currAvg     = currCount > 0 ? parseFloat((currTotal/currCount).toFixed(2)) : 0
+  const prevAvg     = prevCount > 0 ? parseFloat((prevTotal/prevCount).toFixed(2)) : 0
+
+  const currUtil    = parseFloat(currSales.reduce((acc,s) =>
+    acc + (s.items||[]).reduce((a2, item) => {
+      const p = products.find(pr => pr.id === item.productId)
+      const cost = p?.priceBuy > 0 ? p.priceBuy : item.unitPrice * 0.7
+      return a2 + (item.unitPrice - cost) * (item.quantity || 1)
+    }, 0), 0).toFixed(2))
+  const prevUtil    = parseFloat(prevSales.reduce((acc,s) =>
+    acc + (s.items||[]).reduce((a2, item) => {
+      const p = products.find(pr => pr.id === item.productId)
+      const cost = p?.priceBuy > 0 ? p.priceBuy : item.unitPrice * 0.7
+      return a2 + (item.unitPrice - cost) * (item.quantity || 1)
+    }, 0), 0).toFixed(2))
+
+  const currDev     = (returns||[]).filter(r => r.status !== 'anulada' &&
+    new Date(r.createdAt) >= currRange.from).reduce((a,r) => a+r.totalRefund, 0)
+  const ventasNetas = parseFloat((currTotal - currDev).toFixed(2))
+  const margenPct   = currTotal > 0 ? parseFloat((currUtil/currTotal*100).toFixed(1)) : 0
+
+  // Cuentas por cobrar
+  const cxcClients  = clients.filter(c => c.isActive && (c.currentDebt||0) > 0)
+  const totalCxC    = cxcClients.reduce((a,c) => a+(c.currentDebt||0), 0)
+
+  // Top 5 rentables
+  const topRentable = useMemo(() => {
+    const map = {}
+    currSales.forEach(s => s.items?.forEach(item => {
+      const p = products.find(pr => pr.id === item.productId)
+      if (!p) return
+      if (!map[item.productId]) map[item.productId] = { name: item.productName, util: 0, ventas: 0 }
+      const cost = p.priceBuy > 0 ? p.priceBuy : item.unitPrice * 0.7
+      map[item.productId].util   += (item.unitPrice - cost) * (item.quantity||1)
+      map[item.productId].ventas += item.netTotal || item.unitPrice * (item.quantity||1)
+    }))
+    return Object.values(map)
+      .sort((a,b) => b.util - a.util)
+      .slice(0,8)
+      .map(p => ({ ...p, util: parseFloat(p.util.toFixed(2)), ventas: parseFloat(p.ventas.toFixed(2)),
+        margen: p.ventas > 0 ? parseFloat((p.util/p.ventas*100).toFixed(1)) : 0,
+        name: p.name.length > 22 ? p.name.slice(0,20)+'…' : p.name,
+      }))
+  }, [currSales, products])
+
+  // Ventas diarias para gráfica
+  const dailyChart = useMemo(() => {
+    const map = {}
+    currSales.forEach(s => {
+      const day = new Date(s.createdAt).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})
+      if (!map[day]) map[day] = { dia: day, ventas: 0, utilidad: 0 }
+      map[day].ventas += s.total
+      map[day].utilidad += (s.items||[]).reduce((a, item) => {
+        const p = products.find(pr => pr.id === item.productId)
+        const cost = p?.priceBuy > 0 ? p.priceBuy : item.unitPrice * 0.7
+        return a + (item.unitPrice - cost) * (item.quantity||1)
+      }, 0)
+    })
+    return Object.values(map).map(d => ({
+      ...d,
+      ventas:   parseFloat(d.ventas.toFixed(2)),
+      utilidad: parseFloat(d.utilidad.toFixed(2)),
+    }))
+  }, [currSales, products])
+
+  // Métodos de pago
+  const payMethods = useMemo(() => {
+    const map = {}
+    currSales.forEach(s => s.payments?.forEach(p => {
+      map[p.method] = parseFloat(((map[p.method]||0)+p.amount).toFixed(2))
+    }))
+    return Object.entries(map).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase()+name.slice(1), value
+    }))
+  }, [currSales])
+
+  const RANGES = [
+    { key:'today', label:'Hoy'    },
+    { key:'week',  label:'7 días' },
+    { key:'month', label:'Mes'    },
+    { key:'all',   label:'Todo'   },
+  ]
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header + selector período */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-slate-100">Dashboard</h1>
-          <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">
-            {currSales.length} ventas · {prevRange ? 'comparando con período anterior' : 'sin comparación disponible'}
+          <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Dashboard Ejecutivo</h1>
+          <p className="text-sm text-gray-400 dark:text-slate-500">
+            {currCount} ventas · {prevRange ? 'comparando con período anterior' : 'sin comparación disponible'}
           </p>
         </div>
         <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
@@ -189,76 +432,79 @@ export default function Dashboard() {
             <button key={r.key} onClick={() => setRange(r.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 range === r.key ? 'bg-white dark:bg-slate-600 shadow text-blue-600' : 'text-gray-500 dark:text-slate-400'
-              }`}>
-              {r.label}
+              }`}>{r.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* KPIs principales con variación vs período anterior */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Total ventas"     value={formatCurrency(currM.total)}     trend={prevRange ? trends.total     : null} icon="💰" color="text-blue-600"/>
-        <KPICard label="Transacciones"    value={currM.count}                     trend={prevRange ? trends.count     : null} icon="🧾"/>
-        <KPICard label="Ticket promedio"  value={formatCurrency(currM.avgTicket)} trend={prevRange ? trends.avgTicket : null} icon="📊" color="text-teal-600"/>
-        <KPICard label="Utilidad neta"    value={formatCurrency(currM.utilidad)}  trend={prevRange ? trends.utilidad  : null} icon="📈" color="text-green-600"/>
+      {/* KPIs ejecutivos */}
+      <div>
+        <SectionTitle>Indicadores del período</SectionTitle>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
+          <KPI label="Ventas brutas"    value={formatCurrency(currTotal)}    trend={prevRange ? pct(currTotal, prevTotal) : null}   icon="💰" color="text-blue-600 dark:text-blue-400"/>
+          <KPI label="Ventas netas"     value={formatCurrency(ventasNetas)}  icon="✅" color="text-emerald-600 dark:text-emerald-400" sub={currDev > 0 ? `-${formatCurrency(currDev)} dev.` : undefined}/>
+          <KPI label="Utilidad bruta"   value={formatCurrency(currUtil)}     trend={prevRange ? pct(currUtil, prevUtil) : null}      icon="📈" color="text-teal-600 dark:text-teal-400"/>
+          <KPI label="Margen bruto"     value={`${margenPct}%`}              icon="🎯" color={margenPct >= 30 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}/>
+          <KPI label="Ticket promedio"  value={formatCurrency(currAvg)}      trend={prevRange ? pct(currAvg, prevAvg) : null}        icon="📊"/>
+        </div>
       </div>
 
-      {/* KPIs secundarios */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">↩️ Devoluciones</p>
-          <p className="text-xl font-semibold text-red-500">{currReturns.length > 0 ? `-${formatCurrency(totalReembolsado)}` : '—'}</p>
-          <p className="text-xs text-gray-400 dark:text-slate-500">{currReturns.length} NCs emitidas</p>
+      {/* Cuentas por cobrar — alerta crítica */}
+      {totalCxC > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-5">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                📒 Cuentas por cobrar — {cxcClients.length} cliente(s) con saldo pendiente
+              </p>
+              <p className="text-2xl font-black text-amber-700 dark:text-amber-300 mt-1">{formatCurrency(totalCxC)}</p>
+            </div>
+            <div className="space-y-1 text-xs">
+              {cxcClients.slice(0,4).map(c => (
+                <div key={c.id} className="flex justify-between gap-8 text-amber-700 dark:text-amber-400">
+                  <span>{c.name}</span>
+                  <span className="font-semibold">{formatCurrency(c.currentDebt)}</span>
+                </div>
+              ))}
+              {cxcClients.length > 4 && <p className="text-amber-500">+{cxcClients.length - 4} más</p>}
+            </div>
+          </div>
         </div>
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4">
-          <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">✅ Venta neta</p>
-          <p className="text-xl font-semibold text-emerald-700 dark:text-emerald-300">{formatCurrency(ventasNetas)}</p>
-          <p className="text-xs text-emerald-500">ventas - devoluciones</p>
-        </div>
-        <div className={`rounded-xl p-4 ${lowStock > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-slate-800/50'}`}>
-          <p className={`text-xs mb-1 ${lowStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>
-            ⚠️ Stock bajo
-          </p>
-          <p className={`text-xl font-semibold ${lowStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500'}`}>{lowStock}</p>
-          <p className={`text-xs ${lowStock > 0 ? 'text-red-400' : 'text-gray-400 dark:text-slate-500'}`}>productos con stock bajo</p>
-        </div>
-        <div className={`rounded-xl p-4 ${clientsDebt > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-gray-50 dark:bg-slate-800/50'}`}>
-          <p className={`text-xs mb-1 ${clientsDebt > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-slate-400'}`}>
-            📒 Créditos vivos
-          </p>
-          <p className={`text-xl font-semibold ${clientsDebt > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500'}`}>{clientsDebt}</p>
-          <p className={`text-xs ${clientsDebt > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-slate-500'}`}>clientes con deuda</p>
-        </div>
-      </div>
+      )}
 
       {/* Gráficas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Ventas diarias */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+        {/* Ventas + Utilidad diaria */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">Ventas diarias</h3>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">Ventas vs Utilidad</h3>
             {prevRange && (
-              <span className="text-xs text-gray-400 dark:text-slate-500">
-                {trends.total >= 0 ? '↑' : '↓'} {Math.abs(trends.total)}% vs período anterior
+              <span className={`text-xs font-medium ${pct(currTotal, prevTotal) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                {pct(currTotal, prevTotal) >= 0 ? '↑' : '↓'} {Math.abs(pct(currTotal, prevTotal))}% vs período anterior
               </span>
             )}
           </div>
           {dailyChart.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={dailyChart} margin={{ top:5, right:10, left:0, bottom:5 }}>
                 <defs>
-                  <linearGradient id="gradBlue" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="gVentas" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#378ADD" stopOpacity={0.15}/>
                     <stop offset="95%" stopColor="#378ADD" stopOpacity={0.01}/>
+                  </linearGradient>
+                  <linearGradient id="gUtil" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#5DCAA5" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#5DCAA5" stopOpacity={0.01}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
                 <XAxis dataKey="dia" tick={{ fontSize:10, fill:'#9ca3af' }}/>
                 <YAxis tick={{ fontSize:10, fill:'#9ca3af' }} tickFormatter={v=>`S/${v}`} width={52}/>
-                <Tooltip formatter={v=>[formatCurrency(v),'Ventas']} contentStyle={{ fontSize:12, borderRadius:8 }}/>
-                <Area type="monotone" dataKey="total" stroke="#378ADD" fill="url(#gradBlue)" strokeWidth={2}/>
+                <Tooltip formatter={(v,n)=>[formatCurrency(v), n==='ventas'?'Ventas':'Utilidad']}
+                  contentStyle={{ fontSize:12, borderRadius:8 }}/>
+                <Area type="monotone" dataKey="ventas"   stroke="#378ADD" fill="url(#gVentas)" strokeWidth={2} name="ventas"/>
+                <Area type="monotone" dataKey="utilidad" stroke="#5DCAA5" fill="url(#gUtil)"   strokeWidth={2} name="utilidad"/>
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -267,20 +513,20 @@ export default function Dashboard() {
         </div>
 
         {/* Métodos de pago */}
-        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-4">
           <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Métodos de pago</h3>
-          {paymentData.length > 0 ? (
+          {payMethods.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={130}>
+              <ResponsiveContainer width="100%" height={120}>
                 <PieChart>
-                  <Pie data={paymentData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={3} dataKey="value">
-                    {paymentData.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+                  <Pie data={payMethods} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={3} dataKey="value">
+                    {payMethods.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
                   </Pie>
                   <Tooltip formatter={v=>[formatCurrency(v)]} contentStyle={{ fontSize:12, borderRadius:8 }}/>
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-1 mt-2">
-                {paymentData.map((d,i) => (
+                {payMethods.map((d,i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-sm" style={{ background: COLORS[i%COLORS.length] }}/>
@@ -297,21 +543,87 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Top 5 productos */}
-      {top5.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Top 5 productos más vendidos</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={top5} layout="vertical" margin={{ top:0, right:40, left:10, bottom:0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false}/>
-              <XAxis type="number" tick={{ fontSize:10, fill:'#9ca3af' }}/>
-              <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'#6b7280' }} width={120}/>
-              <Tooltip formatter={v=>[`${v} uds.`,'Ventas']} contentStyle={{ fontSize:12, borderRadius:8 }}/>
-              <Bar dataKey="unidades" fill="#5DCAA5" radius={[0,4,4,0]}/>
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Top productos rentables */}
+      {topRentable.length > 0 && (
+        <div>
+          <SectionTitle>Top productos por rentabilidad</SectionTitle>
+          <div className="mt-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-slate-700/50">
+                  {['#','Producto','Ventas totales','Utilidad','Margen'].map(h => (
+                    <th key={h} className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-4 py-2.5 text-left">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                {topRentable.map((p, i) => (
+                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                    <td className="px-4 py-2.5 text-xs font-bold text-gray-400 dark:text-slate-500">#{i+1}</td>
+                    <td className="px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-slate-100">{p.name}</td>
+                    <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300">{formatCurrency(p.ventas)}</td>
+                    <td className="px-4 py-2.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(p.util)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        p.margen >= 40 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                        p.margen >= 20 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                        'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>{p.margen}%</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
+  )
+}
+
+// ─── COMPONENTE PRINCIPAL — enruta por rol ────────────────────────────────────
+export default function Dashboard() {
+  const {
+    sales, products, categories, returns, clients,
+    activeCashSession, currentUser, users,
+  } = useStore()
+
+  const role = currentUser?.role || 'cajero'
+
+  // Cajero → vista de turno personal
+  if (role === 'cajero') {
+    return (
+      <DashboardCajero
+        currentUser={currentUser}
+        sales={sales}
+        activeCashSession={activeCashSession}
+        products={products}
+      />
+    )
+  }
+
+  // Supervisor → vista operativa del día
+  if (role === 'supervisor') {
+    return (
+      <DashboardSupervisor
+        sales={sales}
+        products={products}
+        categories={categories}
+        returns={returns}
+        currentUser={currentUser}
+        users={users}
+      />
+    )
+  }
+
+  // Admin / Gerente → vista ejecutiva completa
+  return (
+    <DashboardEjecutivo
+      sales={sales}
+      products={products}
+      categories={categories}
+      returns={returns}
+      clients={clients}
+    />
   )
 }

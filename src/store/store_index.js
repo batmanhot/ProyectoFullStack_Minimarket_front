@@ -42,7 +42,6 @@ import { createSalesSlice }         from './slices/salesSlice'
 import { createCashSlice }          from './slices/cashSlice'
 import { createStakeholdersSlice }  from './slices/stakeholdersSlice'
 import { createDiscountsSlice }     from './slices/discountsSlice'
-import { createSessionTrackingSlice } from './slices/sessionTrackingSlice'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE PRINCIPAL
@@ -64,45 +63,22 @@ export const useStore = create(
         ...createCashSlice(set, get),
         ...createStakeholdersSlice(set, get),
         ...createDiscountsSlice(set, get),
-        ...createSessionTrackingSlice(set, get),
 
         // ─── Demo reset ──────────────────────────────────────────────────────
+        // Restaura el estado inicial del demo manteniendo al usuario logueado.
         resetDemo: (sector) => {
           const initial = getInitialDemoState()
           if (sector) initial.businessConfig.sector = sector
           set({ ...initial, currentUser: get().currentUser })
         },
 
-        // ─── Cargar datos demo ricos ──────────────────────────────────────────
-        // Inyecta 30 días de ventas históricas con variedad de métodos de pago,
-        // descuentos y horarios realistas. No resetea maestros ni configuración.
-        loadDemoData: () => {
-          // Reutiliza getInitialDemoState que ya tiene SEED_SALES actualizado
-          const freshSales = getInitialDemoState().sales
-          set({
-            sales:          freshSales,
-            stockMovements: [],
-            purchases:      [],
-            cashSessions:   [],
-            auditLog:       [],
-            notifications:  [],
-            nextInvoice:    Math.max(...freshSales.map(s =>
-              parseInt(s.invoiceNumber?.split('-')[1] || '0')
-            )) + 1,
-          })
-        },
-
       }),
 
       // ─── Configuración de persistencia ────────────────────────────────────
       {
-        name: 'mm_store_v5',  // v5 → sesión limpia al actualizar desde v4
+        name: 'mm_store_v5',
 
-        // Solo persiste los datos necesarios.
-        // systemConfig NO viene de seedData, se define en configSlice,
-        // por eso se incluye explícitamente.
         partialize: (s) => ({
-          // Datos de negocio (vienen de seedData y se modifican en runtime)
           products:          s.products,
           productVariants:   s.productVariants,
           stockMovements:    s.stockMovements,
@@ -110,7 +86,6 @@ export const useStore = create(
           clients:           s.clients,
           suppliers:         s.suppliers,
           categories:        s.categories,
-          brands:            s.brands,
           users:             s.users,
           cashSessions:      s.cashSessions,
           activeCashSession: s.activeCashSession,
@@ -118,23 +93,69 @@ export const useStore = create(
           debtPayments:      s.debtPayments,
           cart:              s.cart,
           nextInvoice:       s.nextInvoice,
-          // Configuración
           businessConfig:    s.businessConfig,
           systemConfig:      s.systemConfig,
           alertRules:        s.alertRules,
-          // Usuario activo
           currentUser:       s.currentUser,
-          // Auditoría y notificaciones
           auditLog:          s.auditLog,
           notifications:     s.notifications,
-          // Descuentos y devoluciones
           discountCampaigns: s.discountCampaigns,
           discountTickets:   s.discountTickets,
           returns:           s.returns,
-          // Sesiones de usuarios
-          activeSessions:    s.activeSessions,
-          sessionHistory:    s.sessionHistory,
         }),
+
+        // ── SERIALIZE: control de tamaño del localStorage ─────────────────
+        // Si el JSON supera 4MB recorta historial no crítico antes de escribir.
+        // Evita el fallo silencioso del navegador al superar el límite de 5MB.
+        serialize: (state) => {
+          const json    = JSON.stringify(state)
+          const sizeKB  = Math.round(json.length / 1024)
+          if (sizeKB > 3072) {
+            console.warn(`[Store] localStorage: ${sizeKB}KB / 5120KB máx.`)
+          }
+          if (sizeKB > 4096) {
+            console.error(`[Store] Superó 4MB. Recortando historial...`)
+            try {
+              const p = JSON.parse(json)
+              if (p.state?.auditLog?.length       > 500) p.state.auditLog       = p.state.auditLog.slice(0, 500)
+              if (p.state?.stockMovements?.length > 300) p.state.stockMovements = p.state.stockMovements.slice(0, 300)
+              if (p.state?.notifications?.length  >  50) p.state.notifications  = p.state.notifications.slice(0, 50)
+              return JSON.stringify(p)
+            } catch { /* si falla el recorte, intentar guardar igualmente */ }
+          }
+          return json
+        },
+
+        // ── MERGE: preserva campos loyalty del localStorage sobre el seed ──
+        merge: (persistedState, currentState) => {
+          const merged = { ...currentState, ...persistedState }
+          if (persistedState?.clients && currentState?.clients) {
+            const pMap = {}
+            persistedState.clients.forEach(c => { pMap[c.id] = c })
+            merged.clients = currentState.clients.map(seed => {
+              const p = pMap[seed.id]
+              if (!p) return seed
+              return {
+                ...seed, ...p,
+                loyaltyPoints:       p.loyaltyPoints       ?? seed.loyaltyPoints       ?? 0,
+                loyaltyAccumulated:  p.loyaltyAccumulated  ?? seed.loyaltyAccumulated  ?? 0,
+                loyaltyLevel:        p.loyaltyLevel         ?? seed.loyaltyLevel         ?? 'Bronce',
+                loyaltyTransactions: p.loyaltyTransactions  ?? seed.loyaltyTransactions  ?? [],
+              }
+            })
+            const seedIds = new Set(currentState.clients.map(c => c.id))
+            persistedState.clients
+              .filter(c => !seedIds.has(c.id))
+              .forEach(c => merged.clients.push({
+                ...c,
+                loyaltyPoints:       c.loyaltyPoints       ?? 0,
+                loyaltyAccumulated:  c.loyaltyAccumulated  ?? 0,
+                loyaltyLevel:        c.loyaltyLevel         ?? 'Bronce',
+                loyaltyTransactions: c.loyaltyTransactions  ?? [],
+              }))
+          }
+          return merged
+        },
       }
     )
   )
@@ -199,14 +220,6 @@ export const selectTodayReturns = (s) => {
     (r) => new Date(r.createdAt).toDateString() === today && r.status !== 'anulada'
   )
 }
-
-/** Sesiones activas (evitar mapeo para prevenir re-renders infinitos) */
-export const selectActiveSessions = (s) => 
-  s.activeSessions || []
-
-/** Historial de sesiones (últimas 50 más recientes) */
-export const selectRecentSessionHistory = (s) =>
-  (s.sessionHistory || []).slice(0, 50)
 
 /** Clientes con deuda pendiente, ordenados de mayor a menor */
 export const selectClientsWithDebt = (s) =>

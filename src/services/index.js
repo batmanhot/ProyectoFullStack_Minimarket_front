@@ -142,6 +142,8 @@ export const productService = {
     state.addStockMovement({
       id: crypto.randomUUID(), productId: id, productName: product.name,
       type, quantity, previousStock: prevStock, newStock, reason, userId,
+      unitCost:   parseFloat((product.priceBuy || 0).toFixed(4)),
+      totalValue: parseFloat(((product.priceBuy || 0) * quantity).toFixed(2)),
       createdAt: new Date().toISOString(),
     })
     return ok({ id, newStock })
@@ -182,6 +184,11 @@ export const saleService = {
         id: crypto.randomUUID(), productId: item.productId, productName: product.name,
         type: 'salida', quantity: item.quantity, previousStock: prevStock, newStock,
         reason: `Venta ${payload.invoiceNumber}`, userId: payload.userId,
+        unitCost:   parseFloat((product.priceBuy || 0).toFixed(4)),
+        unitPrice:  parseFloat((item.unitPrice || 0).toFixed(4)),
+        totalValue: parseFloat(((product.priceBuy || 0) * item.quantity).toFixed(2)),
+        totalSale:  parseFloat(((item.unitPrice  || 0) * item.quantity).toFixed(2)),
+        invoiceNumber: payload.invoiceNumber,
         createdAt: payload.createdAt || new Date().toISOString(),
       })
     }
@@ -300,6 +307,9 @@ export const saleService = {
         type: 'entrada', quantity: item.quantity,
         previousStock: product.stock, newStock: product.stock + item.quantity,
         reason: `Cancelación ${sale.invoiceNumber}`, userId,
+        unitCost:   parseFloat((product.priceBuy || 0).toFixed(4)),
+        totalValue: parseFloat(((product.priceBuy || 0) * item.quantity).toFixed(2)),
+        invoiceNumber: sale.invoiceNumber,
         createdAt: new Date().toISOString(),
       })
     }
@@ -466,7 +476,14 @@ export const purchaseService = {
         type: 'entrada', quantity: item.quantity,
         previousStock: prevStock, newStock,
         reason: `Compra proveedor: ${payload.supplierName || ''}`,
-        userId: payload.userId, createdAt: new Date().toISOString(),
+        userId: payload.userId,
+        unitCost:      parseFloat((item.priceBuy || 0).toFixed(4)),
+        totalValue:    parseFloat(((item.priceBuy || 0) * item.quantity).toFixed(2)),
+        costAverage:   parseFloat((item.costAverage || item.priceBuy || 0).toFixed(4)),
+        costMethod:    payload.costMethod || 'peps',
+        supplierName:  payload.supplierName || '',
+        invoiceRef:    payload.invoiceRef  || '',
+        createdAt: new Date().toISOString(),
       })
     }
 
@@ -523,6 +540,10 @@ export const returnService = {
         newStock,
         reason:        `Devolución NC ${creditNote.ncNumber}`,
         userId:        payload.userId,
+        unitCost:      parseFloat((product.priceBuy || 0).toFixed(4)),
+        unitPrice:     parseFloat((item.unitPrice   || 0).toFixed(4)),
+        totalValue:    parseFloat(((product.priceBuy || 0) * item.quantity).toFixed(2)),
+        ncNumber:      creditNote.ncNumber,
         createdAt:     creditNote.createdAt,
       })
     }

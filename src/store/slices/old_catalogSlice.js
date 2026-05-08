@@ -69,60 +69,6 @@ export const createCatalogSlice = (set, get) => ({
       stockMovements: [movement, ...s.stockMovements].slice(0, 1000),
     })),
 
-  // ─── Categorías ────────────────────────────────────────────────────────────
-  addCategory: (category) => {
-    get().addAuditLog({
-      action: 'CREATE', module: 'Catálogo',
-      detail: `Categoría creada: ${category.name}`, entityId: category.id,
-    })
-    set((s) => ({ categories: [category, ...s.categories] }))
-  },
-
-  updateCategory: (id, updates) => {
-    get().addAuditLog({
-      action: 'UPDATE', module: 'Catálogo',
-      detail: `Categoría actualizada: ${updates.name || id}`, entityId: id,
-    })
-    set((s) => ({
-      categories: s.categories.map((c) => c.id === id ? { ...c, ...updates } : c),
-    }))
-  },
-
-  deleteCategory: (id) => {
-    get().addAuditLog({
-      action: 'DELETE', module: 'Catálogo',
-      detail: `Categoría eliminada: ID ${id}`, entityId: id,
-    })
-    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }))
-  },
-
-  // ─── Marcas ────────────────────────────────────────────────────────────────
-  addBrand: (brand) => {
-    get().addAuditLog({
-      action: 'CREATE', module: 'Catálogo',
-      detail: `Marca creada: ${brand.name}`, entityId: brand.id,
-    })
-    set((s) => ({ brands: [brand, ...(s.brands || [])] }))
-  },
-
-  updateBrand: (id, updates) => {
-    get().addAuditLog({
-      action: 'UPDATE', module: 'Catálogo',
-      detail: `Marca actualizada: ${updates.name || id}`, entityId: id,
-    })
-    set((s) => ({
-      brands: (s.brands || []).map((b) => b.id === id ? { ...b, ...updates } : b),
-    }))
-  },
-
-  deleteBrand: (id) => {
-    get().addAuditLog({
-      action: 'DELETE', module: 'Catálogo',
-      detail: `Marca eliminada: ID ${id}`, entityId: id,
-    })
-    set((s) => ({ brands: (s.brands || []).filter((b) => b.id !== id) }))
-  },
-
   // ─── Contador de facturas ──────────────────────────────────────────────────
   getNextInvoice: () => {
     const n = get().nextInvoice
