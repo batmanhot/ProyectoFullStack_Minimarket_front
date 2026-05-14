@@ -7,6 +7,7 @@ import { stockAdjustSchema } from '../../shared/schemas/index'
 import { productService } from '../../services/index'
 import { formatCurrency, formatDate, formatDateTime, isLowStock, isOutOfStock, isExpired, isNearExpiry, stockDaysLeft } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
+import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import { StockBadge, ExpiryBadge } from '../../shared/components/ui/Badge'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -321,8 +322,8 @@ export default function Inventory() {
           <p className="text-sm text-gray-400 dark:text-slate-500">{filtered.length} productos{lowCount > 0 && <span className="ml-2 text-red-400">· {lowCount} con alerta</span>}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
-          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
+          <ExcelButton onClick={handleExportExcel} />
+          <PDFButton   onClick={handleExportPDF} />
           {/* ← AGREGAR ESTE BOTÓN */}
           <button onClick={() => setView('stocktaking')} 
             className="px-3 py-2 text-sm border border-blue-200 dark:border-blue-800

@@ -17,9 +17,10 @@
 
 import { useState, useMemo } from 'react'
 import { useStore }           from '../../store/index'
-import { formatCurrency, formatDate } from '../../shared/utils/helpers'
+import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { useDebounce }        from '../../shared/hooks/useDebounce'
 import toast                  from 'react-hot-toast'
+import ConfirmModal           from '../../shared/components/ui/ConfirmModal'
 
 // ─── Estados del flujo ────────────────────────────────────────────────────────
 const Q_STATUS = {
@@ -42,414 +43,477 @@ const isExpiredQ = (q) =>
   q.expiresAt && new Date(q.expiresAt) < new Date() &&
   !['convertida','rechazada','vencida'].includes(q.status)
 
-// ─── DOCUMENTO DE COTIZACIÓN (imprimible / WhatsApp / PDF) ────────────────────
-function buildQuotationHTML(q, businessConfig) {
-  const biz      = businessConfig || {}
-  const items    = (q.items || []).map(item => {
-    const sub = parseFloat((item.quantity * item.unitPrice * (1 - (item.discount||0)/100)).toFixed(2))
-    const descValue = parseFloat((item.quantity * item.unitPrice * (item.discount||0)/100).toFixed(2))
-    return `
-      <tr>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:left">${item.productName}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${item.quantity}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">S/ ${Number(item.unitPrice).toFixed(2)}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">${item.discount > 0 ? 'S/ ' + descValue.toFixed(2) : '—'}</td>
-        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">S/ ${sub.toFixed(2)}</td>
+// ─── Modal de documento de cotización — estilo idéntico a CreditNoteModal ─────
+function QuotationDocModal({ q, businessConfig, onClose }) {
+  const [showPhone, setShowPhone] = useState(false)
+  const [phone, setPhone]         = useState('')
+  const [phoneError, setPhoneError] = useState('')
+
+  const biz         = businessConfig || {}
+  const expiryDate  = q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('es-PE') : '—'
+  const createdDate = q.createdAt  ? new Date(q.createdAt).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—'
+  const stLabel     = Q_STATUS[q.status]?.label || q.status
+  const totalDesc   = (q.items||[]).reduce((a,i) => a + i.quantity*i.unitPrice*(i.discount||0)/100, 0)
+  const base        = q.total / 1.18
+  const igv         = q.total - base
+
+  // ── PDF A4 formal ──────────────────────────────────────────────────────────
+  const handlePrintA4 = () => {
+    const rows = (q.items||[]).map(item => {
+      const subtotalBruto = parseFloat((item.quantity*item.unitPrice).toFixed(2))
+      const importeDesc   = parseFloat((subtotalBruto*(item.discount||0)/100).toFixed(2))
+      const totalNeto     = parseFloat((subtotalBruto - importeDesc).toFixed(2))
+      const bs = 'padding:7px 8px;border-bottom:1px solid #e5e7eb;color:#111;font-size:10px;'
+      return `<tr>
+        <td style="${bs}">${item.productName}<br><span style="color:#9ca3af;font-size:9px">${item.unit||'u'}</span></td>
+        <td style="${bs}text-align:center;">${item.quantity}</td>
+        <td style="${bs}text-align:right;">S/ ${Number(item.unitPrice).toFixed(2)}</td>
+        <td style="${bs}text-align:right;">S/ ${subtotalBruto.toFixed(2)}</td>
+        <td style="${bs}text-align:center;">${item.discount||0}%</td>
+        <td style="${bs}text-align:right;color:${importeDesc>0?'#dc2626':'#9ca3af'}">${importeDesc>0?`-S/ ${importeDesc.toFixed(2)}`:'—'}</td>
+        <td style="${bs}text-align:right;font-weight:700;">S/ ${totalNeto.toFixed(2)}</td>
       </tr>`
-  }).join('')
-
-  const expiryDate = q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('es-PE') : '—'
-  const createdDate = q.createdAt ? new Date(q.createdAt).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—'
-  const totalDescuento = (q.items || []).reduce((acc, item) => acc + parseFloat((item.quantity * item.unitPrice * (item.discount||0)/100).toFixed(2)), 0)
-  const baseImponible = q.total + totalDescuento
-  const igv = parseFloat((q.total * 0.1765).toFixed(2)) // 18% / 1.18 ≈ 17.65%
-
-  const logoUrl = biz.logoUrl || biz.logo || ''
-
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Cotización ${q.number}</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    }).join('')
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cotización ${q.number}</title>
 <style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Courier New',monospace; font-size:11px; color:#000; background:#f5f5f5; }
-  .actions-bar { display:flex; gap:8px; margin-bottom:20px; padding:15px; background:#fff; position:sticky; top:0; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,.1); }
-  .btn { padding:10px 18px; border:1px solid #999; background:#f9f9f9; cursor:pointer; font-size:11px; font-weight:bold; border-radius:4px; transition:0.3s; }
-  .btn:hover { background:#e9e9e9; }
-  .btn-pdf { background:#dc2626; color:white; border:none; }
-  .btn-pdf:hover { background:#b91c1c; }
-  .btn-wa { background:#16a34a; color:white; border:none; }
-  .btn-wa:hover { background:#15803d; }
-  .page { max-width:900px; margin:0 auto; background:#fff; padding:30px; box-shadow:0 1px 3px rgba(0,0,0,.1); page-break-after:always; }
-  .header-sunat { margin-bottom:25px; border-bottom:3px solid #000; padding-bottom:15px; }
-  .header-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
-  .biz-info { flex:1; }
-  .biz-logo-wrap { margin-bottom:8px; }
-  .biz-logo { max-width:180px; max-height:56px; object-fit:contain; display:block; }
-  .biz-name { font-size:16px; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
-  .biz-ruc { font-size:10px; margin:1px 0; }
-  .biz-address { font-size:10px; margin:1px 0; max-width:350px; }
-  .doc-type { text-align:right; font-size:14px; font-weight:bold; }
-  .doc-number { text-align:right; font-size:11px; margin-top:5px; }
-  .header-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
-  .header-box { font-size:10px; border:1px solid #999; padding:10px; }
-  .header-box-label { font-weight:bold; text-transform:uppercase; font-size:9px; margin-bottom:3px; }
-  .header-box-value { font-size:11px; }
-  table { width:100%; border-collapse:collapse; margin-bottom:15px; }
-  thead { background:#f0f0f0; border-top:2px solid #000; border-bottom:2px solid #000; }
-  thead th { padding:8px; text-align:left; font-weight:bold; font-size:10px; text-transform:uppercase; border:none; }
-  tbody td { padding:8px; border-bottom:1px solid #ddd; }
-  .total-section { margin:20px 0; }
-  .total-row { display:grid; grid-template-columns:auto auto; gap:20px; justify-content:flex-end; font-size:11px; }
-  .total-line { display:grid; grid-template-columns:150px 80px; gap:10px; justify-content:flex-end; }
-  .total-label { text-align:right; font-weight:bold; }
-  .total-value { text-align:right; font-weight:bold; border-bottom:1px solid #000; padding-bottom:3px; }
-  .total-final { font-size:13px; font-weight:bold; }
-  .conditions { font-size:9px; margin-top:20px; line-height:1.5; border-top:1px solid #ddd; padding-top:10px; }
-  .conditions strong { text-transform:uppercase; }
-  .footer { margin-top:25px; text-align:center; font-size:9px; border-top:1px solid #ddd; padding-top:10px; }
-
-  /* Modal bloqueante para WhatsApp */
-  .wa-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(17, 24, 39, 0.65);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    padding: 16px;
-  }
-  .wa-modal-backdrop.show { display: flex; }
-  .wa-modal {
-    width: 100%;
-    max-width: 520px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0,0,0,.25);
-    border: 1px solid #e5e7eb;
-    overflow: hidden;
-  }
-  .wa-modal-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 15px;
-    font-weight: bold;
-  }
-  .wa-modal-body { padding: 16px; }
-  .wa-label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
-  .wa-input {
-    width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 14px;
-    outline: none;
-  }
-  .wa-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); }
-  .wa-help { margin-top: 6px; font-size: 11px; color: #6b7280; }
-  .wa-error { margin-top: 10px; font-size: 12px; color: #dc2626; display: none; }
-  .wa-link-wrap { margin-top: 12px; display: none; }
-  .wa-link {
-    display: inline-block;
-    background: #16a34a;
-    color: #fff;
-    text-decoration: none;
-    padding: 9px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: bold;
-  }
-  .wa-modal-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 14px;
-  }
-  .wa-btn {
-    border: 1px solid #d1d5db;
-    background: #fff;
-    color: #111827;
-    padding: 9px 14px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-  }
-  .wa-btn-primary {
-    background: #2563eb;
-    color: #fff;
-    border-color: #2563eb;
-  }
-
-  @media print { 
-    .actions-bar { display:none !important; } 
-    body { background:white; } 
-    .page { box-shadow:none; margin:0; padding:15mm; page-break-after:always; }
-  }
-</style></head>
-<body>
+*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#f3f4f6;}
+.page{max-width:210mm;margin:10mm auto;background:#fff;padding:15mm;box-shadow:0 2px 16px rgba(0,0,0,.1);}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+.doc-box{border:2px solid #2563eb;border-radius:6px;padding:12px 16px;text-align:center;min-width:150px;}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.meta-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:5px;padding:9px;}
+.meta-label{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700;display:block;margin-bottom:3px;}
+.meta-val{font-size:12px;font-weight:600;color:#111;}.meta-sub{font-size:10px;color:#6b7280;}
+table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+thead tr{background:#2563eb;color:#fff;}thead th{padding:8px;font-size:9px;font-weight:700;}
+tbody tr:nth-child(even){background:#eff6ff;}
+.total-final{background:#2563eb;color:#fff;border-radius:5px;padding:9px 13px;display:flex;justify-content:space-between;font-size:14px;font-weight:800;margin-top:4px;}
+.signature{display:flex;justify-content:space-between;margin-top:28px;}
+.sig-box{text-align:center;border-top:1px solid #d1d5db;padding-top:6px;width:150px;font-size:10px;color:#6b7280;}
+.conditions{font-size:10px;color:#6b7280;line-height:1.6;border-top:1px solid #e5e7eb;padding-top:12px;margin-top:8px;}
+.actions-bar{display:flex;gap:8px;margin-bottom:16px;}
+.btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;}
+.btn-p{background:#2563eb;color:#fff;}.btn-w{background:#16a34a;color:#fff;}
+@media print{.actions-bar{display:none!important}body{background:#fff}.page{box-shadow:none;margin:0;padding:12mm}@page{size:A4;margin:8mm}}
+</style></head><body>
+<div class="page">
   <div class="actions-bar">
-    <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
-    <button class="btn btn-pdf" onclick="savePDFDocument()">📄 Guardar PDF</button>
-    <button class="btn btn-wa" onclick="sendWhatsAppMessage()">📱 Enviar WhatsApp</button>
+    <button class="btn btn-p" onclick="window.print()">🖨️ Imprimir / PDF A4</button>
+    <button class="btn btn-w" onclick="sendWA()">📱 WhatsApp</button>
   </div>
-
-  <div id="wa-modal-backdrop" class="wa-modal-backdrop" aria-hidden="true">
-    <div class="wa-modal" role="dialog" aria-modal="true" aria-labelledby="waModalTitle">
-      <div class="wa-modal-header" id="waModalTitle">Enviar cotización por WhatsApp</div>
-      <div class="wa-modal-body">
-        <label class="wa-label" for="wa-phone-input">Número de WhatsApp</label>
-        <input id="wa-phone-input" class="wa-input" type="text" placeholder="Ej: 51987654321 o 987654321" />
-        <div class="wa-help">Si ingresas 9 dígitos, se agregará prefijo 51 automáticamente.</div>
-        <div id="wa-error" class="wa-error"></div>
-        <div id="wa-link-wrap" class="wa-link-wrap">
-          <div class="wa-help" style="margin-bottom:6px;">Si tu navegador bloquea ventanas emergentes, usa este botón:</div>
-          <a id="wa-manual-link" class="wa-link" href="#" target="_blank" rel="noopener noreferrer">Abrir WhatsApp manualmente</a>
-        </div>
-        <div class="wa-modal-actions">
-          <button class="wa-btn" type="button" onclick="closeWhatsAppModal()">Cerrar</button>
-          <button class="wa-btn wa-btn-primary" type="button" onclick="confirmSendWhatsApp()">Abrir WhatsApp</button>
-        </div>
-      </div>
+  <div class="header">
+    <div>
+      ${biz.logoUrl ? `<img src="${biz.logoUrl}" style="max-height:52px;max-width:155px;object-fit:contain;margin-bottom:5px;display:block" onerror="this.style.display='none'">` : ''}
+      <div style="font-size:16px;font-weight:800;color:#111">${biz.name||'MI NEGOCIO'}</div>
+      ${biz.ruc     ? `<div style="font-size:10px;color:#6b7280">R.U.C.: ${biz.ruc}</div>` : ''}
+      ${biz.address ? `<div style="font-size:10px;color:#6b7280">${biz.address}</div>` : ''}
+      ${biz.phone   ? `<div style="font-size:10px;color:#6b7280">Tel: ${biz.phone}</div>` : ''}
+    </div>
+    <div class="doc-box">
+      <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase">Documento Comercial</div>
+      <div style="font-size:16px;font-weight:900;color:#111;margin:3px 0;letter-spacing:.04em">COTIZACIÓN</div>
+      <div style="font-size:14px;font-weight:900;color:#2563eb;font-family:monospace">${q.number}</div>
+      <div style="font-size:9px;color:#6b7280;margin-top:3px">Estado: <b style="color:#2563eb">${stLabel}</b></div>
     </div>
   </div>
-
-  <div class="page" id="quotation-page">
-    <div class="header-sunat">
-      <div class="header-top">
-        <div class="biz-info">
-          ${logoUrl ? `<div class="biz-logo-wrap"><img src="${logoUrl}" alt="Logo negocio" class="biz-logo" onerror="this.style.display='none'"></div>` : ''}
-          <div class="biz-name">${biz.name || 'RAZÓN SOCIAL'}</div>
-          <div class="biz-ruc">RUC: ${biz.ruc || '—'}</div>
-          <div class="biz-address">${biz.address || 'Dirección'}</div>
-          <div class="biz-ruc">Teléfono: ${biz.phone || '—'}</div>
-        </div>
-        <div>
-          <div class="doc-type">COTIZACIÓN</div>
-          <div class="doc-number">N° ${q.number}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="header-grid">
-      <div class="header-box">
-        <div class="header-box-label">Cliente</div>
-        <div class="header-box-value">${q.clientName || 'Sin cliente'}</div>
-      </div>
-      <div class="header-box">
-        <div class="header-box-label">Fecha de Emisión</div>
-        <div class="header-box-value">${createdDate}</div>
-      </div>
-      <div class="header-box">
-        <div class="header-box-label">Vigencia (Hasta)</div>
-        <div class="header-box-value">${expiryDate}</div>
-      </div>
-      <div class="header-box">
-        <div class="header-box-label">Estado</div>
-        <div class="header-box-value">${q.status === 'aprobada' ? 'APROBADA' : q.status === 'enviada' ? 'ENVIADA' : 'BORRADOR'}</div>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th style="width:45%">Descripción</th>
-          <th style="width:10%">Cant.</th>
-          <th style="width:15%;text-align:right">P. Unit.</th>
-          <th style="width:15%;text-align:right">Descuento</th>
-          <th style="width:15%;text-align:right">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${items}
-      </tbody>
-    </table>
-
-    <div class="total-section">
-      <div class="total-row">
-        <div class="total-line">
-          <span class="total-label">Base Imponible:</span>
-          <span class="total-value">S/ ${baseImponible.toFixed(2)}</span>
-        </div>
-      </div>
-      <div class="total-row">
-        <div class="total-line">
-          <span class="total-label">Descuentos Totales:</span>
-          <span class="total-value">S/ ${totalDescuento.toFixed(2)}</span>
-        </div>
-      </div>
-      <div class="total-row">
-        <div class="total-line">
-          <span class="total-label">IGV (18%):</span>
-          <span class="total-value">S/ ${igv.toFixed(2)}</span>
-        </div>
-      </div>
-      <div class="total-row">
-        <div class="total-line total-final">
-          <span class="total-label">TOTAL A PAGAR:</span>
-          <span class="total-value">S/ ${Number(q.total).toFixed(2)}</span>
-        </div>
-      </div>
-    </div>
-
-    ${q.note ? `<div class="conditions"><strong>Notas / Condiciones:</strong><br>${q.note.replace(/\n/g, '<br>')}</div>` : ''}
-
-    <div class="conditions">
-      <strong>Condiciones Generales:</strong><br>
-      • Esta cotización tiene validez hasta el <strong>${expiryDate}</strong>. Pasada esta fecha no se garantizan los precios.<br>
-      • Los precios incluyen IGV del 18%. Sujeto a disponibilidad de stock.<br>
-      • Para confirmar el pedido, citar N° de cotización <strong>${q.number}</strong>.<br>
-      • Reserva de stock: 48 horas máximo. Luego será liberado automáticamente.<br>
-      • Pago contra entrega. Se aceptan transferencias bancarias y efectivo.
-    </div>
-
-    <div class="footer">
-      <p>Documento emitido por: ${q.userName || '—'}</p>
-      <p style="margin-top:15px;">___________________________<br>Firma del Representante</p>
-    </div>
+  <hr style="border:none;border-top:2px solid #2563eb;margin:12px 0">
+  <div class="meta-grid">
+    <div class="meta-box"><span class="meta-label">Cliente</span><div class="meta-val">${q.clientName||'Sin cliente'}</div></div>
+    <div class="meta-box"><span class="meta-label">Fecha de emisión</span><div class="meta-val">${createdDate}</div></div>
+    <div class="meta-box"><span class="meta-label">Válida hasta</span><div class="meta-val">${expiryDate}</div><div class="meta-sub">${q.validDays} día${q.validDays>1?'s':''} de validez</div></div>
+    <div class="meta-box"><span class="meta-label">Elaborado por</span><div class="meta-val">${q.userName||'—'}</div><div class="meta-sub">Citar N° ${q.number} al confirmar</div></div>
   </div>
-
+  <table>
+    <thead><tr>
+      <th style="text-align:left;width:30%">DESCRIPCIÓN</th>
+      <th style="text-align:center">CANT.</th>
+      <th style="text-align:right">P. UNIT.</th>
+      <th style="text-align:right">SUBTOTAL</th>
+      <th style="text-align:center">DTO.%</th>
+      <th style="text-align:right">IMP. DESC.</th>
+      <th style="text-align:right">TOTAL (S/)</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div style="width:240px;margin-left:auto;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:#555"><span>Base imponible:</span><span>S/ ${base.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:${totalDesc>0?'#dc2626':'#555'}"><span>Descuentos totales:</span><span>-S/ ${totalDesc.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:#555"><span>IGV (18%):</span><span>S/ ${igv.toFixed(2)}</span></div>
+    <div class="total-final"><span>TOTAL A PAGAR:</span><span>S/ ${Number(q.total).toFixed(2)}</span></div>
+  </div>
+  ${q.note ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;padding:10px;margin-bottom:12px;font-size:10px;color:#1e40af"><b>Notas / Condiciones:</b><br>${q.note}</div>` : ''}
+  <div class="conditions">
+    <b>Condiciones generales:</b><br>
+    • Esta cotización tiene validez hasta el <b>${expiryDate}</b>. Pasada esta fecha no se garantizan los precios.<br>
+    • Los precios incluyen IGV del 18%. Sujeto a disponibilidad de stock.<br>
+    • Para confirmar el pedido, citar N° de cotización <b>${q.number}</b>.<br>
+    • Reserva de stock: 48 horas máximo. Luego será liberado automáticamente.
+  </div>
+  <div class="signature">
+    <div class="sig-box"><div style="margin-bottom:28px">V°B° Emisor</div><div>${biz.name||'MI NEGOCIO'}</div></div>
+    <div class="sig-box"><div style="margin-bottom:28px">Aprobado por</div><div>${q.clientName||'Cliente'}</div></div>
+  </div>
+</div>
 <script>
-  var QUOTE_DATA = ${JSON.stringify({ 
-    number: q.number, 
-    clientName: q.clientName, 
-    total: q.total, 
-    items: q.items, 
-    userName: q.userName,
-    bizName: biz.name,
-    createdDate: createdDate,
-    status: q.status
-  })};
-  var BIZ_DATA = ${JSON.stringify({ name: biz.name, ruc: biz.ruc })};
-
-  async function savePDFDocument() {
-    try {
-      const element = document.getElementById('quotation-page');
-      const fileName = 'Cotizacion_' + QUOTE_DATA.number.replace(/-/g, '_') + '_' + (BIZ_DATA.name || 'Empresa').replace(/[^a-zA-Z0-9]/g, '_') + '.pdf';
-      
-      const opt = {
-        margin: 10,
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-      };
-      
-      await html2pdf().set(opt).from(element).save();
-      alert('PDF descargado: ' + fileName);
-    } catch(err) {
-      alert('Error al generar PDF: ' + err.message);
-    }
+var Q=${JSON.stringify({number:q.number,clientName:q.clientName,total:q.total,items:q.items,userName:q.userName,note:q.note})};
+var BIZ=${JSON.stringify({name:biz.name,ruc:biz.ruc})};
+function sendWA(){
+  var lines=['*'+(BIZ.name||'Mi Negocio')+'*'];
+  if(BIZ.ruc) lines.push('RUC: '+BIZ.ruc);
+  lines.push('─────────────────','*COTIZACIÓN '+Q.number+'*','Cliente: '+Q.clientName,'─────────────────');
+  (Q.items||[]).forEach(function(i){
+    var stB=(i.quantity*i.unitPrice).toFixed(2);
+    var imp=((i.quantity*i.unitPrice*(i.discount||0)/100)).toFixed(2);
+    var tot=(i.quantity*i.unitPrice*(1-(i.discount||0)/100)).toFixed(2);
+    var dsc=parseFloat(imp)>0?' | Dto.'+i.discount+'%: -S/'+imp:'';
+    lines.push('• '+i.productName+': '+i.quantity+' '+(i.unit||'u')+' x S/'+(+i.unitPrice).toFixed(2)+' = S/'+stB+dsc+' → *S/'+tot+'*');
+  });
+  lines.push('─────────────────','*TOTAL: S/'+Number(Q.total).toFixed(2)+'*');
+  if(Q.note) lines.push('Nota: '+Q.note);
+  lines.push('Confirmar citando N°: '+Q.number);
+  var ph=prompt('Número WhatsApp (ej: 51987654321):');
+  if(ph) window.open('https://wa.me/'+ph.replace(/[^0-9]/g,'')+'?text='+encodeURIComponent(lines.join('\n')),'_blank');
+}
+</script></body></html>`
+    const win = window.open('', '_blank', 'width=900,height=750,menubar=yes,scrollbars=yes')
+    if (!win) { toast.error('Activa las ventanas emergentes'); return }
+    win.document.write(html)
+    win.document.close()
   }
 
-  function buildWhatsAppMessage() {
-    var lines = [];
-    lines.push('¡Hola! 👋');
-    lines.push('Te compartimos tu *COTIZACIÓN N° ' + QUOTE_DATA.number + '*');
-    lines.push('');
-    lines.push('*Empresa:* ' + (BIZ_DATA.name || '—'));
-    lines.push('*Cliente:* ' + (QUOTE_DATA.clientName || '—'));
-    lines.push('*Fecha:* ' + (QUOTE_DATA.createdDate || '—'));
-    lines.push('*Estado:* ' + (QUOTE_DATA.status === 'aprobada' ? 'APROBADA' : QUOTE_DATA.status === 'enviada' ? 'ENVIADA' : 'BORRADOR'));
-    lines.push('');
-    lines.push('*Detalle de productos:*');
-
-    (QUOTE_DATA.items || []).forEach(function(item, idx) {
-      var qty = Number(item.quantity || 0);
-      var unit = Number(item.unitPrice || 0);
-      var discount = Number(item.discount || 0);
-      var sub = (qty * unit * (1 - discount / 100)).toFixed(2);
-      var desc = discount > 0 ? ' | Dcto: ' + discount.toFixed(2) + '%' : '';
-      lines.push((idx + 1) + '. ' + item.productName);
-      lines.push('   Cant: ' + qty + ' x S/ ' + unit.toFixed(2) + desc);
-      lines.push('   Subtotal: *S/ ' + sub + '*');
-    });
-
-    lines.push('');
-    lines.push('*TOTAL COTIZADO: S/ ' + Number(QUOTE_DATA.total || 0).toFixed(2) + '*');
-    lines.push('');
-    lines.push('Si deseas el PDF, puedes adjuntarlo manualmente desde tu descarga.');
-    lines.push('Gracias por tu preferencia 🙌');
-    lines.push('');
-    lines.push('Atendido por: ' + (QUOTE_DATA.userName || '—'));
-
-    return encodeURIComponent(lines.join('\\n'));
+  // ── WhatsApp desde el modal ───────────────────────────────────────────────
+  const handleWhatsApp = () => {
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length < 9) { setPhoneError('Ingresa un número válido de 9 dígitos'); return }
+    setPhoneError('')
+    const intl      = cleaned.startsWith('51') ? cleaned : `51${cleaned}`
+    const itemLines = (q.items||[]).map(item => {
+      const stBruto = parseFloat((item.quantity * item.unitPrice).toFixed(2))
+      const impDesc = parseFloat((stBruto * (item.discount||0) / 100).toFixed(2))
+      const total   = parseFloat((stBruto - impDesc).toFixed(2))
+      const dscPart = impDesc > 0 ? ` | Dto.${item.discount}%: -S/${impDesc.toFixed(2)}` : ''
+      return `• ${item.productName}: ${item.quantity} ${item.unit||'u'} × S/${Number(item.unitPrice).toFixed(2)} = S/${stBruto.toFixed(2)}${dscPart} → *Total: S/${total.toFixed(2)}*`
+    })
+    const lines = [
+      `*${biz.name||'Mi Negocio'}*`,
+      biz.ruc ? `RUC: ${biz.ruc}` : null,
+      `─────────────────────`,
+      `*COTIZACIÓN ${q.number}*`,
+      `Cliente: ${q.clientName||'Sin cliente'}`,
+      `Válida hasta: ${expiryDate}`,
+      `─────────────────────`,
+      ...itemLines,
+      `─────────────────────`,
+      `*TOTAL: S/ ${Number(q.total).toFixed(2)}*`,
+      q.note ? `Nota: ${q.note}` : null,
+      `Para confirmar citar N°: ${q.number}`,
+    ].filter(Boolean).join('\n')
+    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(lines)}`, '_blank')
+    setShowPhone(false); setPhone('')
   }
 
-  function openWhatsAppModal() {
-    var backdrop = document.getElementById('wa-modal-backdrop');
-    var input = document.getElementById('wa-phone-input');
-    var error = document.getElementById('wa-error');
-    var linkWrap = document.getElementById('wa-link-wrap');
-    var link = document.getElementById('wa-manual-link');
-
-    if (error) { error.style.display = 'none'; error.textContent = ''; }
-    if (linkWrap) linkWrap.style.display = 'none';
-    if (link) link.href = '#';
-
-    backdrop.classList.add('show');
-    backdrop.setAttribute('aria-hidden', 'false');
-    setTimeout(function() { if (input) input.focus(); }, 40);
+  // ── Ticket 80mm (uso interno) ─────────────────────────────────────────────
+  const handlePrint80mm = () => {
+    const win = window.open('', '_blank', 'width=380,height=680')
+    if (!win) { toast.error('Activa las ventanas emergentes'); return }
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:10px;width:80mm;padding:4mm;color:#000;background:#fff}
+.hr{border:none;border-top:1px dashed #000;margin:2.5mm 0}.row{display:flex;justify-content:space-between}.center{text-align:center}.bold{font-weight:bold}
+.fab{position:fixed;bottom:12px;right:12px;background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700}
+@page{size:80mm auto;margin:0}@media print{.fab{display:none}}</style></head><body>
+${biz.logoUrl ? `<div class="center" style="margin-bottom:2mm"><img src="${biz.logoUrl}" style="max-width:48mm;max-height:16mm;object-fit:contain" onerror="this.style.display='none'"></div>` : ''}
+<div class="center bold" style="font-size:12px">${(biz.name||'MI NEGOCIO').toUpperCase()}</div>
+${biz.ruc ? `<div class="center">RUC: ${biz.ruc}</div>` : ''}
+<hr class="hr">
+<div class="center bold">COTIZACIÓN</div>
+<div class="center bold" style="font-size:12px">${q.number}</div>
+<hr class="hr">
+<div>Cliente: ${q.clientName||'Sin cliente'}</div>
+<div>Válida hasta: ${expiryDate}</div>
+<hr class="hr">
+${(q.items||[]).map(i => {
+      const stBruto   = parseFloat((i.quantity*i.unitPrice).toFixed(2))
+      const impDesc   = parseFloat((stBruto*(i.discount||0)/100).toFixed(2))
+      const totalNeto = parseFloat((stBruto - impDesc).toFixed(2))
+      return `<div class="bold">${i.productName}</div>
+<div class="row"><span>${i.quantity} ${i.unit||'u'} x S/${Number(i.unitPrice).toFixed(2)}</span><span>S/${stBruto.toFixed(2)}</span></div>${impDesc>0?`<div class="row"><span>Dto. ${i.discount}%:</span><span style="color:#dc2626">-S/${impDesc.toFixed(2)}</span></div>`:''}
+<div class="row bold"><span>Total:</span><span>S/${totalNeto.toFixed(2)}</span></div>`
+    }).join('<hr class="hr">')}
+<hr class="hr">
+<div class="row bold" style="font-size:12px"><span>TOTAL:</span><span>S/${Number(q.total).toFixed(2)}</span></div>
+<hr class="hr">
+<div class="center" style="font-size:9px">Confirmar citando N°: ${q.number}</div>
+<button class="fab" onclick="window.print()">🖨️ Imprimir 80mm</button>
+</body></html>`)
+    win.document.close()
   }
 
-  function closeWhatsAppModal() {
-    var backdrop = document.getElementById('wa-modal-backdrop');
-    backdrop.classList.remove('show');
-    backdrop.setAttribute('aria-hidden', 'true');
-  }
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col" style={{maxHeight:'92vh'}}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500 text-lg">📋</span>
+              <h2 className="font-bold text-gray-800 dark:text-slate-100">Documento de Cotización</h2>
+            </div>
+            <p className="text-xs text-blue-500 font-mono mt-0.5">{q.number} · {q.clientName||'Sin cliente'}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        {/* Vista previa A4 integrada — colorScheme light para todos los temas */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-200 dark:bg-slate-900" style={{colorScheme:'light'}}>
+          <div className="mx-auto bg-white shadow-lg" style={{width:'100%',maxWidth:'480px',fontFamily:'Arial,sans-serif',fontSize:'11px',color:'#111111',WebkitTextFillColor:'#111111',padding:'20px',border:'1px solid #d1d5db',colorScheme:'light'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'14px'}}>
+              <div>
+                {biz.logoUrl && <img src={biz.logoUrl} alt="" style={{maxHeight:'44px',maxWidth:'140px',objectFit:'contain',marginBottom:'6px',display:'block'}} onError={e => e.target.style.display='none'}/>}
+                <div style={{fontSize:'14px',fontWeight:'800',color:'#111'}}>{biz.name||'MI NEGOCIO'}</div>
+                {biz.ruc     && <div style={{fontSize:'10px',color:'#555'}}>R.U.C.: {biz.ruc}</div>}
+                {biz.address && <div style={{fontSize:'10px',color:'#555'}}>{biz.address}</div>}
+                {biz.phone   && <div style={{fontSize:'10px',color:'#555'}}>Tel: {biz.phone}</div>}
+              </div>
+              <div style={{border:'2px solid #2563eb',borderRadius:'6px',padding:'8px 12px',textAlign:'center',minWidth:'130px'}}>
+                <div style={{fontSize:'8px',fontWeight:'700',color:'#6b7280',textTransform:'uppercase',letterSpacing:'.05em'}}>Documento Comercial</div>
+                <div style={{fontSize:'16px',fontWeight:'900',color:'#111',margin:'3px 0',letterSpacing:'.04em'}}>COTIZACIÓN</div>
+                <div style={{fontSize:'13px',fontWeight:'900',color:'#2563eb',fontFamily:'monospace'}}>{q.number}</div>
+                <div style={{fontSize:'9px',color:'#6b7280',marginTop:'3px'}}>Estado: <strong style={{color:'#2563eb'}}>{stLabel}</strong></div>
+              </div>
+            </div>
+            <hr style={{border:'none',borderTop:'2px solid #2563eb',margin:'10px 0'}}/>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'12px'}}>
+              {[{label:'Cliente',val:q.clientName||'Sin cliente'},{label:'Fecha de emisión',val:createdDate},{label:'Válida hasta',val:expiryDate,sub:`${q.validDays} día${q.validDays>1?'s':''} de validez`},{label:'Elaborado por',val:q.userName||'—',sub:`Citar N° ${q.number}`}].map(m => (
+                <div key={m.label} style={{background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'5px',padding:'8px'}}>
+                  <div style={{fontSize:'8px',textTransform:'uppercase',letterSpacing:'.06em',color:'#9ca3af',fontWeight:'700',marginBottom:'3px'}}>{m.label}</div>
+                  <div style={{fontSize:'11px',fontWeight:'600',color:'#111'}}>{m.val}</div>
+                  {m.sub && <div style={{fontSize:'9px',color:'#6b7280'}}>{m.sub}</div>}
+                </div>
+              ))}
+            </div>
+            <table style={{width:'100%',borderCollapse:'collapse',marginBottom:'12px'}}>
+              <thead>
+                <tr style={{background:'#2563eb',color:'#fff'}}>
+                  {[['DESCRIPCIÓN','left'],['CANT.','center'],['P. UNIT.','right'],['SUBTOTAL','right'],['DTO.%','center'],['IMP. DESC.','right'],['TOTAL','right']].map(([h,align]) => (
+                    <th key={h} style={{padding:'5px 6px',fontSize:'8px',fontWeight:'700',textAlign:align}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(q.items||[]).map((item,idx) => {
+                  const subtotalBruto = parseFloat((item.quantity*item.unitPrice).toFixed(2))
+                  const importeDesc   = parseFloat((subtotalBruto*(item.discount||0)/100).toFixed(2))
+                  const totalNeto     = parseFloat((subtotalBruto - importeDesc).toFixed(2))
+                  const cs = {fontSize:'10px',color:'#111',borderBottom:'1px solid #e5e7eb',padding:'5px 6px'}
+                  return (
+                    <tr key={idx} style={{background:idx%2===1?'#eff6ff':'#fff'}}>
+                      <td style={cs}>{item.productName}<br/><span style={{fontSize:'8px',color:'#9ca3af'}}>{item.unit||'u'}</span></td>
+                      <td style={{...cs,textAlign:'center'}}>{item.quantity}</td>
+                      <td style={{...cs,textAlign:'right'}}>S/ {Number(item.unitPrice).toFixed(2)}</td>
+                      <td style={{...cs,textAlign:'right'}}>S/ {subtotalBruto.toFixed(2)}</td>
+                      <td style={{...cs,textAlign:'center'}}>{item.discount||0}%</td>
+                      <td style={{...cs,textAlign:'right',color:importeDesc>0?'#dc2626':'#9ca3af'}}>{importeDesc>0?`-S/ ${importeDesc.toFixed(2)}`:'—'}</td>
+                      <td style={{...cs,textAlign:'right',fontWeight:'700'}}>S/ {totalNeto.toFixed(2)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div style={{marginLeft:'auto',width:'220px'}}>
+              {[{l:'Base imponible:',v:`S/ ${base.toFixed(2)}`,r:false},{l:'Descuentos totales:',v:`-S/ ${totalDesc.toFixed(2)}`,r:totalDesc>0},{l:'IGV (18%):',v:`S/ ${igv.toFixed(2)}`,r:false}].map(row => (
+                <div key={row.l} style={{display:'flex',justifyContent:'space-between',fontSize:'10px',color:row.r?'#dc2626':'#555',padding:'2px 0'}}>
+                  <span>{row.l}</span><span>{row.v}</span>
+                </div>
+              ))}
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:'13px',fontWeight:'800',background:'#2563eb',color:'#fff',padding:'8px 10px',borderRadius:'5px',marginTop:'4px'}}>
+                <span>TOTAL A PAGAR:</span><span>S/ {Number(q.total).toFixed(2)}</span>
+              </div>
+            </div>
+            {q.note && (
+              <div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'5px',padding:'8px 10px',marginTop:'10px',fontSize:'10px',color:'#1e40af'}}>
+                <strong>Notas / Condiciones:</strong><br/>{q.note}
+              </div>
+            )}
+            <div style={{marginTop:'12px',paddingTop:'10px',borderTop:'1px solid #e5e7eb',fontSize:'9px',color:'#9ca3af',lineHeight:'1.6'}}>
+              <strong style={{color:'#374151'}}>Condiciones generales:</strong><br/>
+              • Válida hasta {expiryDate}. Pasada esta fecha no se garantizan los precios.<br/>
+              • Precios incluyen IGV 18%. Sujeto a disponibilidad de stock.<br/>
+              • Para confirmar citar N° <strong style={{color:'#374151'}}>{q.number}</strong>
+            </div>
+          </div>
+        </div>
+        {showPhone && (
+          <div className="px-5 py-4 border-t border-green-100 dark:border-green-900/50 bg-green-50 dark:bg-green-900/20 flex-shrink-0">
+            <p className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-2">📱 Enviar cotización por WhatsApp</p>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">+51</span>
+                <input type="tel" value={phone} onChange={e => { setPhone(e.target.value); setPhoneError('') }}
+                  placeholder="999 999 999" autoFocus maxLength={9}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-slate-700 dark:text-slate-100"
+                  onKeyDown={e => e.key === 'Enter' && handleWhatsApp()}/>
+              </div>
+              <button onClick={handleWhatsApp} className="px-4 py-2.5 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600">Enviar</button>
+              <button onClick={() => { setShowPhone(false); setPhone(''); setPhoneError('') }}
+                className="px-3 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">✕</button>
+            </div>
+            {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
+          </div>
+        )}
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-slate-700 flex-shrink-0 bg-white dark:bg-slate-800 rounded-b-2xl">
+          <div className="grid grid-cols-4 gap-2">
+            <button onClick={() => setShowPhone(p => !p)} className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-semibold transition-all ${showPhone ? 'bg-green-500 text-white' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 border border-green-200 dark:border-green-800'}`}>
+              <span className="text-lg">📱</span><span>WhatsApp</span>
+            </button>
+            <button onClick={handlePrintA4} className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 transition-all">
+              <span className="text-lg">📄</span><span>PDF A4</span><span className="text-[10px] font-normal opacity-60">Formal</span>
+            </button>
+            <button onClick={handlePrint80mm} className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-semibold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-100 border border-purple-200 dark:border-purple-800 transition-all">
+              <span className="text-lg">🖨️</span><span>Imprimir</span><span className="text-[10px] font-normal opacity-60">80mm</span>
+            </button>
+            <button onClick={onClose} className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-semibold bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 transition-all">
+              <span className="text-lg">✓</span><span>Cerrar</span>
+            </button>
+          </div>
+          <p className="text-center text-xs text-gray-400 dark:text-slate-500 mt-2">PDF A4 = documento formal · 80mm = resumen interno</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  function normalizePhone(raw) {
-    var cleanPhone = String(raw || '').replace(/[^0-9]/g, '');
-    if (cleanPhone.length === 9) cleanPhone = '51' + cleanPhone;
-    return cleanPhone;
-  }
+// ─── Vista de solo lectura de cotización ──────────────────────────────────────
+function QuotationViewModal({ q, onClose }) {
+  const totalDiscount = (q.items||[]).reduce((a, i) => a + i.quantity * i.unitPrice * (i.discount||0) / 100, 0)
+  const total         = (q.items||[]).reduce((a, i) => a + i.quantity * i.unitPrice * (1 - (i.discount||0) / 100), 0)
+  const st            = Q_STATUS[q.status] || Q_STATUS.borrador
 
-  function confirmSendWhatsApp() {
-    try {
-      var input = document.getElementById('wa-phone-input');
-      var error = document.getElementById('wa-error');
-      var linkWrap = document.getElementById('wa-link-wrap');
-      var link = document.getElementById('wa-manual-link');
+  const roField  = 'w-full px-3 py-2 border border-gray-100 dark:border-slate-700 rounded-lg text-sm bg-gray-50 dark:bg-slate-700/50 text-gray-700 dark:text-slate-200 cursor-default select-all'
+  const roLabel  = 'block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1'
 
-      if (error) { error.style.display = 'none'; error.textContent = ''; }
-      if (linkWrap) linkWrap.style.display = 'none';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
 
-      var phone = input ? input.value : '';
-      var cleanPhone = normalizePhone(phone);
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+          <div>
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              <h2 className="font-bold text-gray-800 dark:text-slate-100">Ver Cotización</h2>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+            </div>
+            <p className="text-xs text-indigo-500 font-mono mt-0.5">{q.number}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
 
-      if (!cleanPhone || cleanPhone.length < 11 || cleanPhone.length > 15) {
-        error.textContent = 'Número inválido. Usa formato internacional (ej. 51987654321).';
-        error.style.display = 'block';
-        return;
-      }
+        <div className="p-5 space-y-4">
 
-      var msg = buildWhatsAppMessage();
-      var url = 'https://wa.me/' + cleanPhone + '?text=' + msg;
+          {/* Cliente y validez */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={roLabel}>Cliente</label>
+              <div className={roField}>{q.clientName || 'Sin cliente'}</div>
+            </div>
+            <div>
+              <label className={roLabel}>Válida por (días)</label>
+              <div className={roField}>{q.validDays} día{q.validDays > 1 ? 's' : ''} · vence {q.expiresAt ? new Date(q.expiresAt).toLocaleDateString('es-PE') : '—'}</div>
+            </div>
+          </div>
 
-      var waWin = window.open(url, '_blank');
-      if (!waWin) {
-        if (link) link.href = url;
-        if (linkWrap) linkWrap.style.display = 'block';
-        error.textContent = 'Tu navegador bloqueó la apertura automática. Usa el botón verde para abrir WhatsApp.';
-        error.style.display = 'block';
-        return;
-      }
+          {/* Tabla de ítems */}
+          {(q.items||[]).length > 0 && (
+            <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-700/50 border-b border-gray-100 dark:border-slate-700">
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-left">Producto</th>
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-center">Cant.</th>
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">P. Unit.</th>
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">Subtotal</th>
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-center">Dto.%</th>
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">Imp. Desc.</th>
+                    <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                  {(q.items||[]).map((item, idx) => {
+                    const subtotalBruto = parseFloat((item.quantity * item.unitPrice).toFixed(2))
+                    const importeDesc   = parseFloat((subtotalBruto * (item.discount||0) / 100).toFixed(2))
+                    const totalNeto     = parseFloat((subtotalBruto - importeDesc).toFixed(2))
+                    return (
+                      <tr key={idx} className="bg-white dark:bg-slate-800">
+                        <td className="px-3 py-2">
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{item.productName}</p>
+                          <p className="text-xs text-gray-400 dark:text-slate-500">{item.unit}</p>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">{item.quantity}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span className="text-sm text-gray-500 dark:text-slate-400">{formatCurrency(item.unitPrice)}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span className="text-sm text-gray-700 dark:text-slate-200">{formatCurrency(subtotalBruto)}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="text-sm text-gray-600 dark:text-slate-300">{item.discount||0}%</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {importeDesc > 0
+                            ? <span className="text-sm font-medium text-red-500 dark:text-red-400">-{formatCurrency(importeDesc)}</span>
+                            : <span className="text-sm text-gray-300 dark:text-slate-600">—</span>
+                          }
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <span className="text-sm font-bold text-gray-800 dark:text-slate-100">{formatCurrency(totalNeto)}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <div className="border-t border-gray-100 dark:border-slate-700">
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between items-center px-4 py-2 bg-red-50 dark:bg-red-900/10">
+                    <span className="text-xs font-medium text-red-600 dark:text-red-400">Descuentos aplicados</span>
+                    <span className="text-xs font-semibold text-red-600 dark:text-red-400">-{formatCurrency(totalDiscount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center px-4 py-2.5 bg-gray-50 dark:bg-slate-700/50">
+                  <span className="text-sm font-semibold text-gray-600 dark:text-slate-300">TOTAL COTIZACIÓN</span>
+                  <span className="text-base font-bold text-gray-800 dark:text-slate-100">{formatCurrency(total)}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
-      closeWhatsAppModal();
-    } catch (err) {
-      var error = document.getElementById('wa-error');
-      if (error) {
-        error.textContent = 'No se pudo preparar el envío: ' + err.message;
-        error.style.display = 'block';
-      }
-    }
-  }
+          {/* Nota */}
+          <div>
+            <label className={roLabel}>Nota / Condiciones de la cotización</label>
+            <div className={`${roField} min-h-[60px] whitespace-pre-wrap`}>
+              {q.note || <span className="text-gray-300 dark:text-slate-600 italic">Sin notas</span>}
+            </div>
+          </div>
 
-  async function sendWhatsAppMessage() {
-    openWhatsAppModal();
-  }
-</script>
-</body></html>`
+          {/* Botón cerrar */}
+          <div className="pt-2">
+            <button onClick={onClose}
+              className="w-full py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── Formulario de cotización ─────────────────────────────────────────────────
@@ -481,12 +545,16 @@ function QuotationForm({ quotation, onClose, onSave }) {
   }
 
   const updateItem = (idx, field, val) =>
-    setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: parseFloat(val) || 0 } : item))
+    setItems(prev => prev.map((item, i) => i === idx
+      ? { ...item, [field]: field === 'quantity' ? (parseInt(val) || 1) : (parseFloat(val) || 0) }
+      : item))
 
   const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
 
+  const totalDiscount = items.reduce((a, i) => a + i.quantity * i.unitPrice * (i.discount || 0) / 100, 0)
   const total    = items.reduce((a, i) => a + i.quantity * i.unitPrice * (1 - i.discount / 100), 0)
   const client   = clients.find(c => c.id === clientId)
+  const expiresAt = quotation?.expiresAt || new Date(Date.now() + validDays * 86400000).toISOString()
 
   const handleSave = (status = 'borrador') => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
@@ -498,7 +566,7 @@ function QuotationForm({ quotation, onClose, onSave }) {
       items,
       note,
       validDays,
-      expiresAt:  new Date(new Date().getTime() + validDays * 86400000).toISOString(),
+      expiresAt:  new Date(Date.now() + validDays * 86400000).toISOString(),
       total:      parseFloat(total.toFixed(2)),
       status,
       userId:     currentUser?.id,
@@ -592,15 +660,21 @@ function QuotationForm({ quotation, onClose, onSave }) {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-700/50 border-b border-gray-100 dark:border-slate-700">
-                {['Producto','Cant.','P. Unit.','Dto.%','V. Desc.','Subtotal',''].map(h => (
-                  <th key={h} className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-left">{h}</th>
-                ))}
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-left">Producto</th>
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-center">Cant.</th>
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">P. Unit.</th>
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">Subtotal</th>
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-center">Dto.%</th>
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">Imp. Desc.</th>
+                <th className="text-xs font-medium text-gray-500 dark:text-slate-400 px-3 py-2 text-right">Total</th>
+                <th className="px-2 py-2"/>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {items.map((item, idx) => {
-                const sub = parseFloat((item.quantity * item.unitPrice * (1 - item.discount/100)).toFixed(2))
-                const discountValue = parseFloat((item.quantity * item.unitPrice * (item.discount/100)).toFixed(2))
+                const subtotalBruto = parseFloat((item.quantity * item.unitPrice).toFixed(2))
+                const importeDesc   = parseFloat((subtotalBruto * (item.discount || 0) / 100).toFixed(2))
+                const totalNeto     = parseFloat((subtotalBruto - importeDesc).toFixed(2))
                 return (
                   <tr key={idx}>
                     <td className="px-3 py-2">
@@ -610,20 +684,32 @@ function QuotationForm({ quotation, onClose, onSave }) {
                     <td className="px-3 py-2">
                       <input type="number" min="1" step="1" value={item.quantity}
                         onChange={e => updateItem(idx,'quantity',e.target.value)}
-                        className="w-16 text-center px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"/>
+                        className="w-14 text-center px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"/>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="text-sm text-gray-500 dark:text-slate-400">{formatCurrency(item.unitPrice)}</span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="text-sm text-gray-700 dark:text-slate-200">{formatCurrency(subtotalBruto)}</span>
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" min="0" step="0.01" value={item.unitPrice} disabled
-                        className="w-20 text-right px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm dark:bg-slate-600 dark:text-slate-300 bg-gray-100 text-gray-500 cursor-not-allowed focus:outline-none"/>
+                      <div className="flex items-center justify-center gap-1">
+                        <input type="number" min="0" max="100" step="1" value={item.discount}
+                          onChange={e => updateItem(idx,'discount',e.target.value)}
+                          className="w-12 text-center px-1.5 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"/>
+                        <span className="text-xs text-gray-400 dark:text-slate-500">%</span>
+                      </div>
                     </td>
-                    <td className="px-3 py-2">
-                      <input type="number" min="0" max="100" step="0.01" value={item.discount}
-                        onChange={e => updateItem(idx,'discount',e.target.value)}
-                        className="w-24 text-center px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"/>
+                    <td className="px-3 py-2 text-right">
+                      {importeDesc > 0
+                        ? <span className="text-sm font-medium text-red-500 dark:text-red-400">-{formatCurrency(importeDesc)}</span>
+                        : <span className="text-sm text-gray-300 dark:text-slate-600">—</span>
+                      }
                     </td>
-                    <td className="px-3 py-2 text-sm font-medium text-gray-800 dark:text-slate-100">{formatCurrency(discountValue)}</td>
-                    <td className="px-3 py-2 text-sm font-medium text-gray-800 dark:text-slate-100">{formatCurrency(sub)}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-right">
+                      <span className="text-sm font-bold text-gray-800 dark:text-slate-100">{formatCurrency(totalNeto)}</span>
+                    </td>
+                    <td className="px-2 py-2">
                       <button onClick={() => removeItem(idx)} className="text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
@@ -635,9 +721,17 @@ function QuotationForm({ quotation, onClose, onSave }) {
               })}
             </tbody>
           </table>
-          <div className="flex justify-between items-center px-4 py-2.5 bg-gray-50 dark:bg-slate-700/50 border-t border-gray-100 dark:border-slate-700">
-            <span className="text-sm font-semibold text-gray-600 dark:text-slate-300">TOTAL COTIZACIÓN</span>
-            <span className="text-base font-bold text-gray-800 dark:text-slate-100">{formatCurrency(total)}</span>
+          <div className="border-t border-gray-100 dark:border-slate-700">
+            {totalDiscount > 0 && (
+              <div className="flex justify-between items-center px-4 py-2 bg-red-50 dark:bg-red-900/10">
+                <span className="text-xs font-medium text-red-600 dark:text-red-400">Descuentos aplicados</span>
+                <span className="text-xs font-semibold text-red-600 dark:text-red-400">-{formatCurrency(totalDiscount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center px-4 py-2.5 bg-gray-50 dark:bg-slate-700/50">
+              <span className="text-sm font-semibold text-gray-600 dark:text-slate-300">TOTAL COTIZACIÓN</span>
+              <span className="text-base font-bold text-gray-800 dark:text-slate-100">{formatCurrency(total)}</span>
+            </div>
           </div>
         </div>
       )}
@@ -670,8 +764,8 @@ function QuotationForm({ quotation, onClose, onSave }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
-export default function Quotations() {
-  const { businessConfig } = useStore()
+export default function Quotations({ onNavigate }) {
+  const { products, clients, currentUser, businessConfig } = useStore()
 
   const [quotations, setQuotations] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_quotations') || '[]') } catch { return [] }
@@ -683,6 +777,7 @@ export default function Quotations() {
   }
 
   const [modal,        setModal]        = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('todas')
   const dq = useDebounce(search, 150)
@@ -722,12 +817,67 @@ export default function Quotations() {
     toast.success(`Estado actualizado: ${Q_STATUS[status]?.label}`)
   }
 
-  // ── PUNTO 1, 2, 3, 4: Convertir a venta con todas las restricciones ─────────
+  // ── Convertir cotización aprobada en venta en el POS ────────────────────────
+  const handleConvertToSale = (q) => {
+    if (q.status !== 'aprobada') {
+      toast.error('Solo las cotizaciones "Aprobadas" pueden convertirse en venta')
+      return
+    }
+    // c) No se puede convertir una cotización fuera de fecha
+    if (q.expiresAt && new Date(q.expiresAt) < new Date()) {
+      toast.error(`La cotización ${q.number} ha vencido (${new Date(q.expiresAt).toLocaleDateString('es-PE')}). No se puede convertir en venta.`)
+      return
+    }
+
+    // a) Construir cada línea del carrito con los valores exactos de la cotización:
+    //    unitPrice del momento de la cotización (no el precio actual del producto),
+    //    discount en soles, subtotal = (Cant × P.Unit) - Descuento
+    const cartItems = q.items.map(item => {
+      const product    = products.find(p => p.id === item.productId)
+      if (!product) return null
+      const discountAmt = parseFloat((item.quantity * item.unitPrice * (item.discount || 0) / 100).toFixed(2))
+      // subtotal DEBE ser bruto (qty × price) para que calcCartTotals no descuente dos veces.
+      // El POS calcula: total = subtotal - discount. Si subtotal ya fuera neto, habría doble descuento.
+      const subtotal    = parseFloat((item.quantity * item.unitPrice).toFixed(2))
+      return {
+        _key:        product.id,
+        id:          crypto.randomUUID(),
+        productId:   product.id,
+        variantId:   null,
+        productName: item.productName || product.name,
+        barcode:     product.barcode,
+        quantity:    item.quantity,
+        unitPrice:   item.unitPrice,   // precio de la cotización, no el precio vigente
+        discount:    discountAmt,      // monto en soles
+        subtotal,                      // bruto = qty × price (el POS descuenta aparte)
+        unit:        item.unit || product.unit || 'unidad',
+      }
+    }).filter(Boolean)
+
+    useStore.setState({ cart: cartItems })
+
+    // b) Nota con referencia completa: número, fecha, condiciones
+    const fechaCot = new Date(q.createdAt).toLocaleDateString('es-PE', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    })
+    const partes = [
+      `Ref. ${q.number}`,
+      `Fecha: ${fechaCot}`,
+      q.clientName && q.clientName !== 'Sin cliente' ? `Cliente: ${q.clientName}` : null,
+      q.note ? `Cond.: ${q.note}` : null,
+    ].filter(Boolean)
+    const notaReferencia = partes.join(' | ').slice(0, 200)
+
+    localStorage.setItem('pos_pending_note', notaReferencia)
+
+    handleStatusChange(q.id, 'convertida')
+    onNavigate?.('pos')
+    toast.success(`✅ ${q.number} cargada en el POS`, { duration: 4000 })
+  }
 
   // ── Punto 6: Emitir documento de cotización ───────────────────────────────
   const handleEmitirDocumento = (q) => {
-    const html = buildQuotationHTML(q, businessConfig)
-    setModal({ type: 'document', data: { quotation: q, html } })
+    setModal({ type: 'doc', data: q })
   }
 
   const handleDelete = (id) => {
@@ -777,6 +927,7 @@ export default function Quotations() {
           { s:'borrador',   label:'✏️ Borrador',   note:'Editable' },
           { s:'enviada',    label:'📤 Enviada',    note:'Al cliente' },
           { s:'aprobada',   label:'✅ Aprobada',   note:'Lista para venta', highlight: true },
+          { s:'convertida', label:'🛒 Convertida', note:'En POS' },
         ].map((f, i, arr) => (
           <span key={f.s} className="flex items-center gap-1">
             <span className={`flex flex-col items-center px-2 py-1 rounded-lg ${f.highlight ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 font-semibold border border-green-200 dark:border-green-800' : ''}`}>
@@ -835,6 +986,7 @@ export default function Quotations() {
                   const expired = isExpiredQ(q)
                   const status  = expired ? 'vencida' : q.status
                   const st      = Q_STATUS[status] || Q_STATUS.borrador
+                  const canConvert = status === 'aprobada' && !expired
 
                   return (
                     <tr key={q.id} className={`hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors ${expired ? 'opacity-70' : ''}`}>
@@ -859,10 +1011,22 @@ export default function Quotations() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 flex-wrap">
 
-                          {/* Punto 6: Emitir documento */}
+                          {/* Ver cotización (solo lectura) — solo cuando aún no está aprobada */}
+                          {q.status !== 'aprobada' && (
+                            <button onClick={() => setModal({ type: 'view', data: q })}
+                              className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                              title="Ver cotización">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                              </svg>
+                            </button>
+                          )}
+
+                          {/* Emitir documento — siempre visible */}
                           <button onClick={() => handleEmitirDocumento(q)}
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                            title="Ver / Imprimir documento de cotización">
+                            title="Emitir documento de cotización">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
@@ -884,12 +1048,18 @@ export default function Quotations() {
                             </button>
                           )}
 
-                          {/* Botón de venta removido cuando está aprobada por solicitud del usuario */}
-                          {/* La cotización aprobada se carga manualmente desde otra interfaz */}
+                          {/* Convertir a venta — SOLO APROBADA y no vencida */}
+                          {canConvert && (
+                            <button onClick={() => handleConvertToSale(q)}
+                              className="px-2 py-1 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap"
+                              title="Convertir en venta (pre-carga el POS)">
+                              🛒 → Venta
+                            </button>
+                          )}
 
                           {/* Rechazar */}
                           {['borrador','enviada','aprobada'].includes(q.status) && (
-                            <button onClick={() => handleStatusChange(q.id, 'rechazada')}
+                            <button onClick={() => setRejectTarget(q)}
                               className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Rechazar cotización">
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
@@ -913,33 +1083,23 @@ export default function Quotations() {
         </div>
       )}
 
-      {/* Modal documento de cotización (bloqueante) */}
-      {modal?.type === 'document' && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-6xl h-[92vh] overflow-hidden border border-gray-200 dark:border-slate-700">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900">
-              <div>
-                <h2 className="text-base font-bold text-gray-800 dark:text-slate-100">
-                  Documento de cotización
-                </h2>
-                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
-                  {modal.data?.quotation?.number} · {modal.data?.quotation?.clientName}
-                </p>
-              </div>
-              <button
-                onClick={() => setModal(null)}
-                className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-700">
-                Cerrar
-              </button>
-            </div>
+      {rejectTarget && (
+        <ConfirmModal
+          title="¿Rechazar esta cotización?"
+          message={`La cotización ${rejectTarget.number} de ${rejectTarget.clientName} pasará al estado "Rechazada". Esta acción no se puede deshacer.`}
+          confirmLabel="Sí, rechazar"
+          variant="danger"
+          onConfirm={() => { handleStatusChange(rejectTarget.id, 'rechazada'); setRejectTarget(null) }}
+          onCancel={() => setRejectTarget(null)}
+        />
+      )}
 
-            <iframe
-              title="Documento de cotización"
-              srcDoc={modal.data?.html || ''}
-              className="w-full h-[calc(92vh-58px)] border-0 bg-white"
-            />
-          </div>
-        </div>
+      {modal?.type === 'view' && (
+        <QuotationViewModal q={modal.data} onClose={() => setModal(null)}/>
+      )}
+
+      {modal?.type === 'doc' && (
+        <QuotationDocModal q={modal.data} businessConfig={businessConfig} onClose={() => setModal(null)}/>
       )}
 
       {/* Modal formulario */}

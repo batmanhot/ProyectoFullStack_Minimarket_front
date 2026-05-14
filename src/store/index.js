@@ -131,6 +131,8 @@ export const useStore = create(
           discountCampaigns: s.discountCampaigns,
           discountTickets:   s.discountTickets,
           returns:           s.returns,
+          // Merma
+          mermaRecords:      s.mermaRecords,
           // Sesiones de usuarios
           activeSessions:    s.activeSessions,
           sessionHistory:    s.sessionHistory,

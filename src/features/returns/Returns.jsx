@@ -112,11 +112,14 @@ function KpiCard({ label, value, sub, color = 'gray', icon }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
+// Razones que requieren enviar el producto a merma en vez de stock regular
+const MERMA_REASONS_SET = new Set(['defectuoso', 'vencido', 'incompleto'])
+
 export default function Returns() {
   const {
     sales, clients, products,
     returns: existingReturns = [],
-    addReturn, updateSale, updateProduct, addAuditLog,
+    addReturn, updateSale, updateProduct, addAuditLog, addMermaRecord,
     businessConfig, systemConfig, currentUser,
   } = useStore()
 
@@ -271,9 +274,37 @@ export default function Returns() {
 
     addReturn(nc)
 
+    const goesToMerma = MERMA_REASONS_SET.has(reason)
+
     ncItems.forEach(ncItem => {
       const product = products.find(p => p.id === ncItem.productId)
-      if (product) updateProduct(ncItem.productId, { stock: product.stock + ncItem.quantity })
+      if (!product) return
+
+      if (goesToMerma) {
+        // Defectuoso / Vencido / Incompleto → NO regresa a stock, va a merma
+        addMermaRecord?.({
+          id:          crypto.randomUUID(),
+          productId:   ncItem.productId,
+          productName: ncItem.productName,
+          quantity:    ncItem.quantity,
+          reason:      `${nc.reasonLabel} — Dev. cliente (NC ${ncNumber})`,
+          status:      'en_merma',
+          createdAt:   now,
+          batchNumber: null,
+          expiryDate:  null,
+          unitCost:    product.priceBuy || 0,
+          totalLoss:   parseFloat(((product.priceBuy || 0) * ncItem.quantity).toFixed(2)),
+          userId:      currentUser?.id,
+          userName:    currentUser?.fullName || currentUser?.username,
+          supplierId:  product.supplierId || null,
+          supplierName: null,
+          ncNumber,
+          invoiceRef:  foundSale.invoiceNumber,
+        })
+      } else {
+        // Equivocado / Insatisfecho / Otro → sí regresa a stock regular
+        updateProduct(ncItem.productId, { stock: product.stock + ncItem.quantity })
+      }
     })
 
     const totalOriginalQty = foundSale.items.reduce((a, i) => a + i.quantity, 0)
@@ -358,7 +389,7 @@ export default function Returns() {
           <div className="flex-1 min-w-0 space-y-5">
 
             {/* ─── PASO 1: BUSCAR VENTA ─────────────────────────────────── */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
               {/* Título del paso */}
               <div className={`px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex items-center gap-3 ${
                 step !== 'search' ? 'bg-emerald-50 dark:bg-emerald-900/10' : 'bg-white dark:bg-slate-800'
@@ -406,7 +437,7 @@ export default function Returns() {
 
                   {/* Dropdown de sugerencias */}
                   {showRecent && (searchSuggestions.length > 0 || (!query && recentSales.length > 0)) && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl z-20 overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl z-50 overflow-hidden">
                       <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
                         <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
                           {query ? 'Coincidencias' : 'Ventas recientes'}
@@ -486,6 +517,17 @@ export default function Returns() {
                 </div>
 
                 <div className="p-6">
+                  {/* Aviso bundles */}
+                  {selectedItems.some(i => products.find(p => p.id === i.productId)?.type === 'bundle') && (
+                    <div className="mb-4 flex items-start gap-3 p-3.5 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl text-xs text-orange-700 dark:text-orange-300">
+                      <span className="text-base shrink-0">🎁</span>
+                      <div>
+                        <p className="font-semibold mb-0.5">Producto tipo Bundle / Kit detectado</p>
+                        <p>La devolución se procesa sobre el bundle completo. El sistema restaura el stock del bundle (no de sus componentes individuales). Si los componentes deben volver al almacén por separado, registra cada uno manualmente en <strong>Merma</strong> o <strong>Inventario</strong>.</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Cabecera */}
                   <div className="grid gap-4 px-4 py-2.5 mb-3 rounded-xl bg-gray-50 dark:bg-slate-700/40 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide"
                     style={{ gridTemplateColumns: '1fr 90px 70px 70px 100px' }}>
@@ -621,6 +663,12 @@ export default function Returns() {
                     />
                   )}
 
+                  {reason && MERMA_REASONS_SET.has(reason) && hasSelection && (
+                    <div className="mb-3 flex items-start gap-3 p-3.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300">
+                      <span className="text-base shrink-0">⚠️</span>
+                      <p><strong>Los productos devueltos NO regresarán al stock regular.</strong> Se registrarán automáticamente en el <strong>Almacén de Merma</strong> con referencia a esta Nota de Crédito para su tramitación (reposición, devolución al proveedor o baja).</p>
+                    </div>
+                  )}
                   <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl text-xs text-amber-700 dark:text-amber-300">
                     <span className="text-base shrink-0">📋</span>
                     <p><strong>Nota de Crédito Electrónica:</strong> Este documento anula parcial o totalmente la boleta original y queda registrado en el sistema de auditoría.</p>
@@ -830,6 +878,9 @@ export default function Returns() {
                           <span className="text-base">{RETURN_REASONS.find(x => x.value === r.reason)?.icon || '📝'}</span>
                           <span className="text-xs text-gray-600 dark:text-slate-300">{r.reasonLabel}</span>
                         </div>
+                        {MERMA_REASONS_SET.has(r.reason) && (
+                          <span className="inline-block mt-1 text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-medium">⚠️ En merma</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600 dark:text-slate-300">{r.userName}</td>
                       <td className="px-4 py-4">

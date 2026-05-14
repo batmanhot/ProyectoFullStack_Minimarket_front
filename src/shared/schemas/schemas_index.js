@@ -31,16 +31,6 @@ export const productSchema = z.object({
   // 'serie'     → cada unidad con número de serie único (electrónica, óptica)
   stockControl: z.enum(['simple','lote_fefo','lote_fifo','serie']).default('simple'),
 
-  // ── Bundle / Kit ─────────────────────────────────────────────────────────
-  // 'simple'  → producto individual normal (por defecto)
-  // 'bundle'  → producto compuesto: al vender descuenta stock de sus componentes
-  //             El bundle NO tiene stock propio — se calcula como min(stock_componentes)
-  type:       z.enum(['simple','bundle']).default('simple'),
-  components: z.array(z.object({
-    productId: z.string(),
-    quantity:  z.coerce.number().positive(),
-  })).optional().default([]),
-
 }).refine(d => d.priceSell >= d.priceBuy, {
   message: 'El precio de venta debe ser ≥ al precio de compra',
   path: ['priceSell'],

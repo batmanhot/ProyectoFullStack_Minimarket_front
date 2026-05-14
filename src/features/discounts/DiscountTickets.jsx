@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react'
 import { useStore } from '../../store/index'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel } from '../../shared/utils/export'
+import { ExcelButton } from '../../shared/components/ui/ExportButtons'
 import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -379,7 +380,7 @@ export default function DiscountTickets() {
           <p className="text-sm text-gray-400">Vales de descuento personalizados — uso único al portador</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="px-3 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50">📊 Excel</button>
+          <ExcelButton onClick={handleExport} />
           <button onClick={() => setModal({ type: 'form', data: null })}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>

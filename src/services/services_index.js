@@ -176,41 +176,7 @@ export const saleService = {
     const invoiceNumber = payload.invoiceNumber || 'VENTA'
     const enrichedItems = [] // items enriquecidos con info de lotes asignados
 
-    // ── Expandir Bundles/Kits antes de procesar el inventario ─────────────────
-    // Un bundle tiene type:'bundle' y components:[{productId, quantity}].
-    // Al vender 1 bundle, se expanden sus componentes y se descuenta el stock
-    // de cada componente individual. El bundle en sí no tiene stock propio.
-    const expandedItems = []
     for (const item of payload.items) {
-      const freshState = useStore.getState()
-      const product    = freshState.products.find(p => p.id === item.productId)
-      if (product?.type === 'bundle' && (product.components || []).length > 0) {
-        // Expandir: por cada unidad del bundle, agregar sus componentes
-        for (const comp of product.components) {
-          const compProduct = freshState.products.find(p => p.id === comp.productId)
-          expandedItems.push({
-            productId:   comp.productId,
-            productName: compProduct?.name || comp.productId,
-            quantity:    comp.quantity * item.quantity,
-            unitPrice:   0, // el precio ya está en el bundle padre
-            unit:        compProduct?.unit || 'unidad',
-            _fromBundle: item.productId,
-            _bundleName: product.name,
-          })
-        }
-        // El bundle padre va a enrichedItems sin descontar stock propio
-        enrichedItems.push({
-          ...item,
-          batchAllocations: [],
-          stockControlUsed: 'bundle',
-          isBundle: true,
-        })
-      } else {
-        expandedItems.push(item)
-      }
-    }
-
-    for (const item of expandedItems) {
       const freshState = useStore.getState()
       const product    = freshState.products.find(p => p.id === item.productId)
       if (!product) continue
@@ -423,25 +389,14 @@ export const cashService = {
       return acc + cashAmt
     }, 0)
 
-    // Pagos de deuda cobrados durante esta sesión
-    const sessionDebtPayments = (state.debtPayments || []).filter(p =>
-      new Date(p.createdAt) >= new Date(session.openedAt)
-    )
-    const debtCashTotal = sessionDebtPayments
-      .filter(p => p.method === 'efectivo')
-      .reduce((a, p) => a + (p.amount || 0), 0)
-    const totalDebtCollected = sessionDebtPayments.reduce((a, p) => a + (p.amount || 0), 0)
-
-    const expectedAmount = formatNumber(session.openingAmount + cashTotal + debtCashTotal)
+    const expectedAmount = formatNumber(session.openingAmount + cashTotal)
     const difference     = formatNumber(payload.countedAmount - expectedAmount)
 
     const closedSession = {
       ...session, closingAmount: payload.countedAmount, expectedAmount, difference,
       status: 'cerrada', notes: payload.notes || '', closedAt: new Date().toISOString(),
-      salesCount:          sessionSales.length,
-      totalSales:          formatNumber(sessionSales.reduce((a, s) => a + s.total, 0)),
-      totalDebtCollected:  formatNumber(totalDebtCollected),
-      debtPaymentsCount:   sessionDebtPayments.length,
+      salesCount: sessionSales.length,
+      totalSales: formatNumber(sessionSales.reduce((a, s) => a + s.total, 0)),
     }
     state.closeCashSession(closedSession)
     return ok(closedSession)

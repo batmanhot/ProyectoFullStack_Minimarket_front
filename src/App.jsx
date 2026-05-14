@@ -5,6 +5,7 @@ import { canAccess } from './config/app'
 import { useTheme } from './shared/hooks/useTheme'
 import Sidebar from './shared/components/ui/Sidebar'
 import ExcelPreviewHost from './shared/components/ui/ExcelPreviewHost'
+import PDFPreviewHost from './shared/components/ui/PDFPreviewHost'
 import Login from './features/auth/Login'
 import toast from 'react-hot-toast'
 
@@ -32,6 +33,8 @@ const Returns    = lazy(() => import('./features/returns/Returns'))
 const Settings   = lazy(() => import('./features/settings/Settings'))
 const LoyaltyConsulta = lazy(() => import('./features/loyalty/LoyaltyConsulta'))
 const Quotations = lazy(() => import('./features/quotations/Quotations'))
+const Merma           = lazy(() => import('./features/merma/Merma'))
+const CustomerDisplay = lazy(() => import('./features/pos/CustomerDisplay'))
 
 
 const PAGES = {
@@ -41,7 +44,7 @@ const PAGES = {
   cash: Cash, clients: Clients, reports: Reports,
   users: Users, audit: Audit, alerts: Alerts,
   discounts: Discounts, tickets: Tickets, returns: Returns,
-  settings: Settings, loyalty: LoyaltyConsulta, quotations: Quotations,
+  settings: Settings, loyalty: LoyaltyConsulta, quotations: Quotations, merma: Merma, 'customer-display': CustomerDisplay,
 }
 
 // ── PageFallback — spinner mientras carga el módulo lazy ──────────────────────
@@ -192,6 +195,7 @@ export default function App() {
         error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
       }}/>
       <ExcelPreviewHost/>
+      <PDFPreviewHost/>
     </div>
   )
 }

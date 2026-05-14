@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { downloadExcel, exportToExcel, exportToPDF }  from '../../shared/utils/export'
+import { ExcelButton, PDFButton }                       from '../../shared/components/ui/ExportButtons'
 import { useReportMetrics }                            from './hooks/useReportMetrics'
 import Modal                                            from '../../shared/components/ui/Modal'
 
@@ -181,6 +182,7 @@ export default function Reports() {
       IGV:         formatCurrency(igv),
       Total:       formatCurrency(s.total),
       Metodo:      s.payments?.map((p) => p.method).join(' + ') || '—',
+      'Nota de venta': s.note || '—',
     }
   }), [filteredSales])
 
@@ -203,12 +205,22 @@ export default function Reports() {
 
     } else if (tab === 'detalle_venta') {
       const rows = filteredSales.flatMap((s) =>
-        s.items?.map((item) => ({
-          Boleta: s.invoiceNumber, Fecha: formatDate(s.createdAt),
-          Producto: item.productName, Cantidad: item.quantity,
-          PrecioUnit: item.unitPrice, Descuento: item.discount || 0,
-          Subtotal: item.subtotal,
-        })) || []
+        s.items?.map((item) => {
+          const lotes = item.batchAllocations?.length
+            ? item.batchAllocations.map(b => `${b.batchNumber}(${b.quantity}u)`).join(', ')
+            : '—'
+          const venc = item.batchAllocations?.length
+            ? item.batchAllocations.map(b => b.expiryDate ? new Date(b.expiryDate).toLocaleDateString('es-PE') : '—').join(', ')
+            : '—'
+          return {
+            Boleta: s.invoiceNumber, Fecha: formatDate(s.createdAt),
+            Producto: item.productName, Cantidad: item.quantity,
+            PrecioUnit: item.unitPrice, Descuento: item.discount || 0,
+            Subtotal: item.subtotal,
+            Lote: lotes,
+            Vencimiento: venc,
+          }
+        }) || []
       )
       exportToExcel(rows, 'detalle_productos_ventas')
 
@@ -371,8 +383,8 @@ export default function Reports() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">Ventas diarias</h3>
               <div className="flex gap-2">
-                <button onClick={() => handleExportExcel('ventas')} className="text-xs text-blue-600 hover:underline">Excel</button>
-                <button onClick={() => handleExportPDF('ventas')}   className="text-xs text-blue-600 hover:underline">PDF</button>
+                <ExcelButton onClick={() => handleExportExcel('ventas')} />
+                <PDFButton   onClick={() => handleExportPDF('ventas')} />
               </div>
             </div>
             {dailyChart.length > 0 ? (
@@ -423,8 +435,8 @@ export default function Reports() {
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">Top 10 productos más vendidos</h3>
             <div className="flex gap-2">
-              <button onClick={() => handleExportExcel('productos')} className="text-xs text-blue-600 hover:underline">Excel</button>
-              <button onClick={() => handleExportPDF('productos')}   className="text-xs text-blue-600 hover:underline">PDF</button>
+              <ExcelButton onClick={() => handleExportExcel('productos')} />
+              <PDFButton   onClick={() => handleExportPDF('productos')} />
             </div>
           </div>
           <table className="w-full">
@@ -594,11 +606,7 @@ export default function Reports() {
               <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">
                 Rentabilidad por producto — top {Math.min(rentabilidadProductos.length, 50)}
               </h3>
-              <button
-                onClick={() => handleExportExcel('rentabilidad')}
-                className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
-                📊 Excel completo
-              </button>
+              <ExcelButton onClick={() => handleExportExcel('rentabilidad')} label="Excel completo" />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -669,9 +677,9 @@ export default function Reports() {
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-600 dark:text-slate-300">Click en una venta para ver el detalle de productos</p>
             <div className="flex gap-2">
-              <button onClick={handleExportOperaciones}              className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">📈 Excel operaciones</button>
-              <button onClick={() => handleExportExcel('detalle_venta')} className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">📊 Excel detalle</button>
-              <button onClick={() => handleExportPDF('ventas')}      className="px-3 py-1.5 text-xs border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">📄 PDF</button>
+              <ExcelButton onClick={handleExportOperaciones}                  label="Excel Ventas" />
+              <ExcelButton onClick={() => handleExportExcel('detalle_venta')} label="Excel Productos Vendidos" />
+              <PDFButton   onClick={() => handleExportPDF('ventas')} />
             </div>
           </div>
           <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
@@ -704,7 +712,7 @@ export default function Reports() {
                           </svg>
                         </div>
                       </div>
-                      <div className="px-4 pb-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-x-3 gap-y-2 border-t border-gray-50 dark:border-slate-700/50 pt-2">
+                      <div className="px-4 pb-2 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-x-3 gap-y-2 border-t border-gray-50 dark:border-slate-700/50 pt-2">
                         {[
                           { icon: '🕐', label: 'Fecha y Hora', val: new Date(s.createdAt).toLocaleString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) },
                           { icon: '📦', label: 'Cant. Productos', val: `${s.items?.length} prods · ${s.items?.reduce((a,i)=>a+i.quantity,0)} uds.` },
@@ -724,6 +732,15 @@ export default function Reports() {
                           </div>
                         ))}
                       </div>
+                      {s.note && (
+                        <div className="px-4 pb-3 flex items-start gap-1.5">
+                          <span className="text-gray-300 dark:text-slate-600 mt-0.5 flex-shrink-0">📝</span>
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-400 dark:text-slate-500 leading-none mb-0.5">Nota de venta</p>
+                            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 leading-tight">{s.note}</p>
+                          </div>
+                        </div>
+                      )}
                     </button>
 
                     {expandedSale === s.id && (
@@ -731,21 +748,20 @@ export default function Reports() {
                         <table className="w-full">
                           <thead>
                             <tr>
-                              {['Producto','Código','Cant.','P. Unit.','Descuento','Subtotal'].map((h) => (
-                                <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 pb-2 ${h === 'Producto' ? 'text-left' : 'text-right'}`}>{h}</th>
+                              {['Producto','Código','Cant.','P. Unit.','Descuento','Subtotal','Lote / Venc.'].map((h) => (
+                                <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 pb-2 ${h === 'Producto' ? 'text-left' : h === 'Lote / Venc.' ? 'text-left pl-4' : 'text-right'}`}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {s.items?.map((item, idx) => {
-                              // Descuento real: campaña + manual + totalDiscount (cualquiera que venga)
                               const itemDiscount = parseFloat((
                                 (item.totalDiscount || 0) ||
                                 ((item.campaignDiscount || 0) + (item.discount || 0))
                               ).toFixed(2))
-                              // Subtotal real: netTotal > subtotal > calculado
                               const itemSubtotal = item.netTotal ?? item.subtotal ??
                                 parseFloat(((item.quantity || 1) * item.unitPrice - itemDiscount).toFixed(2))
+                              const hasBatch = item.batchAllocations?.length > 0
 
                               return (
                               <tr key={idx} className="border-t border-gray-100 dark:border-slate-700">
@@ -758,6 +774,19 @@ export default function Reports() {
                                 </td>
                                 <td className="py-1.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">
                                   {formatCurrency(itemSubtotal)}
+                                </td>
+                                <td className="py-1.5 pl-4">
+                                  {hasBatch
+                                    ? item.batchAllocations.map((b, bi) => (
+                                        <div key={bi} className="flex flex-col">
+                                          <span className="text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400">{b.batchNumber}</span>
+                                          {b.expiryDate && (
+                                            <span className="text-[10px] text-gray-400 dark:text-slate-500">Venc: {new Date(b.expiryDate).toLocaleDateString('es-PE')}</span>
+                                          )}
+                                        </div>
+                                      ))
+                                    : <span className="text-xs text-gray-300 dark:text-slate-600">—</span>
+                                  }
                                 </td>
                               </tr>
                               )
@@ -816,7 +845,7 @@ export default function Reports() {
           <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">Notas de Crédito emitidas</h3>
-              <button onClick={() => handleExportExcel('devoluciones')} className="text-xs text-blue-600 hover:underline">Excel</button>
+              <ExcelButton onClick={() => handleExportExcel('devoluciones')} />
             </div>
             {returnMetrics.list.length === 0 ? (
               <div className="text-center py-8 text-sm text-green-500">✓ Sin devoluciones en el período</div>
@@ -853,8 +882,8 @@ export default function Reports() {
           <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">Cuentas por cobrar</h3>
             <div className="flex gap-2">
-              <button onClick={() => handleExportExcel('deuda')} className="text-xs text-blue-600 hover:underline">Excel</button>
-              <button onClick={() => handleExportPDF('deuda')}   className="text-xs text-blue-600 hover:underline">PDF</button>
+              <ExcelButton onClick={() => handleExportExcel('deuda')} />
+              <PDFButton   onClick={() => handleExportPDF('deuda')} />
             </div>
           </div>
           <table className="w-full">
@@ -892,7 +921,7 @@ export default function Reports() {
                 Capital inmovilizado: <span className="font-medium text-amber-600">{formatCurrency(sinMovimiento.capitalInmovilizado)}</span>
               </p>
             </div>
-            <button onClick={() => handleExportExcel('inmovilizado')} className="text-xs text-blue-600 hover:underline">Excel</button>
+            <ExcelButton onClick={() => handleExportExcel('inmovilizado')} />
           </div>
           <table className="w-full">
             <thead>

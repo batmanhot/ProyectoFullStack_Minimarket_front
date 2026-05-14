@@ -6,11 +6,44 @@ import { clientSchema } from '../../shared/schemas/index'
 import { clientService } from '../../services/index'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
+import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import Modal from '../../shared/components/ui/Modal'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
 import { PAYMENT_METHODS } from '../../config/app'
 import toast from 'react-hot-toast'
+
+// ── Helper: reimprimir recibo de pago de deuda ────────────────────────────────
+function reprintDebtReceipt(receipt, businessConfig) {
+  const now = new Date().toLocaleString('es-PE')
+  const m   = PAYMENT_METHODS.find(pm => pm.value === receipt.method)
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo ${receipt.receiptNumber}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:11px;width:80mm;padding:4mm}
+.center{text-align:center}.bold{font-weight:bold}.divider{border-top:1px dashed #000;margin:3mm 0}.row{display:flex;justify-content:space-between;margin:1.5mm 0}
+@media print{@page{size:80mm auto;margin:0}}</style></head><body>
+<div class="center bold" style="font-size:14px;margin-bottom:2mm">${businessConfig?.name || 'Mi Negocio'}</div>
+${businessConfig?.ruc ? `<div class="center">RUC: ${businessConfig.ruc}</div>` : ''}
+<div class="divider"></div>
+<div class="center bold">RECIBO DE PAGO DE DEUDA</div>
+<div class="center" style="font-size:10px">${receipt.receiptNumber}</div>
+<div class="divider"></div>
+<div class="row"><span>Fecha:</span><span>${new Date(receipt.createdAt).toLocaleString('es-PE')}</span></div>
+<div class="row"><span>Cliente:</span><span>${receipt.clientName}</span></div>
+<div class="divider"></div>
+<div class="row"><span>Deuda anterior:</span><span>S/ ${(receipt.previousDebt||0).toFixed(2)}</span></div>
+<div class="row bold"><span>PAGO RECIBIDO:</span><span>S/ ${(receipt.amount||0).toFixed(2)}</span></div>
+<div class="row"><span>Método:</span><span>${m?.icon || ''} ${m?.label || receipt.method}</span></div>
+${receipt.reference ? `<div class="row"><span>Referencia:</span><span>${receipt.reference}</span></div>` : ''}
+<div class="divider"></div>
+<div class="row bold"><span>DEUDA RESTANTE:</span><span>S/ ${(receipt.newDebt||0).toFixed(2)}</span></div>
+${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ DEUDA SALDADA COMPLETAMENTE</div>' : ''}
+<div class="divider"></div>
+<div class="center" style="font-size:10px">Reimpresión · ${now}</div>
+<script>window.onload=()=>{window.print();}<\/script></body></html>`
+  const win = window.open('','_blank','width=320,height=600')
+  win.document.write(html)
+  win.document.close()
+}
 
 function ClientForm({ client, onClose }) {
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(clientSchema), defaultValues: client || { documentType: 'DNI', creditLimit: 0 } })
@@ -300,8 +333,8 @@ export default function Clients() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
-          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
+          <ExcelButton onClick={handleExportExcel} />
+          <PDFButton   onClick={handleExportPDF} />
           <button onClick={() => setModal({ type: 'form', data: null })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>Nuevo cliente
           </button>
@@ -309,10 +342,11 @@ export default function Clients() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1 w-fit">
+      <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1 w-fit flex-wrap">
         {[
           { key: 'clientes', label: '👥 Clientes' },
-          { key: 'cxc',      label: `📒 Cuentas por cobrar${debtCount > 0 ? ` (${debtCount})` : ''}` },
+          { key: 'cxc',      label: `📒 Ctas. por cobrar${debtCount > 0 ? ` (${debtCount})` : ''}` },
+          { key: 'pagos',    label: `💳 Historial pagos${debtPayments?.length > 0 ? ` (${debtPayments.length})` : ''}` },
         ].map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
@@ -445,6 +479,81 @@ export default function Clients() {
           )}
         </div>
       )}
+
+      {/* ── TAB: HISTORIAL DE PAGOS DE DEUDA ── */}
+      {activeTab === 'pagos' && (() => {
+        const sortedPayments = [...(debtPayments || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        const totalCobrado   = sortedPayments.reduce((a, p) => a + (p.amount || 0), 0)
+        return (
+          <div className="space-y-4">
+            {/* KPI */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+                <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Total pagos registrados</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{sortedPayments.length}</p>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl p-4">
+                <p className="text-xs text-green-600 mb-1">Total cobrado en deudas</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{formatCurrency(totalCobrado)}</p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
+                <p className="text-xs text-blue-600 mb-1">Clientes que pagaron</p>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{new Set(sortedPayments.map(p => p.clientId)).size}</p>
+              </div>
+            </div>
+
+            {sortedPayments.length === 0 ? (
+              <div className="text-center py-16 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl">
+                <div className="text-5xl mb-3 opacity-20">💳</div>
+                <p className="text-gray-400 dark:text-slate-500 font-medium">Sin pagos de deuda registrados</p>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-slate-700/50 border-b border-gray-100 dark:border-slate-700">
+                      {['Recibo','Cliente','Monto','Método','Deuda anterior','Deuda restante','Fecha','Comprobante'].map(h => (
+                        <th key={h} className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide px-4 py-2.5 text-left whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                    {sortedPayments.map(p => {
+                      const m = PAYMENT_METHODS.find(pm => pm.value === p.method)
+                      return (
+                        <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+                          <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">{p.receiptNumber}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-100">{p.clientName}</td>
+                          <td className="px-4 py-3 text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
+                          <td className="px-4 py-3 text-xs text-gray-600 dark:text-slate-300">{m?.icon} {m?.label || p.method}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">{formatCurrency(p.previousDebt || 0)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-sm font-semibold ${(p.newDebt || 0) === 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {formatCurrency(p.newDebt || 0)}
+                              {(p.newDebt || 0) === 0 && <span className="text-xs ml-1">✓ Saldado</span>}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-400 dark:text-slate-500 whitespace-nowrap">{formatDateTime(p.createdAt)}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => reprintDebtReceipt(p, businessConfig)}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                              </svg>
+                              Reimprimir
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {modal?.type === 'form' && <Modal title={modal.data ? 'Editar cliente' : 'Nuevo cliente'} onClose={() => setModal(null)}><ClientForm client={modal.data} onClose={() => setModal(null)}/></Modal>}
       {modal?.type === 'detail' && <Modal title={modal.data.name} subtitle={`${modal.data.documentType}: ${modal.data.documentNumber}`} onClose={() => setModal(null)}><ClientDetail client={modal.data} sales={sales} onClose={() => setModal(null)}/></Modal>}

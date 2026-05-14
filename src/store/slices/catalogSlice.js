@@ -123,6 +123,29 @@ export const createCatalogSlice = (set, get) => ({
     set((s) => ({ brands: (s.brands || []).filter((b) => b.id !== id) }))
   },
 
+  // ─── Merma ─────────────────────────────────────────────────────────────────
+  addMermaRecord: (record) => {
+    get().addAuditLog({
+      action: 'CREATE',
+      module: 'Merma',
+      detail: `Registro de merma: ${record.productName || record.productId} · ${record.quantity || 0}`,
+      entityId: record.id,
+    })
+    set((s) => ({ mermaRecords: [record, ...(s.mermaRecords || [])] }))
+  },
+
+  updateMermaRecord: (id, updates) => {
+    get().addAuditLog({
+      action: 'UPDATE',
+      module: 'Merma',
+      detail: `Merma actualizada: ID ${id}`,
+      entityId: id,
+    })
+    set((s) => ({
+      mermaRecords: (s.mermaRecords || []).map((r) => (r.id === id ? { ...r, ...updates } : r)),
+    }))
+  },
+
   // ─── Contador de facturas ──────────────────────────────────────────────────
   getNextInvoice: () => {
     const n = get().nextInvoice

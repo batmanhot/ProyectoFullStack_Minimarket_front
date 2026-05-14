@@ -175,13 +175,6 @@ export function exportToPDF(
   .footer { padding:12px 28px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#a0aec0; background:#f7fafc; }
   .footer-left { display:flex; flex-direction:column; gap:2px; }
 
-  /* Botones flotantes — ocultos en impresión */
-  .fab-group { position:fixed; bottom:20px; right:20px; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
-  .fab { border:none; padding:10px 18px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px; box-shadow:0 4px 14px rgba(0,0,0,.2); transition:transform .1s; }
-  .fab:hover { transform:translateY(-1px); }
-  .fab-print { background:#2563eb; color:#fff; }
-  .fab-close  { background:#64748b; color:#fff; }
-
   @media print {
     body { background:#fff; }
     .page { box-shadow:none; max-width:100%; }
@@ -238,18 +231,10 @@ export function exportToPDF(
   </div>
 </div>
 
-<!-- Botones flotantes -->
-<div class="fab-group">
-  <button class="fab fab-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
-  <button class="fab fab-close"  onclick="window.close()">✕ Cerrar</button>
-</div>
 </body>
 </html>`
 
-  const win = window.open('', '_blank', `width=${orientation === 'landscape' ? 1200 : 860},height=700,menubar=yes,toolbar=yes,scrollbars=yes`)
-  if (!win) { alert('Activa las ventanas emergentes para ver el PDF'); return }
-  win.document.write(html)
-  win.document.close()
+  window.dispatchEvent(new CustomEvent('pdf-preview', { detail: { html, title } }))
 }
 
 /**
@@ -304,8 +289,7 @@ export function exportToPDFAdvanced(title, sections = [], businessConfig = {}, u
   th{padding:8px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;}
   td{padding:6px 10px;border-bottom:1px solid #e8edf5;}
   .footer{padding:12px 28px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:9px;color:#a0aec0;background:#f7fafc;}
-  .fab{position:fixed;bottom:20px;right:20px;background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.2);}
-  @media print{.fab{display:none}@page{size:A4 landscape;margin:10mm 12mm;}}
+  @media print{@page{size:A4 landscape;margin:10mm 12mm;}}
 </style></head>
 <body><div class="page">
   <div class="header">
@@ -315,11 +299,7 @@ export function exportToPDFAdvanced(title, sections = [], businessConfig = {}, u
   <div class="content">${sectionsHtml}</div>
   <div class="footer"><span>Sistema POS · ${businessName}</span><span>${now}</span></div>
 </div>
-<button class="fab" onclick="window.print()">🖨️ Imprimir / PDF</button>
 </body></html>`
 
-  const win = window.open('', '_blank', 'width=1200,height=700,menubar=yes,scrollbars=yes')
-  if (!win) { alert('Activa las ventanas emergentes'); return }
-  win.document.write(html)
-  win.document.close()
+  window.dispatchEvent(new CustomEvent('pdf-preview', { detail: { html, title } }))
 }

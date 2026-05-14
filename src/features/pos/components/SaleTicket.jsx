@@ -502,7 +502,7 @@ export default function SaleTicket({ sale, onClose }) {
 
               {/* QR */}
               <div style={{ textAlign: 'center', margin: '8px 0' }}>
-                <div style={{ display: 'inline-block', width: '80px', height: '80px', border: '1px solid #000', fontSize: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4px' }}>
+                <div style={{ width: '80px', height: '80px', border: '1px solid #000', fontSize: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4px' }}>
                   Código<br/>verificación<br/>SUNAT
                 </div>
               </div>

@@ -17,6 +17,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { useStore }                    from '../../store/index'
 import { formatDateTime, exportCSV }    from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF }   from '../../shared/utils/export'
+import { ExcelButton, PDFButton }        from '../../shared/components/ui/ExportButtons'
 import { AUDIT_ACTIONS }                from '../../config/app'
 import { useDebounce }                  from '../../shared/hooks/useDebounce'
 import { EmptyState }                   from '../../shared/components/ui/Skeleton'
@@ -219,14 +220,8 @@ export default function Audit() {
             className={`px-3 py-2 text-sm rounded-lg border transition-colors ${showStats ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>
             📊 Estadísticas
           </button>
-          <button onClick={handleExportExcel}
-            className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
-            📈 Excel
-          </button>
-          <button onClick={handleExportPDF}
-            className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
-            📄 PDF
-          </button>
+          <ExcelButton onClick={handleExportExcel} />
+          <PDFButton   onClick={handleExportPDF} />
           {isAdmin && (
             <button onClick={() => setConfirmClear(true)}
               className="px-3 py-2 text-sm border border-red-200 text-red-500 rounded-lg hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20">

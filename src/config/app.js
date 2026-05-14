@@ -11,19 +11,19 @@ export const APP_CONFIG = {
 export const ROLES = {
   admin: {
     label: 'Administrador', color: 'bg-blue-100 text-blue-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings','returns','loyalty','quotations'],
+    pages: ['dashboard','pos','catalog','inventory','merma','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns', 'loyalty', 'quotations'],
   },
   gerente: {
     label: 'Gerente', color: 'bg-purple-100 text-purple-700',
-    pages: ['dashboard','pos','catalog','inventory','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets','loyalty','quotations'],
+    pages: ['dashboard','pos','catalog','inventory','merma','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets', 'loyalty', 'quotations'],
   },
   supervisor: {
     label: 'Supervisor', color: 'bg-amber-100 text-amber-700',
-    pages: ['dashboard','pos','catalog','inventory','cash','clients','alerts','discounts','tickets','returns','loyalty','quotations'],
+    pages: ['dashboard','pos','catalog','inventory','merma','cash','clients','alerts','discounts','tickets','returns', 'loyalty', 'quotations'],
   },
   cajero: {
     label: 'Cajero', color: 'bg-green-100 text-green-700',
-    pages: ['dashboard','pos','cash','returns'],
+    pages: ['dashboard','pos','cash','returns', 'quotations'],    
   },
 }
 
@@ -58,19 +58,20 @@ export const UNITS = [
 ]
 
 export const SECTORS = [
-  { value: 'bodega',      label: 'Bodega / Abarrotes',    icon: '🛒', group: 'alimentos' },
-  { value: 'panaderia',   label: 'Panadería',              icon: '🍞', group: 'alimentos' },
-  { value: 'carniceria',  label: 'Carnicería',             icon: '🥩', group: 'alimentos' },
-  { value: 'farmacia',    label: 'Farmacia',               icon: '💊', group: 'salud' },
-  { value: 'boutique',    label: 'Boutique / Ropa',        icon: '👗', group: 'moda' },
-  { value: 'optica',      label: 'Óptica',                 icon: '👓', group: 'salud' },
-  { value: 'ferreteria',  label: 'Ferretería',             icon: '🔧', group: 'hogar' },
-  { value: 'electronica', label: 'Electrónica',            icon: '📱', group: 'hogar' },
-  { value: 'libreria',    label: 'Librería',               icon: '📚', group: 'otros' },
-  { value: 'repuestos',   label: 'Repuestos Automotrices', icon: '🚗', group: 'otros' },
-  { value: 'regalos',     label: 'Regalos / Variedades',   icon: '🎁', group: 'otros' },
-  { value: 'otro',        label: 'Otro negocio',           icon: '🏪', group: 'otros' },
+  { value: 'bodega',      label: 'Bodega / Abarrotes',     icon: '🛒', stockDefault: 'lote_fefo', expiryAlert: 30  },
+  { value: 'panaderia',   label: 'Panadería',              icon: '🍞', stockDefault: 'lote_fefo', expiryAlert: 3   },
+  { value: 'carniceria',  label: 'Carnicería',             icon: '🥩', stockDefault: 'lote_fefo', expiryAlert: 5   },
+  { value: 'farmacia',    label: 'Farmacia',               icon: '💊', stockDefault: 'lote_fefo', expiryAlert: 60  },
+  { value: 'boutique',    label: 'Boutique / Ropa',        icon: '👗', stockDefault: 'simple',    expiryAlert: 0   },
+  { value: 'optica',      label: 'Óptica',                 icon: '👓', stockDefault: 'serie',     expiryAlert: 0   },
+  { value: 'ferreteria',  label: 'Ferretería',             icon: '🔧', stockDefault: 'lote_fifo', expiryAlert: 0   },
+  { value: 'electronica', label: 'Electrónica',            icon: '📱', stockDefault: 'serie',     expiryAlert: 0   },
+  { value: 'libreria',    label: 'Librería',               icon: '📚', stockDefault: 'simple',    expiryAlert: 0   },
+  { value: 'repuestos',   label: 'Repuestos Automotrices', icon: '🚗', stockDefault: 'lote_fifo', expiryAlert: 0   },
+  { value: 'regalos',     label: 'Regalos / Variedades',   icon: '🎁', stockDefault: 'simple',    expiryAlert: 0   },
+  { value: 'otro',        label: 'Otro negocio',           icon: '🏪', stockDefault: 'simple',    expiryAlert: 0   },
 ]
+
 
 export const AUDIT_ACTIONS = {
   CREATE: { label: 'Creación',      color: 'bg-green-100 text-green-700' },

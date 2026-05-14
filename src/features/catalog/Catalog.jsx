@@ -5,13 +5,71 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema } from '../../shared/schemas/index'
 import { productService } from '../../services/index'
 import { formatCurrency, formatDate } from '../../shared/utils/helpers'
-import { exportToExcel, exportToPDF } from '../../shared/utils/export'
+import { exportToExcel } from '../../shared/utils/export'
+import { ExcelButton } from '../../shared/components/ui/ExportButtons'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import { StockBadge, ExpiryBadge } from '../../shared/components/ui/Badge'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
 import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import toast from 'react-hot-toast'
+
+function createSafeId() {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+// ─── Etiquetas de precio 58mm ──────────────────────────────────────────────────
+// Genera una ventana con etiquetas imprimibles en formato 58mm con código de
+// barras (JsBarcode via CDN), nombre del producto, precio y código.
+function buildLabelHTML(products, businessConfig) {
+  const bizName = (businessConfig?.name || 'MI NEGOCIO').substring(0, 22)
+  const labels  = products.map(p => `
+    <div class="label">
+      <div class="biz">${bizName}</div>
+      <div class="name">${p.name.substring(0, 32)}</div>
+      <div class="price">S/ ${Number(p.priceSell).toFixed(2)}</div>
+      <svg class="bc" data-barcode="${p.barcode}"></svg>
+      <div class="sku">${p.barcode}${p.sku ? ' · ' + p.sku : ''}</div>
+    </div>`
+  ).join('')
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquetas de precio</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Courier New',monospace; background:#fff; }
+  .grid { display:flex; flex-wrap:wrap; gap:4px; padding:8px; }
+  .label { width:56mm; border:1px solid #ccc; border-radius:3px; padding:4px 6px; text-align:center; page-break-inside:avoid; }
+  .biz   { font-size:7px; color:#555; margin-bottom:1px; }
+  .name  { font-size:9px; font-weight:bold; margin-bottom:2px; min-height:20px; display:flex; align-items:center; justify-content:center; }
+  .price { font-size:20px; font-weight:900; margin:3px 0; color:#000; }
+  .bc    { width:100%; height:30px; }
+  .sku   { font-size:7px; color:#777; margin-top:1px; }
+  .fab   { position:fixed; bottom:16px; right:16px; background:#2563eb; color:#fff; border:none; padding:10px 20px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+  @media print { .fab { display:none } @page { size:A4; margin:5mm; } }
+</style></head>
+<body>
+<div class="grid">${labels}</div>
+<button class="fab" onclick="window.print()">🖨️ Imprimir etiquetas</button>
+<script>
+  document.querySelectorAll('.bc').forEach(el => {
+    try { JsBarcode(el, el.dataset.barcode, { format:'CODE128', width:1.2, height:30, displayValue:false, margin:0 }) }
+    catch(e) { el.style.display='none' }
+  })
+</script></body></html>`
+}
+
+export function printPriceLabels(products, businessConfig) {
+  if (!products?.length) { toast.error('No hay productos para imprimir'); return }
+  const win = window.open('', '_blank', 'width=950,height=720,menubar=yes,scrollbars=yes')
+  if (!win) { toast.error('Activa las ventanas emergentes para imprimir etiquetas'); return }
+  win.document.write(buildLabelHTML(products, businessConfig))
+  win.document.close()
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 // ─── Estilos reutilizables ────────────────────────────────────────────────────
 const inputCls = 'w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -23,72 +81,6 @@ const btnPrimary   = 'flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm fo
 function ColorDot({ color, size = 'sm' }) {
   const s = size === 'lg' ? 'w-5 h-5' : 'w-3 h-3'
   return <span className={`${s} rounded-full inline-block flex-shrink-0`} style={{ backgroundColor: color || '#94a3b8' }}/>
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-function buildLabelHTML(products, businessConfig) {
-  const labels = products.map((p) => {
-    const businessName = escapeHtml(businessConfig?.name || 'MI NEGOCIO').substring(0, 22)
-    const productName = escapeHtml(p.name).substring(0, 32)
-    const price = Number(p.priceSell || 0).toFixed(2)
-    const barcode = escapeHtml(p.barcode)
-    const sku = p.sku ? ` · ${escapeHtml(p.sku)}` : ''
-
-    return `
-    <div class="label">
-      <div class="biz">${businessName}</div>
-      <div class="name">${productName}</div>
-      <div class="price">S/ ${price}</div>
-      <svg class="bc" data-barcode="${barcode}"></svg>
-      <div class="sku">${barcode}${sku}</div>
-    </div>`
-  }).join('')
-
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquetas</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{font-family:'Courier New',monospace;background:#fff;}
-  .grid{display:flex;flex-wrap:wrap;gap:4px;padding:8px;}
-  .label{width:56mm;border:1px solid #ccc;border-radius:3px;padding:4px 6px;text-align:center;page-break-inside:avoid;}
-  .biz{font-size:7px;color:#555;margin-bottom:1px;}
-  .name{font-size:9px;font-weight:bold;margin-bottom:2px;min-height:20px;display:flex;align-items:center;justify-content:center;}
-  .price{font-size:20px;font-weight:900;margin:3px 0;}
-  .bc{width:100%;height:30px;}
-  .sku{font-size:7px;color:#777;margin-top:1px;}
-  .fab{position:fixed;bottom:16px;right:16px;background:#185FA5;color:#fff;border:none;padding:10px 18px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;}
-  @media print{.fab{display:none}@page{size:A4;margin:5mm;}}
-</style></head>
-<body>
-<div class="grid">${labels}</div>
-<button class="fab" onclick="window.print()">Imprimir etiquetas</button>
-<script>
-  document.querySelectorAll('.bc').forEach(el => {
-    try { JsBarcode(el, el.dataset.barcode, {format:'CODE128',width:1.2,height:30,displayValue:false,margin:0}) }
-    catch(e) { el.style.display='none' }
-  })
-</script></body></html>`
-}
-
-function printPriceLabels(products, businessConfig) {
-  if (!products?.length) { toast.error('Selecciona al menos un producto'); return }
-  const width = 900
-  const height = 700
-  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2))
-  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2))
-  const features = `width=${width},height=${height},left=${left},top=${top},menubar=yes,scrollbars=yes`
-  const win = window.open('', '_blank', features)
-  if (!win) { toast.error('Activa las ventanas emergentes para imprimir'); return }
-  win.document.write(buildLabelHTML(products, businessConfig))
-  win.document.close()
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -106,17 +98,29 @@ function ProductForm({ product, onClose }) {
   } = useStore()
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(productSchema),
-    defaultValues: product || {
+    defaultValues: product ? {
+      ...product,
+      stockControl: product.stockControl || 'simple',
+      type:         product.type         || 'simple',
+      useBatches:   product.useBatches   ?? false,
+      components:   product.components   || [],
+      imageUrl:     product.imageUrl     || '',
+      brand:        product.brand        || '',
+    } : {
       unit: 'unidad', stockMin: 5, stockMax: 100,
       isActive: true, hasVariants: false, useBatches: false,
-      imageUrl: '', brand: '', categoryId: '', supplierId: '',
+      imageUrl: '', stockControl: 'simple', type: 'simple', components: [],
+      brand: '', categoryId: '', supplierId: '',
     },
   })
 
   // Preview de imagen en tiempo real
-  const imageUrl  = watch('imageUrl')
-  const useBatches = watch('useBatches')
-  const [imgError, setImgError] = useState(false)
+  const imageUrl   = watch('imageUrl')
+  const useBatches  = watch('useBatches')
+  const productType = watch('type') || 'simple'
+  const [imgError, setImgError]           = useState(false)
+  const [bundleSearch, setBundleSearch]   = useState('')
+  const [bundleResults, setBundleResults] = useState([])
 
   // Modales de creación rápida dentro del formulario
   const [quickModal, setQuickModal] = useState(null) // 'brand' | 'category' | 'supplier'
@@ -130,17 +134,17 @@ function ProductForm({ product, onClose }) {
     if (quickModal === 'brand') {
       const id = crypto.randomUUID()
       addBrand?.({ id, name, color: quickColor, isActive: true, createdAt: new Date().toISOString() })
-      setValue('brand', name, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+      setValue('brand', name)
       toast.success(`Marca "${name}" creada`)
     } else if (quickModal === 'category') {
       const id = crypto.randomUUID()
       addCategory({ id, name, color: quickColor, description: '', isActive: true, createdAt: new Date().toISOString() })
-      setValue('categoryId', id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+      setValue('categoryId', id)
       toast.success(`Categoría "${name}" creada`)
     } else if (quickModal === 'supplier') {
       const id = crypto.randomUUID()
       addSupplier?.({ id, name, isActive: true, createdAt: new Date().toISOString() })
-      setValue('supplierId', id, { shouldDirty: true, shouldTouch: true, shouldValidate: true })
+      setValue('supplierId', id)
       toast.success(`Proveedor "${name}" creado`)
     }
     setQuickModal(null)
@@ -314,7 +318,174 @@ function ProductForm({ product, onClose }) {
           </div>
           {/* ────────────────────────────────────────────────────────────────── */}
 
-          {/* ── Gestión por lotes ────────────────────────────────────────────── */}
+          {/* ── Estrategia de control de inventario ────────────────────────── */}
+          <div className="col-span-2">
+            <label className={labelCls}>Estrategia de control de inventario *</label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {[
+                { value: 'simple',    icon: '📦', label: 'Simple',     desc: 'Stock manual. Sin lotes. Para ropa, plásticos, librería, artículos de bazar.' },
+                { value: 'lote_fefo', icon: '🕐', label: 'Lotes FEFO', desc: 'Vence primero → sale primero. Para alimentos, medicamentos, cosméticos, panadería.' },
+                { value: 'lote_fifo', icon: '📥', label: 'Lotes FIFO', desc: 'Entró primero → sale primero. Para ferretería, repuestos, ropa con lotes.' },
+                { value: 'serie',     icon: '🔢', label: 'Por serie',   desc: 'Cada unidad con N° de serie único. Para electrónica, óptica, equipos.' },
+              ].map(opt => {
+                const sel = (watch('stockControl') || 'simple') === opt.value
+                const selColor = {
+                  simple:    'border-blue-500 bg-blue-50 dark:bg-blue-900/20',
+                  lote_fefo: 'border-green-500 bg-green-50 dark:bg-green-900/20',
+                  lote_fifo: 'border-amber-500 bg-amber-50 dark:bg-amber-900/20',
+                  serie:     'border-purple-500 bg-purple-50 dark:bg-purple-900/20',
+                }[opt.value]
+                return (
+                  <button key={opt.value} type="button"
+                    onClick={() => setValue('stockControl', opt.value)}
+                    className={`text-left p-3 rounded-xl border-2 transition-all ${sel ? selColor : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{opt.icon}</span>
+                      <span className={`text-sm font-semibold ${sel ? 'text-gray-800 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}`}>{opt.label}</span>
+                      {sel && <span className="ml-auto w-2 h-2 rounded-full bg-current"/>}
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-slate-500 leading-snug">{opt.desc}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <input type="hidden" {...register('stockControl')}/>
+            {errors.stockControl && <p className="text-xs text-red-500 mt-1">{errors.stockControl.message}</p>}
+            {/* Si elige FEFO o FIFO, sugerir activar gestión por lotes */}
+            {['lote_fefo','lote_fifo'].includes(watch('stockControl')) && !useBatches && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                <span>⚠️</span>
+                <span>Para usar esta estrategia debes activar también <strong>Gestión por lotes</strong> abajo y registrar los lotes en el módulo de Catálogo → pestaña Lotes.</span>
+              </div>
+            )}
+          </div>
+          {/* ────────────────────────────────────────────────────────────────── */}
+
+          {/* ── Tipo de producto: Simple o Bundle/Kit ──────────────────────── */}
+          <div className="col-span-2">
+            <label className={labelCls}>Tipo de producto</label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {[
+                { value: 'simple', icon: '📦', label: 'Producto simple', desc: 'Unidad individual con su propio stock. La gran mayoría de los productos.' },
+                { value: 'bundle', icon: '🎁', label: 'Bundle / Kit',    desc: 'Paquete compuesto. Al vender descuenta stock de cada componente automáticamente.' },
+              ].map(opt => {
+                const sel = productType === opt.value
+                return (
+                  <button key={opt.value} type="button"
+                    onClick={() => setValue('type', opt.value)}
+                    className={`text-left p-3 rounded-xl border-2 transition-all ${
+                      sel
+                        ? opt.value === 'bundle'
+                          ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                          : 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'
+                    }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{opt.icon}</span>
+                      <span className={`text-sm font-semibold ${sel ? 'text-gray-800 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}`}>{opt.label}</span>
+                      {sel && <span className="ml-auto w-2 h-2 rounded-full bg-current"/>}
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-slate-500 leading-snug">{opt.desc}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <input type="hidden" {...register('type')}/>
+            {errors.type && <p className="text-xs text-red-500 mt-1">{errors.type.message}</p>}
+          </div>
+
+          {/* ── Componentes del Bundle ─────────────────────────────────────────────────── */}
+          {productType === 'bundle' && (
+            <div className="col-span-2">
+              <div className="border-2 border-orange-200 dark:border-orange-800 rounded-xl p-4 space-y-3 bg-orange-50/50 dark:bg-orange-900/10">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎁</span>
+                  <div>
+                    <p className="text-sm font-bold text-orange-800 dark:text-orange-300">Componentes del Bundle</p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                      Al vender este bundle se descuenta el stock de cada componente.
+                      Stock del bundle = min(stock de todos los componentes).
+                    </p>
+                  </div>
+                </div>
+                <div className="relative">
+                  <input value={bundleSearch}
+                    onChange={e => {
+                      const q = e.target.value
+                      setBundleSearch(q)
+                      if (q.trim().length < 2) { setBundleResults([]); return }
+                      const ql = q.toLowerCase()
+                      const currentComps = watch('components') || []
+                      setBundleResults(
+                        (useStore.getState().products || [])
+                          .filter(p => p.isActive && p.type !== 'bundle' && !currentComps.find(c => c.productId === p.id) && (p.name.toLowerCase().includes(ql) || p.barcode.includes(q)))
+                          .slice(0, 6)
+                      )
+                    }}
+                    placeholder="Buscar producto componente por nombre o código..."
+                    className={inputCls}/>
+                  {bundleResults.length > 0 && (
+                    <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl z-20 overflow-hidden">
+                      {bundleResults.map(p => (
+                        <button key={p.id} type="button"
+                          onMouseDown={() => {
+                            const current = watch('components') || []
+                            setValue('components', [...current, { productId: p.id, quantity: 1, _name: p.name, _barcode: p.barcode, _unit: p.unit, _priceSell: p.priceSell }])
+                            setBundleSearch(''); setBundleResults([])
+                          }}
+                          className="w-full text-left px-3 py-2.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center justify-between border-b border-gray-50 dark:border-slate-700/50 last:border-0">
+                          <div>
+                            <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{p.name}</p>
+                            <p className="text-xs text-gray-400">{p.barcode} · Stock: {p.stock} {p.unit}</p>
+                          </div>
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-semibold ml-2">+ Agregar</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {(watch('components') || []).length === 0 ? (
+                  <div className="text-center py-3 text-xs text-orange-400">
+                    Sin componentes — busca los productos que forman este bundle
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(watch('components') || []).map((comp, idx) => (
+                      <div key={comp.productId} className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-800 rounded-lg px-3 py-2">
+                        <span>📦</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{comp._name || comp.productId}</p>
+                          <p className="text-xs text-gray-400">{comp._barcode} · S/{Number(comp._priceSell||0).toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs text-gray-500">Cant.:</span>
+                          <input type="number" min="0.01" step="0.01" value={comp.quantity}
+                            onChange={e => {
+                              const c = [...(watch('components')||[])]
+                              c[idx] = { ...c[idx], quantity: parseFloat(e.target.value)||1 }
+                              setValue('components', c)
+                            }}
+                            className="w-16 text-center px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+                          <span className="text-xs text-gray-400">{comp._unit||'u'}</span>
+                        </div>
+                        <button type="button"
+                          onClick={() => setValue('components', (watch('components')||[]).filter((_,i)=>i!==idx))}
+                          className="p-1 text-gray-300 hover:text-red-400 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-orange-700 dark:text-orange-400 px-2">
+                      Al escanear <strong>{watch('barcode')||'—'}</strong> en el POS se descuenta automáticamente el stock de los {(watch('components')||[]).length} componentes.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {/* ────────────────────────────────────────────────────────────────── */}
+
+          {/* ── Gestión por lotes ────────────────────────────────────────────────── */}
           <div className="col-span-2">
             <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
               <button type="button"
@@ -431,7 +602,7 @@ function CategoryForm({ category, onClose }) {
       toast.success('Categoría actualizada')
     } else {
       addCategory({
-        id: `cat-${crypto.randomUUID().slice(0,8)}`,
+        id: `cat-${createSafeId().slice(0,8)}`,
         name: name.trim(), description: description.trim(), color,
         createdAt: new Date().toISOString(),
       })
@@ -500,7 +671,7 @@ function BrandForm({ brand, onClose }) {
       toast.success('Marca actualizada')
     } else {
       addBrand({
-        id: `brn-${crypto.randomUUID().slice(0,8)}`,
+        id: `brn-${createSafeId().slice(0,8)}`,
         name: name.trim(), description: description.trim(), color,
         isActive: true, createdAt: new Date().toISOString(),
       })
@@ -640,16 +811,13 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
             </button>
           ))}
         </div>
-        <button onClick={handleExportExcel}
-          className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
-          📊 Excel
-        </button>
+        <ExcelButton onClick={handleExportExcel} />
+        {/* Etiquetas de precio 58mm */}
         <button
           onClick={() => printPriceLabels(filtered.filter(p => p.isActive), businessConfig)}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20"
+          className="px-3 py-2 text-sm border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
           title="Imprimir etiquetas de precio 58mm con código de barras">
-          <span aria-hidden="true">🏷️</span>
-          Etiquetas
+          🏷️ Etiquetas
         </button>
         <button onClick={() => setModal({ type: 'form', data: null })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
@@ -719,6 +887,13 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
                         <button onClick={() => setModal({ type: 'form', data: p })}
                           className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg" title="Editar">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        </button>
+                        {/* Etiqueta individual */}
+                        <button
+                          onClick={() => printPriceLabels([p], businessConfig)}
+                          className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg"
+                          title="Imprimir etiqueta de precio">
+                          <span className="text-xs">🏷️</span>
                         </button>
                         {p.isActive && (
                           <button onClick={() => setDeleteTarget(p)}
@@ -1113,7 +1288,7 @@ export default function Catalog() {
         <BrandsView brands={brands || []} products={products}/>
       )}
       {tab === 'batches' && (
-        <BatchesView products={products} suppliers={suppliers} onEditProduct={(p) => setModal({ type: 'form', data: p })}/>
+        <BatchesView products={products} suppliers={suppliers}/>
       )}
     </div>
   )
@@ -1122,8 +1297,8 @@ export default function Catalog() {
 // ══════════════════════════════════════════════════════════════════════════════
 // VIEW — GESTIÓN DE LOTES
 // ══════════════════════════════════════════════════════════════════════════════
-function BatchesView({ products, suppliers, onEditProduct }) {
-  const { addBatch, updateBatch, deleteBatch } = useStore()
+function BatchesView({ products }) {
+  const { updateBatch } = useStore()
   const [search,       setSearch]       = useState('')
   const [selectedProd, setSelectedProd] = useState(null)
   const [modal,        setModal]        = useState(null) // { type:'form', batch }
@@ -1145,7 +1320,7 @@ function BatchesView({ products, suppliers, onEditProduct }) {
     if (!selectedProd) return
 
     const batch = {
-      id:          modal?.batch?.id || crypto.randomUUID(),
+      id:          modal?.batch?.id || createSafeId(),
       ...batchForm,
       quantity:    parseFloat(batchForm.quantity) || 0,
       priceBuy:    parseFloat(batchForm.priceBuy) || 0,

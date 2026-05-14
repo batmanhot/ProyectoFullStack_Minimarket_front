@@ -36,14 +36,16 @@ function OpenForm({ currentUser, onBack }) {
   )
 }
 
-function CloseForm({ session, sessionTotals, sessionSales, onBack }) {
+function CloseForm({ session, sessionTotals, sessionSales, sessionDebtPayments, onBack }) {
   const { register, handleSubmit, watch, formState: { errors } } = useForm({ resolver: zodResolver(closeCashSchema) })
   const [loading, setLoading] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  const counted  = parseFloat(watch('countedAmount') || 0)
-  const cashTotal  = sessionTotals.byMethod?.efectivo || 0
-  const expected   = formatNumber(session.openingAmount + cashTotal)
-  const difference = formatNumber(counted - expected)
+  const counted        = parseFloat(watch('countedAmount') || 0)
+  const cashTotal      = sessionTotals.byMethod?.efectivo || 0
+  const debtCash       = (sessionDebtPayments || []).filter(p => p.method === 'efectivo').reduce((a, p) => a + (p.amount || 0), 0)
+  const totalDebt      = (sessionDebtPayments || []).reduce((a, p) => a + (p.amount || 0), 0)
+  const expected       = formatNumber(session.openingAmount + cashTotal + debtCash)
+  const difference     = formatNumber(counted - expected)
 
   const doClose = async (data) => {
     setLoading(true)
@@ -77,10 +79,22 @@ function CloseForm({ session, sessionTotals, sessionSales, onBack }) {
           })}
           <div className="border-t border-gray-100 dark:border-slate-700 pt-2 mt-2 flex justify-between font-semibold text-sm"><span>TOTAL GENERAL</span><span>{formatCurrency(sessionTotals.total)}</span></div>
         </div>
+        {totalDebt > 0 && (
+          <div className="bg-amber-50 rounded-lg p-3 flex justify-between items-center text-sm">
+            <div>
+              <p className="text-xs text-amber-600 font-medium mb-0.5">Cobros de deuda en este turno</p>
+              <p className="text-xs text-amber-500">{sessionDebtPayments.length} pago{sessionDebtPayments.length !== 1 ? 's' : ''} · {debtCash > 0 ? `S/${debtCash.toFixed(2)} en efectivo` : 'Sin efectivo'}</p>
+            </div>
+            <span className="font-bold text-amber-700">{formatCurrency(totalDebt)}</span>
+          </div>
+        )}
         <div className="bg-blue-50 rounded-lg p-3">
           <p className="text-xs text-blue-600 mb-1">Efectivo esperado en caja</p>
           <p className="text-lg font-semibold text-blue-700">{formatCurrency(expected)}</p>
-          <p className="text-xs text-blue-400">Apertura ({formatCurrency(session.openingAmount)}) + ventas efectivo ({formatCurrency(cashTotal)})</p>
+          <p className="text-xs text-blue-400">
+            Apertura ({formatCurrency(session.openingAmount)}) + ventas efectivo ({formatCurrency(cashTotal)})
+            {debtCash > 0 ? ` + cobros deuda efectivo (${formatCurrency(debtCash)})` : ''}
+          </p>
         </div>
         <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto contado físicamente (S/) *</label><input type="number" step="0.50" {...register('countedAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00"/>{errors.countedAmount && <p className="text-xs text-red-500 mt-1">{errors.countedAmount.message}</p>}</div>
         {counted > 0 && (
@@ -138,7 +152,7 @@ function SessionDetail({ session, onClose }) {
 }
 
 export default function Cash() {
-  const { activeCashSession, cashSessions, sales, currentUser } = useStore()
+  const { activeCashSession, cashSessions, sales, debtPayments, currentUser } = useStore()
   const [view, setView] = useState('main')
   const [detailSession, setDetailSession] = useState(null)
 
@@ -146,6 +160,11 @@ export default function Cash() {
     if (!activeCashSession) return []
     return sales.filter(s => s.status === 'completada' && new Date(s.createdAt) >= new Date(activeCashSession.openedAt))
   }, [activeCashSession, sales])
+
+  const sessionDebtPayments = useMemo(() => {
+    if (!activeCashSession) return []
+    return (debtPayments || []).filter(p => new Date(p.createdAt) >= new Date(activeCashSession.openedAt))
+  }, [activeCashSession, debtPayments])
 
   const sessionTotals = useMemo(() => {
     const total = formatNumber(sessionSales.reduce((a, s) => a + s.total, 0))
@@ -155,7 +174,7 @@ export default function Cash() {
   }, [sessionSales])
 
   if (view === 'open')  return <OpenForm currentUser={currentUser} onBack={() => setView('main')}/>
-  if (view === 'close' && activeCashSession) return <CloseForm session={activeCashSession} sessionTotals={sessionTotals} sessionSales={sessionSales} onBack={() => setView('main')}/>
+  if (view === 'close' && activeCashSession) return <CloseForm session={activeCashSession} sessionTotals={sessionTotals} sessionSales={sessionSales} sessionDebtPayments={sessionDebtPayments} onBack={() => setView('main')}/>
 
   return (
     <div className="p-6 space-y-6">
@@ -175,7 +194,7 @@ export default function Cash() {
 
       {activeCashSession && view === 'main' && (
         <>
-          {/* CARDS — punto 7: añadir efectivo y tarjeta además del ticket promedio */}
+          {/* CARDS */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4"><p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Monto inicial</p><p className="text-xl font-medium">{formatCurrency(activeCashSession.openingAmount)}</p></div>
             <div className="bg-green-50 rounded-xl p-4"><p className="text-xs text-green-600 mb-1">Total ventas turno</p><p className="text-xl font-medium text-green-700">{formatCurrency(sessionTotals.total)}</p><p className="text-xs text-green-500">{sessionSales.length} transacciones</p></div>
@@ -184,10 +203,10 @@ export default function Cash() {
               <p className="text-xl font-medium text-blue-700">{formatCurrency(sessionTotals.byMethod?.efectivo || 0)}</p>
               <p className="text-xs text-blue-400">💵 Efectivo del turno</p>
             </div>
-            <div className="bg-indigo-50 rounded-xl p-4">
-              <p className="text-xs text-indigo-600 mb-1">Ventas con tarjeta</p>
-              <p className="text-xl font-medium text-indigo-700">{formatCurrency(sessionTotals.byMethod?.tarjeta || 0)}</p>
-              <p className="text-xs text-indigo-400">💳 Tarjeta del turno</p>
+            <div className="bg-amber-50 rounded-xl p-4">
+              <p className="text-xs text-amber-600 mb-1">Cobros de deuda</p>
+              <p className="text-xl font-medium text-amber-700">{formatCurrency(sessionDebtPayments.reduce((a, p) => a + (p.amount || 0), 0))}</p>
+              <p className="text-xs text-amber-400">💰 {sessionDebtPayments.length} pago{sessionDebtPayments.length !== 1 ? 's' : ''} cobrado{sessionDebtPayments.length !== 1 ? 's' : ''}</p>
             </div>
             <div className="bg-purple-50 rounded-xl p-4">
               <p className="text-xs text-purple-600 mb-1">Ticket promedio</p>
@@ -228,7 +247,9 @@ export default function Cash() {
           {/* Últimas ventas del turno */}
           {sessionSales.length > 0 && (
             <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700"><h3 className="text-sm font-medium text-gray-700">Ventas del turno</h3></div>
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-slate-200">Ventas del turno</h3>
+              </div>
               <table className="w-full">
                 <thead><tr className="bg-gray-50 dark:bg-slate-800/50"><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Boleta</th><th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Hora</th><th className="text-center text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Método</th><th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Total</th></tr></thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
@@ -244,6 +265,51 @@ export default function Cash() {
                     )
                   })}
                 </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Cobros de deuda del turno */}
+          {sessionDebtPayments.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 border border-amber-100 dark:border-amber-900/40 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-amber-100 dark:border-amber-900/40 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Cobros de deuda del turno</h3>
+                <span className="text-xs text-amber-600 dark:text-amber-500 font-semibold">
+                  {sessionDebtPayments.length} pago{sessionDebtPayments.length !== 1 ? 's' : ''} · {formatCurrency(sessionDebtPayments.reduce((a, p) => a + (p.amount || 0), 0))}
+                </span>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-amber-50 dark:bg-amber-900/10">
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">N° Recibo</th>
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Cliente</th>
+                    <th className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Hora</th>
+                    <th className="text-center text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Método</th>
+                    <th className="text-right text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2">Monto cobrado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                  {sessionDebtPayments.map(p => {
+                    const m = PAYMENT_METHODS.find(pm => pm.value === p.method)
+                    return (
+                      <tr key={p.id} className="hover:bg-amber-50/50 dark:hover:bg-amber-900/10">
+                        <td className="px-4 py-2.5 text-xs font-mono font-semibold text-blue-600 dark:text-blue-400">{p.receiptNumber}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-slate-200 font-medium">{p.clientName}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-slate-400">{new Date(p.createdAt).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}</td>
+                        <td className="px-4 py-2.5 text-center text-xs text-gray-500 dark:text-slate-400">{m?.icon} {m?.label}</td>
+                        <td className="px-4 py-2.5 text-sm font-bold text-right text-amber-700 dark:text-amber-400">{formatCurrency(p.amount)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-amber-50 dark:bg-amber-900/20 border-t border-amber-100 dark:border-amber-900/40">
+                    <td colSpan={4} className="px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400">TOTAL COBRADO EN DEUDAS</td>
+                    <td className="px-4 py-2 text-sm font-bold text-right text-amber-700 dark:text-amber-400">
+                      {formatCurrency(sessionDebtPayments.reduce((a, p) => a + (p.amount || 0), 0))}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
@@ -268,7 +334,7 @@ export default function Cash() {
           ) : (
             <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
               <table className="w-full">
-                <thead><tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">{['Apertura','Cierre','Cajero','Inicial','Ventas','Contado','Diferencia','Detalle'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-3 ${['Inicial','Ventas','Contado','Diferencia'].includes(h)?'text-right':h==='Detalle'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
+                <thead><tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">{['Apertura','Cierre','Cajero','Inicial','Ventas','Cobranzas','Contado','Diferencia','Detalle'].map(h => <th key={h} className={`text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-3 ${['Inicial','Ventas','Cobranzas','Contado','Diferencia'].includes(h)?'text-right':h==='Detalle'?'text-center':'text-left'}`}>{h}</th>)}</tr></thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
                   {cashSessions.map(s => (
                     <tr key={s.id} className="hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">
@@ -277,6 +343,7 @@ export default function Cash() {
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-slate-300">{s.userName || s.userId}</td>
                       <td className="px-4 py-3 text-sm text-right">{formatCurrency(s.openingAmount)}</td>
                       <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">{formatCurrency(s.totalSales || 0)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-amber-600 font-medium">{formatCurrency(s.totalDebtCollected || 0)}</td>
                       <td className="px-4 py-3 text-sm text-right">{formatCurrency(s.closingAmount || 0)}</td>
                       <td className="px-4 py-3 text-sm text-right font-medium">
                         <span className={`${(s.difference||0)===0?'text-green-600':(s.difference||0)>0?'text-blue-600':'text-red-500'}`}>{(s.difference||0)>=0?'+':''}{formatCurrency(s.difference||0)}</span>

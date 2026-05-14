@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { usePOSBroadcast, buildCartForDisplay } from './POSBroadcast'
 import { useStore, selectCartCount } from '../../store/index'
 import { saleService } from '../../services/index'
 import { calcCartTotals, fuzzySearch, formatCurrency } from '../../shared/utils/helpers'
@@ -11,7 +10,7 @@ import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
 import { evaluateDiscounts } from '../../shared/utils/discountEngine'
-
+import { usePOSBroadcast, buildCartForDisplay } from './POSBroadcast'
 
 // ── F5: LoyaltyBadge ahora vive dentro de PaymentPanel (donde es visible) ────
 // import LoyaltyBadge from './components/LoyaltyBadge'  ← ya no necesario aquí
@@ -43,6 +42,7 @@ export default function POS({ onNavigate }) {
   // Máximo 5 slots en memoria (se pierden al recargar la página).
   const { heldCarts, holdCart, recoverCart, discardHold, canHold } = useCartHold()
   const [showHeldCarts, setShowHeldCarts] = useState(false)
+  const { broadcast, openDisplay } = usePOSBroadcast()
 
   const handleHoldCart = () => {
     if (cart.length === 0) { toast('El carrito está vacío', { icon: 'ℹ️' }); return }
@@ -185,14 +185,6 @@ export default function POS({ onNavigate }) {
   // eslint-disable-next-line no-unused-vars -- se usa en salePayload
   const [saleNote, setSaleNote] = useState('')
 
-  useEffect(() => {
-    const pending = localStorage.getItem('pos_pending_note')
-    if (pending) {
-      localStorage.removeItem('pos_pending_note')
-      setSaleNote(pending)
-    }
-  }, [])
-
   const { sales } = useStore()
   const sessionSales = activeCashSession
     ? sales.filter(s => s.status==='completada' && new Date(s.createdAt) >= new Date(activeCashSession.openedAt))
@@ -201,8 +193,6 @@ export default function POS({ onNavigate }) {
 
   // Atajos teclado con ref pattern (fix stale closure)
   const actionsRef = useRef({})
-  // ── Pantalla del cliente ────────────────────────────────────────────────
-  const { broadcast, openDisplay } = usePOSBroadcast()
 
   useEffect(() => {
     actionsRef.current = {
@@ -222,13 +212,12 @@ export default function POS({ onNavigate }) {
     return () => window.removeEventListener('keydown', handler)
   }, [cart.length, activeCashSession])
 
-  // ── Emitir carrito a la pantalla del cliente en tiempo real ──────────────
-  useEffect(() => {
+  useEffect(() => {                    ← useEffect NUEVO de broadcast
     broadcast('CART_UPDATE', {
       cart: buildCartForDisplay(mergedCartItems, products),
       businessConfig,
     })
-  }, [mergedCartItems]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mergedCartItems])
 
   const handleSelectProduct = (product) => {
     if (product.stock <= 0) { toast.error(`${product.name} sin stock`); return }
@@ -340,15 +329,6 @@ export default function POS({ onNavigate }) {
     setCompletedSale(result.data)
     setShowTicket(true)
     toast.success(`Venta ${result.data.invoiceNumber} completada`, { duration: 3000, icon: '🎉' })
-
-    // ── Notificar a la pantalla del cliente ────────────────────────────────
-    broadcast('SALE_COMPLETE', {
-      sale: {
-        invoiceNumber: result.data.invoiceNumber,
-        total:         result.data.total,
-        change:        result.data.change || 0,
-      },
-    })
   }, [
     appliedTicket,
     baseImponible,
@@ -577,7 +557,10 @@ export default function POS({ onNavigate }) {
 
         {/* Atajos */}
         <div className="px-4 py-2 bg-white border-t border-gray-100 flex gap-4 text-xs text-gray-300 flex-wrap">
-          <span>F2 Buscar</span><span>F8 Cobrar</span><span>Ctrl+Del Vaciar</span><span>% Descuento por ítem</span>          
+          <span>F2 Buscar</span><span>F8 Cobrar</span><span>Ctrl+Del Vaciar</span><span>% Descuento por ítem</span>
+          <button onClick={openDisplay} title="Abrir pantalla del cliente">
+            📺
+          </button>
         </div>
       </div>
 
@@ -851,10 +834,7 @@ export default function POS({ onNavigate }) {
       disabled={cart.length === 0}
       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
       <span>Cobrar</span>
-      <span className="opacity-60 text-xs">F8</span>      
-    </button>
-    <button onClick={openDisplay} title="Abrir pantalla del cliente">
-      📺
+      <span className="opacity-60 text-xs">F8</span>
     </button>
   
 

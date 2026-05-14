@@ -3,6 +3,7 @@ import { useStore } from '../../store/index'
 import { purchaseService } from '../../services/index'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
+import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
 import Modal from '../../shared/components/ui/Modal'
@@ -280,8 +281,8 @@ export default function Purchases() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div><h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Compras a proveedor</h1><p className="text-sm text-gray-400 dark:text-slate-500">{enriched.length} registros</p></div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📊 Excel</button>
-          <button onClick={handleExportPDF}   className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">📄 PDF</button>
+          <ExcelButton onClick={handleExportExcel} />
+          <PDFButton   onClick={handleExportPDF} />
           <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
             Nueva entrada
