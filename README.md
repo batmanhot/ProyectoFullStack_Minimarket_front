@@ -6,87 +6,185 @@
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-Sistema de Punto de Ventas (POS) moderno y eficiente diseñado para la gestión integral de supermercados y minimarkets. Esta aplicación proporciona una solución completa para el control de inventarios, procesamiento de ventas rápidas, gestión de caja y reportes detallados.
+Aplicación web de Punto de Venta (POS) orientada a la operación diaria de minimarkets y tiendas de retail de proximidad.  
+El sistema permite administrar ventas, inventario, caja, clientes, compras y reportes desde una interfaz moderna, rápida y preparada para uso intensivo en mostrador.
 
 ---
 
-## ✨ Características Principales
+## 📌 Descripción del proyecto
 
-### 📦 Gestión de Inventario
-- **Stock en Tiempo Real:** Control preciso con alertas automáticas de reposición.
-- **CRUD de Productos:** Gestión completa con soporte integrado para **códigos de barras**.
-- **Categorización:** Organización lógica por categorías y gestión de proveedores.
-- **Kardex:** Historial detallado de movimientos (entradas/salidas).
+Este proyecto implementa un **sistema POS frontend** para centralizar procesos comerciales y operativos en negocios de venta minorista.  
+Incluye módulos integrados para:
 
-### 🖥️ Punto de Venta (POS)
-- **Venta Rápida:** Interfaz optimizada para uso con lectores de código de barras.
-- **Automatización:** Cálculo instantáneo de totales, impuestos y descuentos.
-- **Pagos Flexibles:** Soporte para efectivo, tarjeta y transferencia.
-- **Tickets Dinámicos:** Generación y previsualización de tickets de venta.
+- Venta en caja con cálculo de totales, descuentos e impuestos.
+- Gestión de catálogo e inventario con control de stock.
+- Control de caja (apertura, movimientos, cierre y arqueo).
+- Clientes, proveedores, compras, devoluciones y cotizaciones.
+- Reportes operativos y trazabilidad de movimientos.
+- Capacidades PWA para experiencia de uso mejorada.
 
-### 💰 Control de Caja
-- **Flujo Diario:** Módulo dedicado para apertura y cierre de caja.
-- **Cuentas Claras:** Registro exhaustivo de todos los ingresos y egresos.
-- **Arqueo:** Herramientas para detección automática de diferencias.
-
-### 👥 Gestión de Clientes y Usuarios
-- **Fidelización:** Base de datos de clientes con historial de compras.
-- **Seguridad:** Roles (Admin, Cajero, Supervisor) con permisos granulares.
-
-### 📊 Reportes y Dashboard
-- **KPIs:** Panel interactivo con ventas del día y productos top.
-- **Exportación:** Reportes descargables de inventario y flujo de caja.
+> Nota: este repositorio corresponde al **frontend** del sistema.
 
 ---
 
-## 🚀 Tecnologías (Stack Tecnológico)
+## 🏪 Tipo de negocios objetivo
 
-| Tecnología | Descripción |
-| :--- | :--- |
-| **React 19** | Biblioteca principal para la interfaz |
-| **Vite** | Herramienta de construcción y desarrollo rápido |
-| **Tailwind CSS** | Framework de estilos utilitarios |
-| **Zustand** | Gestión de estado ligera y reactiva |
-| **React Router 7** | Navegar entre secciones del sistema |
-| **Lucide React** | Set de iconos modernos y consistentes |
-| **Axios** | Cliente HTTP para comunicación con el servidor |
+El sistema está orientado principalmente a:
+
+- Minimarkets y bodegas.
+- Tiendas de conveniencia.
+- Autoservicios de barrio.
+- Pequeños supermercados.
+- Comercios minoristas con alto flujo de tickets.
+
+También puede adaptarse a otros negocios retail que requieran control de inventario y venta rápida por caja.
 
 ---
 
-## 🛠️ Instalación y Desarrollo
+## 🚀 Stack tecnológico
 
-Sigue estos pasos para ejecutar el proyecto localmente:
+### Frontend y arquitectura
+- **React 19** (UI basada en componentes).
+- **Vite** (desarrollo y build).
+- **Tailwind CSS** (estilos utilitarios).
+- **Zustand** + `persist` + `subscribeWithSelector` (estado global y persistencia local).
+- **React Router DOM 7** (navegación).
 
-1. **Clonar el repositorio:**
+### Formularios, validaciones y utilidades
+- **React Hook Form** + **Zod** (`@hookform/resolvers`) para formularios y validación.
+- **Axios** para consumo de servicios HTTP.
+- **decimal.js** para cálculos numéricos precisos.
+- **react-hot-toast** para notificaciones.
+
+### Reportes, documentos y exportación
+- **Recharts** para visualización de métricas.
+- **xlsx** para exportación/importación en Excel.
+- **jsPDF** + **html2canvas** para generación de PDF.
+
+### PWA
+- Service Worker y recursos offline (`public/sw.js`, `public/offline.html`).
+- Componente de instalación de app (`InstallPWA`).
+- Indicadores de estado online/offline en la interfaz.
+
+---
+
+## 🔄 Procesos principales del negocio
+
+1. **Proceso de venta en POS**
+   - Búsqueda de productos por nombre/código/SKU.
+   - Agregado al carrito y ajuste de cantidades.
+   - Aplicación de descuentos (manuales, campañas y tickets).
+   - Cálculo de subtotal bruto, descuentos, base imponible e IGV.
+   - Registro de pagos y emisión de ticket.
+   - Gestión de ventas en espera (hold/recover) para atención simultánea.
+
+2. **Proceso de caja**
+   - Apertura de caja por turno.
+   - Registro y control de movimientos.
+   - Seguimiento de ventas del turno.
+   - Cierre y arqueo de caja con control de diferencias.
+
+3. **Proceso de inventario**
+   - Administración de productos y categorías.
+   - Control de stock mínimo y alertas.
+   - Movimientos de inventario y kardex.
+   - Toma de inventario (stocktaking) y ajustes.
+
+4. **Proceso comercial y soporte**
+   - Gestión de clientes y proveedores.
+   - Registro de compras.
+   - Gestión de devoluciones y notas relacionadas.
+   - Cotizaciones y seguimiento.
+
+5. **Proceso de control y análisis**
+   - Dashboard con indicadores clave.
+   - Reportes operativos/exportables.
+   - Auditoría de acciones y trazabilidad.
+
+---
+
+## ✨ Funcionalidades por módulo
+
+- **Dashboard:** indicadores operativos y resumen general.
+- **POS:** venta rápida, descuentos, ticketing, pagos y pantalla cliente.
+- **Catálogo:** gestión de productos, categorías y datos comerciales.
+- **Inventario:** stock, movimientos, kardex y toma de inventario.
+- **Caja:** apertura/cierre, arqueo y control diario de efectivo.
+- **Clientes:** gestión de cartera y apoyo a fidelización.
+- **Proveedores:** administración de terceros de compra.
+- **Compras:** registro y control de abastecimiento.
+- **Descuentos y Tickets:** campañas, cupones/tickets y reglas de aplicación.
+- **Devoluciones:** control de devoluciones y documentos asociados.
+- **Cotizaciones:** emisión y gestión de propuestas comerciales.
+- **Reportes:** análisis de ventas e inventario con exportación.
+- **Usuarios y roles:** control de accesos por perfil.
+- **Auditoría:** historial de eventos y acciones.
+- **Merma y Trazabilidad:** control operativo para pérdidas y seguimiento.
+
+---
+
+## 🛠️ Instalación y ejecución local
+
+1. **Clonar el repositorio**
    ```bash
    git clone [url-del-repositorio]
    cd minimarket
    ```
 
-2. **Instalar dependencias:**
+2. **Instalar dependencias**
    ```bash
    npm install
    ```
 
-3. **Configurar el entorno:**
-   Crea un archivo `.env` basado en `.env.example`:
+3. **Configurar variables de entorno**
+   Crear/ajustar archivo `.env` según tu entorno:
    ```env
    VITE_API_URL=http://localhost:3000
    ```
 
-4. **Ejecutar en modo desarrollo:**
+4. **Ejecutar en desarrollo**
    ```bash
    npm run dev
    ```
 
+5. **Build de producción**
+   ```bash
+   npm run build
+   ```
+
+6. **Preview de build**
+   ```bash
+   npm run preview
+   ```
+
+7. **Build con flujo PWA**
+   ```bash
+   npm run build:pwa
+   ```
+
 ---
 
-## 🔒 Seguridad y Rendimiento
+## 📁 Estructura general del proyecto
 
-- **Autenticación:** Gestión segura de sesiones mediante **JWT**.
-- **Optimización:** Implementación de *Code Splitting* y *Lazy Loading* para máxima velocidad.
-- **Integridad:** Validación estricta de datos con **Zod** y **React Hook Form**.
+```text
+src/
+  features/        # módulos funcionales del negocio
+  shared/          # componentes, hooks y utilidades compartidas
+  store/           # estado global (Zustand + slices)
+  services/        # capa de servicios
+  data/            # datos semilla/demo
+  config/          # configuración de app y permisos
+public/
+  sw.js            # service worker
+  offline.html     # fallback offline
+```
 
 ---
 
-Desarrollado con ❤️ para el sector retail.
+## 📄 Licencia
+
+MIT
+
+---
+
+Desarrollado para digitalizar y optimizar operaciones del sector retail de proximidad.

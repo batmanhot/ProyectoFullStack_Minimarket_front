@@ -1,9 +1,13 @@
-# TODO - Corrección Catálogo (modales de creación rápida)
+# TODO - Documentación README (Proyecto POS Minimarket)
 
-- [x] Revisar y actualizar `src/features/catalog/Catalog.jsx`:
-  - [x] Agregar helper de ID seguro con fallback (sin depender solo de `crypto.randomUUID`).
-  - [x] Reemplazar usos directos de `crypto.randomUUID()` por helper.
-  - [x] Corregir referencia inválida a `setModal` en integración con `BatchesView`.
-- [ ] Ajustar lint en `Catalog.jsx` (exports/props/variables no usadas y key duplicada).
-- [ ] Verificar que no queden usos inseguros de `randomUUID` en `Catalog.jsx`.
-- [ ] Entregar resumen de cambios aplicados.
+- [x] Revisar archivos relevantes del proyecto para documentar con precisión (`README.md`, `package.json`, `src/App.jsx`, `src/store/index.js`, `src/features/pos/POS.jsx`).
+- [x] Definir plan de edición y confirmar aprobación del usuario.
+- [x] Actualizar `README.md` con:
+  - [x] Descripción del proyecto.
+  - [x] Tipo de negocios objetivo.
+  - [x] Stack tecnológico real del frontend.
+  - [x] Procesos principales del negocio.
+  - [x] Funcionalidades por módulo.
+  - [x] Instalación y ejecución local.
+- [x] Validar consistencia de la documentación con el código actual.
+- [ ] Entregar resumen final de cambios aplicados.
