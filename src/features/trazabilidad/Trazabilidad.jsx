@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../../store/index'
-import { downloadExcel } from '../../shared/utils/export'
+import { exportToExcel } from '../../shared/utils/export'
+import { ExcelButton } from '../../shared/components/ui/ExportButtons'
 import toast from 'react-hot-toast'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -290,8 +291,7 @@ export default function Trazabilidad() {
     }
 
     if (!rows.length) { toast.error('No hay datos de lotes para exportar'); return }
-    downloadExcel(rows, 'Trazabilidad_Lotes')
-    toast.success(`${rows.length} movimientos exportados`, { duration: 3000 })
+    exportToExcel(rows, 'Trazabilidad_Lotes', { title: 'Trazabilidad de Lotes' })
   }
 
   // ── Render helpers ─────────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ export default function Trazabilidad() {
 
   // ── JSX ────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
+    <div className="p-6 space-y-6">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -318,14 +318,7 @@ export default function Trazabilidad() {
             Ciclo de vida completo: ingresos · ventas · devoluciones · merma
           </p>
         </div>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-colors flex-shrink-0">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
-          </svg>
-          Exportar Excel
-        </button>
+        <ExcelButton onClick={handleExport} />
       </div>
 
       {/* Stats */}
