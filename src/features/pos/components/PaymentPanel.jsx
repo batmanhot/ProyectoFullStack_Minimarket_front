@@ -158,6 +158,17 @@ export default function PaymentPanel({
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') addPayment() }
 
+  // F8 → Confirmar venta (cuando el panel de pago está abierto)
+  const confirmRef = useRef(null)
+  confirmRef.current = handleConfirm
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F8') { e.preventDefault(); confirmRef.current() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white dark:bg-slate-800">

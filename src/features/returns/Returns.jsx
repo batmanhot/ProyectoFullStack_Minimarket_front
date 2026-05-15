@@ -15,6 +15,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useStore } from '../../store/index'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
+import { calcStockDisponible } from '../../shared/utils/inventoryEngine'
 import toast from 'react-hot-toast'
 import CreditNoteModal from './components/CreditNoteModal'
 
@@ -40,19 +41,62 @@ const HALF_UP = (n) => Math.floor(Number(n) * 100 + 0.5) / 100
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function calcItemNetUnitPrice(item) {
+  if (item.netTotal != null && item.quantity > 0) {
+    return HALF_UP(item.netTotal / item.quantity)
+  }
   const gross    = item.quantity * item.unitPrice
-  const discount = item.discount || item.campaignDiscount || item.totalDiscount || 0
-  const net      = Math.max(0, gross - discount)
-  return HALF_UP(net / item.quantity)
+  const discount = item.totalDiscount != null
+    ? item.totalDiscount
+    : (item.discount || 0) + (item.campaignDiscount || 0)
+  return HALF_UP(Math.max(0, gross - discount) / item.quantity)
 }
 
-function getReturnableQty(item, existingReturns) {
+function getReturnableQty(item, existingReturns, saleId) {
   const already = (existingReturns || [])
-    .filter(r => r.status !== 'anulada')
+    .filter(r => r.status !== 'anulada' && r.saleId === saleId)
     .flatMap(r => r.items)
     .filter(ri => ri.saleItemId === item.id || ri.productId === item.productId)
     .reduce((acc, ri) => acc + ri.quantity, 0)
   return Math.max(0, item.quantity - already)
+}
+
+/**
+ * Restaura el stock de un producto respetando su estrategia de control de inventario.
+ * Equivalente a lo que hace saleService.cancel() pero para devoluciones parciales.
+ *
+ * @param {Object}   product      - Producto fresco del store
+ * @param {number}   qty          - Unidades a restaurar
+ * @param {string|null} batchId   - ID del lote (para lote_fefo / lote_fifo)
+ * @param {string|null} batchNum  - Número de lote / número de serie (para serie)
+ * @param {Function} updateProduct - Acción del store
+ */
+function _restoreProductStock(product, qty, batchId, batchNum, updateProduct) {
+  const ctrl = product.stockControl || 'simple'
+
+  if ((ctrl === 'lote_fefo' || ctrl === 'lote_fifo') && batchId) {
+    // Restaurar cantidad exacta en el lote específico
+    const updatedBatches = (product.batches || []).map(batch => {
+      if (batch.id !== batchId) return batch
+      const restored = (batch.quantity || 0) + qty
+      return {
+        ...batch,
+        quantity: restored,
+        status: batch.status === 'agotado' && restored > 0 ? 'activo' : batch.status,
+      }
+    })
+    const newStock = updatedBatches
+      .filter(b => b.status !== 'agotado' && b.status !== 'merma')
+      .reduce((sum, b) => sum + (b.quantity || 0), 0)
+    updateProduct(product.id, { batches: updatedBatches, stock: newStock })
+
+  } else if (ctrl === 'serie' && batchNum) {
+    // Restaurar el número de serie al producto
+    updateProduct(product.id, { stock: product.stock + qty, serialNumber: batchNum })
+
+  } else {
+    // Simple (o lote sin batchId conocido): incrementar stock directo
+    updateProduct(product.id, { stock: product.stock + qty })
+  }
 }
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
@@ -112,14 +156,11 @@ function KpiCard({ label, value, sub, color = 'gray', icon }) {
 }
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
-// Razones que requieren enviar el producto a merma en vez de stock regular
-const MERMA_REASONS_SET = new Set(['defectuoso', 'vencido', 'incompleto'])
-
 export default function Returns() {
   const {
     sales, clients, products,
     returns: existingReturns = [],
-    addReturn, updateSale, updateProduct, addAuditLog, addMermaRecord,
+    addReturn, updateSale, updateProduct, addAuditLog,
     businessConfig, systemConfig, currentUser,
   } = useStore()
 
@@ -134,10 +175,12 @@ export default function Returns() {
   const [historyFilter, setHistoryFilter] = useState('all')
   const [showRecent, setShowRecent] = useState(false)
 
-  // Ventas recientes completadas (para búsqueda rápida)
+  // Ventas recientes con comprobante emitido (para búsqueda rápida)
+  // Incluye 'devolucion' para permitir consultar comprobantes ya devueltos
+  const RETURNABLE_STATUSES = new Set(['completada', 'dev-parcial', 'devolucion'])
   const recentSales = useMemo(() =>
     [...sales]
-      .filter(s => s.status === 'completada' || s.status === 'dev-parcial')
+      .filter(s => RETURNABLE_STATUSES.has(s.status))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 8)
   , [sales])
@@ -148,7 +191,7 @@ export default function Returns() {
     const q = query.trim().toUpperCase()
     return sales
       .filter(s =>
-        (s.status === 'completada' || s.status === 'dev-parcial') &&
+        RETURNABLE_STATUSES.has(s.status) &&
         (s.invoiceNumber?.toUpperCase().includes(q) ||
          clients.find(c => c.id === s.clientId)?.name?.toUpperCase().includes(q))
       )
@@ -177,14 +220,19 @@ export default function Returns() {
   }, [existingReturns, historyFilter])
 
   // Items de la venta encontrada
+  // Filtramos los ítems expandidos de bundles (_fromBundle) — son detalles internos
+  // de descomposición de stock, no líneas facturables independientes. Solo mostramos
+  // el bundle padre (isBundle: true) para que el usuario devuelva el kit completo.
   const selectedItems = useMemo(() => {
     if (!foundSale) return []
-    return foundSale.items.map(item => ({
-      ...item,
-      returnableQty: getReturnableQty(item, existingReturns),
-      selectedQty:   selected[item.id] || 0,
-      netUnitPrice:  calcItemNetUnitPrice(item),
-    }))
+    return foundSale.items
+      .filter(item => !item._fromBundle)
+      .map(item => ({
+        ...item,
+        returnableQty: getReturnableQty(item, existingReturns, foundSale.id),
+        selectedQty:   selected[item.id] || 0,
+        netUnitPrice:  calcItemNetUnitPrice(item),
+      }))
   }, [foundSale, selected, existingReturns])
 
   const totalRefund = useMemo(() =>
@@ -240,18 +288,25 @@ export default function Returns() {
     const now     = new Date().toISOString()
     const ncItems = selectedItems
       .filter(i => (selected[i.id] || 0) > 0)
-      .map(i => ({
-        saleItemId:   i.id,
-        productId:    i.productId,
-        productName:  i.productName,
-        barcode:      i.barcode,
-        quantity:     selected[i.id],
-        unitPrice:    i.unitPrice,
-        netUnitPrice: i.netUnitPrice,
-        discount:     i.discount || 0,
-        totalRefund:  HALF_UP(i.netUnitPrice * selected[i.id]),
-        unit:         i.unit || 'unidad',
-      }))
+      .map(i => {
+        const saleItem    = foundSale.items?.find(si => si.id === i.id || si.productId === i.productId)
+        const firstBatch  = saleItem?.batchAllocations?.[0] ?? null
+        return {
+          saleItemId:   i.id,
+          productId:    i.productId,
+          productName:  i.productName,
+          barcode:      i.barcode,
+          quantity:     selected[i.id],
+          unitPrice:    i.unitPrice,
+          netUnitPrice: i.netUnitPrice,
+          discount:     i.discount || 0,
+          totalRefund:  HALF_UP(i.netUnitPrice * selected[i.id]),
+          unit:         i.unit || 'unidad',
+          batchId:      firstBatch?.batchId     ?? null,
+          batchNumber:  firstBatch?.batchNumber ?? null,
+          expiryDate:   firstBatch?.expiryDate  ?? null,
+        }
+      })
 
     const igvRate       = parseFloat(systemConfig?.igvRate ?? businessConfig?.igvRate ?? 0.18)
     const baseImponible = HALF_UP(totalRefund / (1 + igvRate))
@@ -274,40 +329,56 @@ export default function Returns() {
 
     addReturn(nc)
 
-    const goesToMerma = MERMA_REASONS_SET.has(reason)
-
     ncItems.forEach(ncItem => {
       const product = products.find(p => p.id === ncItem.productId)
       if (!product) return
 
-      if (goesToMerma) {
-        // Defectuoso / Vencido / Incompleto → NO regresa a stock, va a merma
-        addMermaRecord?.({
-          id:          crypto.randomUUID(),
-          productId:   ncItem.productId,
-          productName: ncItem.productName,
-          quantity:    ncItem.quantity,
-          reason:      `${nc.reasonLabel} — Dev. cliente (NC ${ncNumber})`,
-          status:      'en_merma',
-          createdAt:   now,
-          batchNumber: null,
-          expiryDate:  null,
-          unitCost:    product.priceBuy || 0,
-          totalLoss:   parseFloat(((product.priceBuy || 0) * ncItem.quantity).toFixed(2)),
-          userId:      currentUser?.id,
-          userName:    currentUser?.fullName || currentUser?.username,
-          supplierId:  product.supplierId || null,
-          supplierName: null,
-          ncNumber,
-          invoiceRef:  foundSale.invoiceNumber,
+      const isBundle = product.type === 'bundle'
+
+      if (isBundle) {
+        // Bundle/Kit → al vender se descontó el stock de los COMPONENTES, no del bundle.
+        // Los ítems de componentes en foundSale.items tienen sus propios batchAllocations
+        // registrados durante la venta — los usamos para restaurar lotes exactos.
+        ;(product.components || []).forEach(comp => {
+          const { products: freshProducts } = useStore.getState()
+          const cp = freshProducts.find(p => p.id === comp.productId)
+          if (!cp) return
+          const compSaleItem = foundSale.items?.find(
+            si => si._fromBundle === ncItem.productId && si.productId === comp.productId
+          )
+          const compBatchId  = compSaleItem?.batchAllocations?.[0]?.batchId     ?? null
+          const compBatchNum = compSaleItem?.batchAllocations?.[0]?.batchNumber  ?? null
+          const restoreQty   = comp.quantity * ncItem.quantity
+          _restoreProductStock(cp, restoreQty, compBatchId, compBatchNum, updateProduct)
         })
+
+        // Recalcular stock del bundle como mínimo de sus componentes ya restaurados.
+        // Mismo criterio que saleService.cancel: calcStockDisponible excluye lotes
+        // vencidos (FEFO) y lotes en merma para obtener el stock real disponible.
+        const { products: freshProds } = useStore.getState()
+        const freshBundle = freshProds.find(p => p.id === ncItem.productId)
+        if (freshBundle?.components?.length) {
+          const newBundleStock = Math.floor(
+            Math.min(...freshBundle.components.map(comp => {
+              const cp = freshProds.find(p => p.id === comp.productId)
+              return cp && comp.quantity > 0
+                ? Math.floor(calcStockDisponible(cp) / comp.quantity)
+                : 0
+            }))
+          )
+          updateProduct(freshBundle.id, { stock: newBundleStock })
+        }
+
       } else {
-        // Equivocado / Insatisfecho / Otro → sí regresa a stock regular
-        updateProduct(ncItem.productId, { stock: product.stock + ncItem.quantity })
+        // Producto regular → respetar la estrategia de control de inventario
+        _restoreProductStock(product, ncItem.quantity, ncItem.batchId, ncItem.batchNumber, updateProduct)
       }
     })
 
-    const totalOriginalQty = foundSale.items.reduce((a, i) => a + i.quantity, 0)
+    // Excluir componentes expandidos de bundles — son internos del motor de inventario,
+    // no líneas facturables. Solo contar los ítems facturables (padres).
+    const billableItems    = foundSale.items.filter(i => !i._fromBundle)
+    const totalOriginalQty = billableItems.reduce((a, i) => a + i.quantity, 0)
     const totalReturnedQty = [
       ...(existingReturns || []).filter(r => r.saleId === foundSale.id && r.status !== 'anulada'),
       nc
@@ -492,7 +563,7 @@ export default function Returns() {
                     </div>
                     {/* Mini productos */}
                     <div className="border-t border-violet-200/60 dark:border-violet-800/60 px-5 py-3 bg-white/50 dark:bg-slate-900/20 flex flex-wrap gap-2">
-                      {foundSale.items?.map((item, idx) => (
+                      {foundSale.items?.filter(i => !i._fromBundle).map((item, idx) => (
                         <span key={idx} className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 text-gray-600 dark:text-slate-400">
                           {item.quantity}× {item.productName}
                         </span>
@@ -663,12 +734,6 @@ export default function Returns() {
                     />
                   )}
 
-                  {reason && MERMA_REASONS_SET.has(reason) && hasSelection && (
-                    <div className="mb-3 flex items-start gap-3 p-3.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300">
-                      <span className="text-base shrink-0">⚠️</span>
-                      <p><strong>Los productos devueltos NO regresarán al stock regular.</strong> Se registrarán automáticamente en el <strong>Almacén de Merma</strong> con referencia a esta Nota de Crédito para su tramitación (reposición, devolución al proveedor o baja).</p>
-                    </div>
-                  )}
                   <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl text-xs text-amber-700 dark:text-amber-300">
                     <span className="text-base shrink-0">📋</span>
                     <p><strong>Nota de Crédito Electrónica:</strong> Este documento anula parcial o totalmente la boleta original y queda registrado en el sistema de auditoría.</p>
@@ -878,9 +943,6 @@ export default function Returns() {
                           <span className="text-base">{RETURN_REASONS.find(x => x.value === r.reason)?.icon || '📝'}</span>
                           <span className="text-xs text-gray-600 dark:text-slate-300">{r.reasonLabel}</span>
                         </div>
-                        {MERMA_REASONS_SET.has(r.reason) && (
-                          <span className="inline-block mt-1 text-[10px] bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-medium">⚠️ En merma</span>
-                        )}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600 dark:text-slate-300">{r.userName}</td>
                       <td className="px-4 py-4">

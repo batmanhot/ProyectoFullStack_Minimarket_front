@@ -12,8 +12,9 @@ const NAV_GROUPS = [
   { label:'Operaciones', items:[
     { key:'catalog',    label:'Catálogo',             icon:'🗂️' },
     { key:'inventory',  label:'Inventario',           icon:'📦' },
-    { key:'merma',      label:'Merma',                icon:'⚠️' },
-    { key:'suppliers',  label:'Proveedores',          icon:'🏭' },
+    { key:'merma',         label:'Merma',                icon:'⚠️' },
+    { key:'trazabilidad',  label:'Trazabilidad',         icon:'🧬' },
+    { key:'suppliers',     label:'Proveedores',          icon:'🏭' },
     { key:'purchases',  label:'Compras',              icon:'🛍️' },
   ]},
   { label:'Comercial',   items:[

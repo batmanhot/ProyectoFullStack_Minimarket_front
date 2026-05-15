@@ -11,15 +11,15 @@ export const APP_CONFIG = {
 export const ROLES = {
   admin: {
     label: 'Administrador', color: 'bg-blue-100 text-blue-700',
-    pages: ['dashboard','pos','catalog','inventory','merma','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns', 'loyalty', 'quotations'],
+    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings', 'returns', 'loyalty', 'quotations'],
   },
   gerente: {
     label: 'Gerente', color: 'bg-purple-100 text-purple-700',
-    pages: ['dashboard','pos','catalog','inventory','merma','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets', 'loyalty', 'quotations'],
+    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets', 'loyalty', 'quotations'],
   },
   supervisor: {
     label: 'Supervisor', color: 'bg-amber-100 text-amber-700',
-    pages: ['dashboard','pos','catalog','inventory','merma','cash','clients','alerts','discounts','tickets','returns', 'loyalty', 'quotations'],
+    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','cash','clients','alerts','discounts','tickets','returns', 'loyalty', 'quotations'],
   },
   cajero: {
     label: 'Cajero', color: 'bg-green-100 text-green-700',

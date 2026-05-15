@@ -11,6 +11,7 @@ import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
 import { evaluateDiscounts } from '../../shared/utils/discountEngine'
+import { calcStockDisponible } from '../../shared/utils/inventoryEngine'
 
 
 // ── F5: LoyaltyBadge ahora vive dentro de PaymentPanel (donde es visible) ────
@@ -89,6 +90,8 @@ export default function POS({ onNavigate }) {
   const [showTicket, setShowTicket]       = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showPayment, setShowPayment]     = useState(false)
+  const showPaymentRef = useRef(false)
+  showPaymentRef.current = showPayment          // sync on every render
   const [showHistory, setShowHistory]     = useState(false)
   // Estado de descuento por ítem: { [key]: { value: string, pct: bool } }
   const [discountEdit, setDiscountEdit]   = useState({})
@@ -215,7 +218,7 @@ export default function POS({ onNavigate }) {
     const handler = (e) => {
       if (e.key==='F2')  { e.preventDefault(); actionsRef.current.focusSearch() }
       if (e.key==='Escape') actionsRef.current.clearSearch()
-      if (e.key==='F8')  { e.preventDefault(); actionsRef.current.openPayment() }
+      if (e.key==='F8')  { e.preventDefault(); if (!showPaymentRef.current) actionsRef.current.openPayment() }
       if (e.key==='Delete' && e.ctrlKey) { e.preventDefault(); actionsRef.current.promptClear() }
     }
     window.addEventListener('keydown', handler)
@@ -230,8 +233,23 @@ export default function POS({ onNavigate }) {
     })
   }, [mergedCartItems]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Stock disponible real: usa calcStockDisponible (excluye lotes vencidos en FEFO).
+  // Para bundles = min(disponible_componente / qty_componente).
+  const getAvailableStock = (product) => {
+    if (product.type !== 'bundle' || !product.components?.length) {
+      return calcStockDisponible(product)
+    }
+    return Math.floor(
+      Math.min(...product.components.map(comp => {
+        const cp = products.find(p => p.id === comp.productId)
+        return cp && comp.quantity > 0 ? Math.floor(calcStockDisponible(cp) / comp.quantity) : 0
+      }))
+    )
+  }
+
   const handleSelectProduct = (product) => {
-    if (product.stock <= 0) { toast.error(`${product.name} sin stock`); return }
+    const available = getAvailableStock(product)
+    if (available <= 0) { toast.error(`${product.name} sin stock`); return }
     addToCart(product)
     setSearch(''); setShowResults(false)
     searchRef.current?.focus()
@@ -243,7 +261,8 @@ export default function POS({ onNavigate }) {
     const product = products.find(p => p.id===item?.productId)
     if (!product) return
     if (newQty <= 0) { removeFromCart(key); return }
-    if (newQty > product.stock) { toast.error(`Stock disponible: ${product.stock}`); return }
+    const available = getAvailableStock(product)
+    if (newQty > available) { toast.error(`Stock disponible: ${available}`); return }
     updateCartItem(key, { quantity: newQty })
   }
 
@@ -392,7 +411,7 @@ export default function POS({ onNavigate }) {
           {showResults && searchResults.length > 0 && (
             <div className="absolute left-3 right-3 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-20">
               {searchResults.map(product => (
-                <button key={product.id} onClick={() => handleSelectProduct(product)} disabled={product.stock===0}
+                <button key={product.id} onClick={() => handleSelectProduct(product)} disabled={getAvailableStock(product) === 0}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-b-0 disabled:opacity-40">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-800 truncate">{product.name}</div>
@@ -849,9 +868,12 @@ export default function POS({ onNavigate }) {
     <button
       onClick={() => setShowPayment(true)}
       disabled={cart.length === 0}
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-colors disabled:opacity-40 flex items-center justify-center gap-2 text-sm">
+      className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm shadow-sm shadow-blue-300 dark:shadow-none">
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
+      </svg>
       <span>Cobrar</span>
-      <span className="opacity-60 text-xs">F8</span>      
+      <span className="opacity-50 text-xs font-normal">F8</span>
     </button>
     <button onClick={openDisplay} title="Abrir pantalla del cliente">
       📺

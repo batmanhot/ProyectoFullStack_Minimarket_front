@@ -73,7 +73,7 @@ function buildTicketHTML(sale, businessConfig) {
     : ''
 
   // ── Items ──
-  const itemsHtml = (sale.items || []).map((item, idx) => {
+  const itemsHtml = (sale.items || []).filter(item => !item._fromBundle).map((item, idx) => {
     const qty = item.quantity ?? item.qty ?? 1
     const pu = item.unitPrice ?? item.price ?? 0
     const itemDiscount = item.totalDiscount ?? item.discount ?? 0
@@ -410,7 +410,7 @@ export default function SaleTicket({ sale, onClose }) {
               <hr style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }} />
 
               {/* Items */}
-              {(sale.items || []).map((item, idx) => {
+              {(sale.items || []).filter(item => !item._fromBundle).map((item, idx) => {
                 const qty = item.quantity ?? item.qty ?? 1
                 const pu = item.unitPrice ?? item.price ?? 0
                 const itemDiscount = item.totalDiscount ?? item.discount ?? 0

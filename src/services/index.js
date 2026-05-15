@@ -148,7 +148,7 @@ export const productService = {
   },
 }
 
-import { allocateStock } from '../shared/utils/inventoryEngine'
+import { allocateStock, calcStockDisponible } from '../shared/utils/inventoryEngine'
 
 
 export const saleService = {
@@ -252,6 +252,22 @@ export const saleService = {
         batchAllocations:  result.batchAllocations,
         stockControlUsed:  product.stockControl || 'simple',
       })
+    }
+
+    // Actualizar product.stock de cada bundle al nuevo mínimo de sus componentes.
+    // calcStockDisponible excluye lotes vencidos (FEFO) y lotes en merma.
+    for (const enrichedItem of enrichedItems) {
+      if (!enrichedItem.isBundle) continue
+      const freshState    = useStore.getState()
+      const bundleProduct = freshState.products.find(p => p.id === enrichedItem.productId)
+      if (!bundleProduct?.components?.length) continue
+      const newBundleStock = Math.floor(
+        Math.min(...bundleProduct.components.map(comp => {
+          const cp = freshState.products.find(p => p.id === comp.productId)
+          return cp && comp.quantity > 0 ? Math.floor(calcStockDisponible(cp) / comp.quantity) : 0
+        }))
+      )
+      freshState.updateProduct(bundleProduct.id, { stock: newBundleStock })
     }
 
     // Reemplazar items con los enriquecidos (que incluyen batchAllocations)
@@ -362,17 +378,72 @@ export const saleService = {
     if (sale.status !== 'completada') return fail('Solo se pueden cancelar ventas completadas')
 
     for (const item of sale.items) {
+      // Saltar el bundle padre — sus componentes restauran el stock individualmente
+      if (item.isBundle || item.stockControlUsed === 'bundle') continue
+
       const freshState = useStore.getState()
       const product    = freshState.products.find(p => p.id === item.productId)
       if (!product) continue
-      freshState.updateProduct(item.productId, { stock: product.stock + item.quantity })
+
+      const prevStock = product.stock
+      let stockUpdate
+      let newStock
+
+      if (
+        item.batchAllocations?.length > 0 &&
+        (item.stockControlUsed === 'lote_fefo' || item.stockControlUsed === 'lote_fifo')
+      ) {
+        // ── Lotes FEFO / FIFO: restaurar las cantidades exactas de cada lote ──
+        const updatedBatches = (product.batches || []).map(batch => {
+          const alloc = item.batchAllocations.find(a => a.batchId === batch.id)
+          if (!alloc) return batch
+          const restoredQty = (batch.quantity || 0) + alloc.quantity
+          return {
+            ...batch,
+            quantity: restoredQty,
+            // Reactivar el lote si estaba agotado por esta venta
+            status: batch.status === 'agotado' && restoredQty > 0 ? 'activo' : batch.status,
+          }
+        })
+        newStock    = updatedBatches
+          .filter(b => b.status !== 'agotado' && b.status !== 'merma')
+          .reduce((sum, b) => sum + (b.quantity || 0), 0)
+        stockUpdate = { batches: updatedBatches, stock: newStock }
+
+      } else if (item.stockControlUsed === 'serie' && item.batchAllocations?.[0]?.batchNumber) {
+        // ── Serie: restaurar el número de serie que se liberó al vender ──────
+        newStock    = product.stock + item.quantity
+        stockUpdate = { stock: newStock, serialNumber: item.batchAllocations[0].batchNumber }
+
+      } else {
+        // ── Simple: solo incrementar el stock ─────────────────────────────────
+        newStock    = product.stock + item.quantity
+        stockUpdate = { stock: newStock }
+      }
+
+      freshState.updateProduct(item.productId, stockUpdate)
       freshState.addStockMovement({
         id: crypto.randomUUID(), productId: item.productId, productName: product.name,
         type: 'entrada', quantity: item.quantity,
-        previousStock: product.stock, newStock: product.stock + item.quantity,
+        previousStock: prevStock, newStock,
         reason: `Cancelación ${sale.invoiceNumber}`, userId,
         createdAt: new Date().toISOString(),
       })
+    }
+
+    // Recalcular product.stock de bundles al nuevo mínimo de componentes
+    for (const item of sale.items) {
+      if (!item.isBundle) continue
+      const freshState    = useStore.getState()
+      const bundleProduct = freshState.products.find(p => p.id === item.productId)
+      if (!bundleProduct?.components?.length) continue
+      const newBundleStock = Math.floor(
+        Math.min(...bundleProduct.components.map(comp => {
+          const cp = freshState.products.find(p => p.id === comp.productId)
+          return cp && comp.quantity > 0 ? Math.floor(calcStockDisponible(cp) / comp.quantity) : 0
+        }))
+      )
+      freshState.updateProduct(bundleProduct.id, { stock: newBundleStock })
     }
 
     // Revertir deuda de crédito

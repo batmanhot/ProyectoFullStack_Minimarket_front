@@ -21,6 +21,8 @@ import { downloadExcel, exportToExcel, exportToPDF }  from '../../shared/utils/e
 import { ExcelButton, PDFButton }                       from '../../shared/components/ui/ExportButtons'
 import { useReportMetrics }                            from './hooks/useReportMetrics'
 import Modal                                            from '../../shared/components/ui/Modal'
+import { saleService }                                 from '../../services/index'
+import toast                                           from 'react-hot-toast'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const COLORS = ['#378ADD', '#5DCAA5', '#EF9F27', '#D85A30', '#7F77DD', '#D4537E']
@@ -143,12 +145,15 @@ function ExcelPreviewModal({ title, rows, filename, onClose, onDownload }) {
 }
 
 export default function Reports() {
-  const { sales, products, clients, categories, returns = [], businessConfig, systemConfig, addAuditLog } = useStore()
+  const { sales, products, clients, categories, returns = [], businessConfig, systemConfig, addAuditLog, currentUser } = useStore()
 
   const [range, setRange]           = useState('month')
   const [activeTab, setActiveTab]   = useState('ventas')
   const [expandedSale, setExpandedSale] = useState(null)
   const [excelPreview, setExcelPreview] = useState(null)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling]     = useState(false)
 
   // ── Todas las métricas vienen del hook ────────────────────────────────────
   const {
@@ -185,6 +190,23 @@ export default function Reports() {
       'Nota de venta': s.note || '—',
     }
   }), [filteredSales])
+
+  // ─── Anulación de venta ───────────────────────────────────────────────────
+  const handleCancelSale = async () => {
+    if (!cancelReason.trim()) return
+    setCancelling(true)
+    try {
+      await saleService.cancel(cancelTarget.id, cancelReason.trim(), currentUser.id)
+      addAuditLog({ action: 'CANCEL_SALE', module: 'Reportes', detail: `Anulación: ${cancelTarget.invoiceNumber} — ${cancelReason.trim()}` })
+      toast.success(`Venta ${cancelTarget.invoiceNumber} anulada`)
+      setCancelTarget(null)
+      setCancelReason('')
+    } catch (err) {
+      toast.error(err?.message || 'Error al anular la venta')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   // ─── Exportaciones ────────────────────────────────────────────────────────
   const handleExportExcel = (tab) => {
@@ -702,6 +724,22 @@ export default function Reports() {
                           <p className="text-sm font-black font-mono text-blue-700 dark:text-blue-300">{s.invoiceNumber}</p>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
+                          {s.status === 'anulada' && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 uppercase tracking-wide">ANULADA</span>
+                          )}
+                          {s.status === 'devolucion' && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 uppercase tracking-wide">DEV. TOTAL</span>
+                          )}
+                          {s.status === 'dev-parcial' && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 uppercase tracking-wide">DEV. PARCIAL</span>
+                          )}
+                          {s.status === 'completada' && ['admin', 'gerente'].includes(currentUser?.role) && (
+                            <button
+                              onClick={e => { e.stopPropagation(); setCancelTarget(s); setCancelReason('') }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 transition-colors">
+                              🚫 Anular
+                            </button>
+                          )}
                           <div className="text-right">
                             <p className="text-xs text-gray-400 uppercase tracking-wide">Total</p>
                             <p className="text-base font-black text-gray-800 dark:text-slate-100">{formatCurrency(s.total)}</p>
@@ -754,13 +792,16 @@ export default function Reports() {
                             </tr>
                           </thead>
                           <tbody>
-                            {s.items?.map((item, idx) => {
+                            {s.items?.filter(item => !item._fromBundle).map((item, idx) => {
                               const itemDiscount = parseFloat((
-                                (item.totalDiscount || 0) ||
-                                ((item.campaignDiscount || 0) + (item.discount || 0))
+                                item.totalDiscount != null
+                                  ? item.totalDiscount
+                                  : (item.campaignDiscount || 0) + (item.discount || 0)
                               ).toFixed(2))
-                              const itemSubtotal = item.netTotal ?? item.subtotal ??
-                                parseFloat(((item.quantity || 1) * item.unitPrice - itemDiscount).toFixed(2))
+                              const itemSubtotal = item.netTotal != null
+                                ? item.netTotal
+                                : item.subtotal ??
+                                  parseFloat(((item.quantity || 1) * item.unitPrice - itemDiscount).toFixed(2))
                               const hasBatch = item.batchAllocations?.length > 0
 
                               return (
@@ -958,6 +999,68 @@ export default function Reports() {
           onClose={() => setExcelPreview(null)}
           onDownload={handleDownloadOperaciones}
         />
+      )}
+
+      {/* ── Modal anulación de venta ────────────────────────────────────────── */}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xl flex-shrink-0">
+                🚫
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800 dark:text-gray-100">Anular venta</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  Comprobante <span className="font-mono font-bold text-gray-700 dark:text-gray-200">{cancelTarget.invoiceNumber}</span> · {formatCurrency(cancelTarget.total)}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+              ⚠️ Esta acción restaura el stock de todos los productos de la venta y marca el comprobante como <strong>ANULADA</strong>. No se puede deshacer.
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                Motivo de anulación <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                placeholder="Ej: Error en el precio, pedido cancelado por el cliente..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 dark:bg-gray-800 dark:text-gray-100 resize-none"
+              />
+              {cancelReason.trim() === '' && (
+                <p className="text-xs text-red-500">El motivo es obligatorio para anular una venta.</p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setCancelTarget(null); setCancelReason('') }}
+                disabled={cancelling}
+                className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50">
+                Cancelar
+              </button>
+              <button
+                onClick={handleCancelSale}
+                disabled={!cancelReason.trim() || cancelling}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {cancelling ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Anulando...
+                  </>
+                ) : '🚫 Confirmar anulación'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

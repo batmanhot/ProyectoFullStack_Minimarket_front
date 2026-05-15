@@ -408,13 +408,13 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
           </button>
         </div>
 
-        {/* ── FIX 1: Vista previa siempre en blanco con colorScheme light ────── */}
-        {/* ── FIX 2: Simulación A4 en lugar de ticket 80mm ─────────────────── */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-200 dark:bg-slate-900"
-          style={{ colorScheme: 'light' }}>
-          <div className="mx-auto bg-white shadow-lg"
+        {/* Vista previa — siempre fondo blanco, inmune al tema oscuro */}
+        <div className="flex-1 overflow-y-auto p-4"
+          style={{ background: '#d1d5db', colorScheme: 'light' }}>
+          <div className="mx-auto shadow-lg"
             style={{
               width: '100%', maxWidth: '480px',
+              background: '#ffffff',
               fontFamily: 'Arial, sans-serif',
               fontSize: '11px',
               color: '#111111',
@@ -509,7 +509,6 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
             </div>
           </div>
         </div>
-        {/* ─────────────────────────────────────────────────────────────────── */}
 
         {/* Panel WhatsApp */}
         {showPhone && (

@@ -32,12 +32,17 @@ const IGV_RATE = 0.18
 export function useReportMetrics({ sales, products, categories, returns = [], range }) {
 
   // ── 1. Ventas filtradas por rango de fecha ─────────────────────────────────
+  // Incluye 'completada', 'dev-parcial' y 'devolucion': todas son transacciones reales
+  // que generaron un comprobante. Las NCs (devoluciones) se registran por separado en
+  // returnMetrics y no eliminan el comprobante original del historial.
+  // Solo se excluyen 'anulada' y 'cancelada'.
   const filteredSales = useMemo(() => {
-    const completed = sales.filter((s) => s.status === 'completada')
-    if (range === 'today') return completed.filter((s) => isToday(s.createdAt))
-    if (range === 'week')  return completed.filter((s) => isThisWeek(s.createdAt))
-    if (range === 'month') return completed.filter((s) => isThisMonth(s.createdAt))
-    return completed
+    const ACTIVE_STATUSES = new Set(['completada', 'dev-parcial', 'devolucion'])
+    const active = sales.filter((s) => ACTIVE_STATUSES.has(s.status))
+    if (range === 'today') return active.filter((s) => isToday(s.createdAt))
+    if (range === 'week')  return active.filter((s) => isThisWeek(s.createdAt))
+    if (range === 'month') return active.filter((s) => isThisMonth(s.createdAt))
+    return active
   }, [sales, range])
 
   // ── 2. KPIs de ventas ──────────────────────────────────────────────────────

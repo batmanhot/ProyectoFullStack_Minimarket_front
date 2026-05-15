@@ -93,7 +93,7 @@ function ProductForm({ product, onClose }) {
   // Al leer del store directamente, React re-renderiza automáticamente al
   // agregar una categoría/marca/proveedor nuevo.
   const {
-    categories, brands, suppliers,
+    categories, brands, suppliers, products: allProducts,
     addCategory, addBrand, addSupplier,
   } = useStore()
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
@@ -103,7 +103,16 @@ function ProductForm({ product, onClose }) {
       stockControl: product.stockControl || 'simple',
       type:         product.type         || 'simple',
       useBatches:   product.useBatches   ?? false,
-      components:   product.components   || [],
+      components:   (product.components || []).map(comp => {
+        const p = allProducts.find(pr => pr.id === comp.productId)
+        return {
+          ...comp,
+          _name:      p?.name      ?? comp._name      ?? comp.productId,
+          _barcode:   p?.barcode   ?? comp._barcode   ?? '',
+          _unit:      p?.unit      ?? comp._unit      ?? 'u',
+          _priceSell: p?.priceSell ?? comp._priceSell ?? 0,
+        }
+      }),
       imageUrl:     product.imageUrl     || '',
       brand:        product.brand        || '',
     } : {

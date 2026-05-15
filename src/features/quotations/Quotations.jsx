@@ -264,9 +264,9 @@ ${(q.items||[]).map(i => {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        {/* Vista previa A4 integrada — colorScheme light para todos los temas */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-200 dark:bg-slate-900" style={{colorScheme:'light'}}>
-          <div className="mx-auto bg-white shadow-lg" style={{width:'100%',maxWidth:'480px',fontFamily:'Arial,sans-serif',fontSize:'11px',color:'#111111',WebkitTextFillColor:'#111111',padding:'20px',border:'1px solid #d1d5db',colorScheme:'light'}}>
+        {/* Vista previa — siempre fondo blanco, inmune al tema oscuro */}
+        <div className="flex-1 overflow-y-auto p-4" style={{background:'#d1d5db',colorScheme:'light'}}>
+          <div className="mx-auto shadow-lg" style={{width:'100%',maxWidth:'480px',background:'#ffffff',fontFamily:'Arial,sans-serif',fontSize:'11px',color:'#111111',WebkitTextFillColor:'#111111',padding:'20px',border:'1px solid #d1d5db',colorScheme:'light'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'14px'}}>
               <div>
                 {biz.logoUrl && <img src={biz.logoUrl} alt="" style={{maxHeight:'44px',maxWidth:'140px',objectFit:'contain',marginBottom:'6px',display:'block'}} onError={e => e.target.style.display='none'}/>}

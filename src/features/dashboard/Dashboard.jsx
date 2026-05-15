@@ -23,6 +23,25 @@ import {
 
 const COLORS = ['#378ADD','#5DCAA5','#EF9F27','#D85A30','#7F77DD','#D4537E']
 
+const MERMA_REASON_LABELS = {
+  vencido:    'Vencido',
+  danado:     'Dañado/Roto',
+  rotura:     'Rotura',
+  hurto:      'Hurto',
+  calidad:    'Calidad',
+  devolucion: 'Dev. cliente',
+  otro:       'Otro',
+}
+
+const RETURN_REASON_LABELS = {
+  defectuoso:   'Defectuoso',
+  vencido:      'Vencido',
+  equivocado:   'Error cobro',
+  insatisfecho: 'Insatisfecho',
+  incompleto:   'Incompleto',
+  otro:         'Otro',
+}
+
 // ─── Helpers comunes ──────────────────────────────────────────────────────────
 function getRange(key) {
   const now = new Date(), s = new Date(now)
@@ -320,14 +339,288 @@ function DashboardSupervisor({ sales, products, categories, returns, currentUser
   )
 }
 
+// ─── WIDGET: MERMAS ───────────────────────────────────────────────────────────
+function WidgetMermas({ mermaRecords = [], currRange }) {
+  const filtered = useMemo(() =>
+    mermaRecords.filter(r => {
+      const d = new Date(r.createdAt)
+      return d >= currRange.from && d <= currRange.to
+    })
+  , [mermaRecords, currRange])
+
+  const totalLoss = parseFloat(filtered.reduce((a, r) => a + (r.totalLoss || 0), 0).toFixed(2))
+  const totalQty  = filtered.reduce((a, r) => a + (r.quantity || 0), 0)
+  const activos   = mermaRecords.filter(r => r.status === 'en_merma').length
+
+  const topProductos = useMemo(() => {
+    const map = {}
+    filtered.forEach(r => {
+      if (!map[r.productId]) map[r.productId] = { name: r.productName || r.productId, loss: 0, qty: 0 }
+      map[r.productId].loss += r.totalLoss || 0
+      map[r.productId].qty  += r.quantity  || 0
+    })
+    return Object.values(map)
+      .sort((a, b) => b.loss - a.loss)
+      .slice(0, 6)
+      .map(p => ({
+        ...p,
+        name: p.name.length > 24 ? p.name.slice(0, 22) + '…' : p.name,
+        loss: parseFloat(p.loss.toFixed(2)),
+      }))
+  }, [filtered])
+
+  const porMotivo = useMemo(() => {
+    const map = {}
+    filtered.forEach(r => {
+      const key = MERMA_REASON_LABELS[r.reason] || r.reason || 'Otro'
+      if (!map[key]) map[key] = { name: key, count: 0, loss: 0 }
+      map[key].count += 1
+      map[key].loss  += r.totalLoss || 0
+    })
+    return Object.values(map).sort((a, b) => b.loss - a.loss)
+  }, [filtered])
+
+  return (
+    <div>
+      <SectionTitle>🗑️ Mermas del período</SectionTitle>
+      <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* KPIs + motivos */}
+        <div className="flex flex-col gap-3">
+          <div className="bg-white dark:bg-slate-800 border border-red-100 dark:border-red-900/30 rounded-xl p-4">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Pérdida valorizada</p>
+            <p className="text-2xl font-semibold text-red-600 dark:text-red-400">{formatCurrency(totalLoss)}</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{totalQty} unid. · {filtered.length} registro(s)</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">En almacén merma ahora</p>
+            <p className={`text-2xl font-semibold ${activos > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{activos}</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">productos pendientes de gestión</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 flex-1">
+            <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-2">Por motivo</p>
+            {porMotivo.length > 0 ? (
+              <div className="space-y-1.5">
+                {porMotivo.map((m, i) => (
+                  <div key={i} className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600 dark:text-slate-300 truncate mr-2">{m.name} <span className="text-gray-400">({m.count})</span></span>
+                    <span className="font-medium text-red-500 shrink-0">{formatCurrency(m.loss)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-300 dark:text-slate-600 text-center py-3">Sin mermas en el período</p>
+            )}
+          </div>
+        </div>
+
+        {/* Bar chart top productos */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-4">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Top productos con mayor pérdida</h3>
+          {topProductos.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={topProductos} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0"/>
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => `S/${v}`}/>
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#6b7280' }} width={130}/>
+                <Tooltip
+                  formatter={(v, n, props) => [
+                    `${formatCurrency(v)} · ${props.payload.qty} unid.`,
+                    'Pérdida',
+                  ]}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Bar dataKey="loss" fill="#ef4444" radius={[0, 4, 4, 0]}>
+                  {topProductos.map((_, i) => (
+                    <Cell key={i} fill={i === 0 ? '#dc2626' : '#ef4444'} fillOpacity={1 - i * 0.1}/>
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-48 text-gray-300 dark:text-slate-600">
+              <span className="text-4xl mb-2 opacity-40">✅</span>
+              <span className="text-sm">Sin mermas registradas en el período</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── WIDGET: EMBUDO DE DEVOLUCIONES ───────────────────────────────────────────
+function WidgetEmbudo({ returns = [], currSales, currTotal, currRange }) {
+  const filteredReturns = useMemo(() =>
+    returns.filter(r => {
+      if (r.status === 'anulada') return false
+      const d = new Date(r.createdAt)
+      return d >= currRange.from && d <= currRange.to
+    })
+  , [returns, currRange])
+
+  const totalReembolsado = parseFloat(filteredReturns.reduce((a, r) => a + r.totalRefund, 0).toFixed(2))
+  const ventasAfectadas  = new Set(filteredReturns.map(r => r.saleId)).size
+  const tasaDev          = currSales.length > 0
+    ? parseFloat((ventasAfectadas / currSales.length * 100).toFixed(1))
+    : 0
+  const tasaMonto        = currTotal > 0
+    ? parseFloat((totalReembolsado / currTotal * 100).toFixed(1))
+    : 0
+  const ventasNetas      = parseFloat((currTotal - totalReembolsado).toFixed(2))
+
+  const tasaColor =
+    tasaDev > 5  ? 'text-red-500 dark:text-red-400' :
+    tasaDev > 2  ? 'text-amber-500 dark:text-amber-400' :
+                   'text-emerald-600 dark:text-emerald-400'
+
+  const topMotivos = useMemo(() => {
+    const map = {}
+    filteredReturns.forEach(r => {
+      const key = RETURN_REASON_LABELS[r.reason] || r.reasonLabel || r.reason || 'Otro'
+      if (!map[key]) map[key] = { name: key, count: 0, monto: 0 }
+      map[key].count += 1
+      map[key].monto += r.totalRefund || 0
+    })
+    return Object.values(map).sort((a, b) => b.count - a.count)
+  }, [filteredReturns])
+
+  const funnelStages = [
+    {
+      label:   'Ventas brutas',
+      detail:  `${currSales.length} transacción(es)`,
+      amount:  currTotal,
+      pct:     100,
+      color:   'bg-blue-500',
+    },
+    {
+      label:   'Ventas con devolución',
+      detail:  `${ventasAfectadas} venta(s) afectada(s)`,
+      amount:  totalReembolsado,
+      pct:     tasaDev,
+      color:   tasaDev > 5 ? 'bg-red-500' : tasaDev > 2 ? 'bg-amber-400' : 'bg-emerald-500',
+    },
+    {
+      label:   'Monto reembolsado',
+      detail:  `${filteredReturns.length} nota(s) de crédito`,
+      amount:  totalReembolsado,
+      pct:     tasaMonto,
+      color:   'bg-red-400',
+    },
+  ]
+
+  return (
+    <div>
+      <SectionTitle>🔄 Embudo de devoluciones</SectionTitle>
+      <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Funnel + KPIs footer */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-5">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-4">Flujo ventas → devoluciones</h3>
+          <div className="space-y-4">
+            {funnelStages.map((stage, i) => (
+              <div key={i}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="font-medium text-gray-700 dark:text-slate-300">{stage.label}</span>
+                  <span className="text-gray-500 dark:text-slate-400">{stage.detail} · {formatCurrency(stage.amount)}</span>
+                </div>
+                <div className="h-9 bg-gray-100 dark:bg-slate-700 rounded-lg overflow-hidden">
+                  <div
+                    className={`h-full ${stage.color} rounded-lg flex items-center pl-3 transition-all duration-500`}
+                    style={{ width: `${Math.max(stage.pct, 1.5)}%` }}
+                  >
+                    {stage.pct >= 6 && (
+                      <span className="text-white text-xs font-bold">{stage.pct}%</span>
+                    )}
+                  </div>
+                </div>
+                {stage.pct < 6 && stage.pct > 0 && (
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 pl-1">{stage.pct}%</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-slate-700">
+            <div className="text-center">
+              <p className="text-xs text-gray-500 dark:text-slate-400">Tasa devolución</p>
+              <p className={`text-xl font-bold mt-0.5 ${tasaColor}`}>{tasaDev}%</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                {tasaDev <= 2 ? '✅ Saludable' : tasaDev <= 5 ? '⚠️ Vigilar' : '🚨 Crítico'}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500 dark:text-slate-400">Reembolsado</p>
+              <p className="text-xl font-bold mt-0.5 text-red-500 dark:text-red-400">{formatCurrency(totalReembolsado)}</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{tasaMonto}% de ventas</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500 dark:text-slate-400">Ventas netas</p>
+              <p className="text-xl font-bold mt-0.5 text-emerald-600 dark:text-emerald-400">{formatCurrency(ventasNetas)}</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">después de devoluciones</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Top motivos */}
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-4">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Top motivos</h3>
+          {topMotivos.length > 0 ? (
+            <div className="space-y-3">
+              {topMotivos.map((m, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{ background: COLORS[i % COLORS.length] + '22', color: COLORS[i % COLORS.length] }}
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-700 dark:text-slate-300 truncate">{m.name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex-1 h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${topMotivos[0].count > 0 ? (m.count / topMotivos[0].count * 100) : 0}%`,
+                            background: COLORS[i % COLORS.length],
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-400 shrink-0">{m.count}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-red-500 dark:text-red-400 shrink-0">{formatCurrency(m.monto)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-300 dark:text-slate-600">
+              <span className="text-4xl mb-2 opacity-40">👍</span>
+              <span className="text-sm text-center">Sin devoluciones en el período</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── VISTA ADMIN / GERENTE ────────────────────────────────────────────────────
-function DashboardEjecutivo({ sales, products, categories, returns, clients }) {
+function DashboardEjecutivo({ sales, products, categories, returns, clients, mermaRecords }) {
   const [range, setRange] = useState('month')
 
   const currRange = useMemo(() => getRange(range), [range])
   const prevRange = useMemo(() => getPrevRange(range), [range])
   const currSales = useMemo(() => filterSales(sales, currRange), [sales, currRange])
   const prevSales = useMemo(() => filterSales(sales, prevRange), [sales, prevRange])
+
+  const mermaTotal = useMemo(() =>
+    parseFloat((mermaRecords || []).filter(r => {
+      const d = new Date(r.createdAt)
+      return d >= currRange.from && d <= currRange.to
+    }).reduce((a, r) => a + (r.totalLoss || 0), 0).toFixed(2))
+  , [mermaRecords, currRange])
 
   // Métricas
   const currTotal   = parseFloat(currSales.reduce((a,s) => a+s.total, 0).toFixed(2))
@@ -441,12 +734,14 @@ function DashboardEjecutivo({ sales, products, categories, returns, clients }) {
       {/* KPIs ejecutivos */}
       <div>
         <SectionTitle>Indicadores del período</SectionTitle>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
-          <KPI label="Ventas brutas"    value={formatCurrency(currTotal)}    trend={prevRange ? pct(currTotal, prevTotal) : null}   icon="💰" color="text-blue-600 dark:text-blue-400"/>
-          <KPI label="Ventas netas"     value={formatCurrency(ventasNetas)}  icon="✅" color="text-emerald-600 dark:text-emerald-400" sub={currDev > 0 ? `-${formatCurrency(currDev)} dev.` : undefined}/>
-          <KPI label="Utilidad bruta"   value={formatCurrency(currUtil)}     trend={prevRange ? pct(currUtil, prevUtil) : null}      icon="📈" color="text-teal-600 dark:text-teal-400"/>
-          <KPI label="Margen bruto"     value={`${margenPct}%`}              icon="🎯" color={margenPct >= 30 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}/>
-          <KPI label="Ticket promedio"  value={formatCurrency(currAvg)}      trend={prevRange ? pct(currAvg, prevAvg) : null}        icon="📊"/>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mt-3">
+          <KPI label="Ventas brutas"       value={formatCurrency(currTotal)}    trend={prevRange ? pct(currTotal, prevTotal) : null}   icon="💰" color="text-blue-600 dark:text-blue-400"/>
+          <KPI label="Ventas netas"        value={formatCurrency(ventasNetas)}  icon="✅" color="text-emerald-600 dark:text-emerald-400" sub={currDev > 0 ? `-${formatCurrency(currDev)} dev.` : undefined}/>
+          <KPI label="Utilidad bruta"      value={formatCurrency(currUtil)}     trend={prevRange ? pct(currUtil, prevUtil) : null}      icon="📈" color="text-teal-600 dark:text-teal-400"/>
+          <KPI label="Margen bruto"        value={`${margenPct}%`}              icon="🎯" color={margenPct >= 30 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}/>
+          <KPI label="Ticket promedio"     value={formatCurrency(currAvg)}      trend={prevRange ? pct(currAvg, prevAvg) : null}        icon="📊"/>
+          <KPI label="Val. Mermas"         value={formatCurrency(mermaTotal)}   icon="🗑️" color="text-orange-600 dark:text-orange-400" sub="Pérdidas en el período"/>
+          <KPI label="Val. Devoluciones"   value={formatCurrency(currDev)}      icon="↩️" color="text-purple-600 dark:text-purple-400" sub="Reembolsado en el período"/>
         </div>
       </div>
 
@@ -577,6 +872,7 @@ function DashboardEjecutivo({ sales, products, categories, returns, clients }) {
           </div>
         </div>
       )}
+
     </div>
   )
 }
@@ -585,6 +881,7 @@ function DashboardEjecutivo({ sales, products, categories, returns, clients }) {
 export default function Dashboard() {
   const {
     sales, products, categories, returns, clients,
+    mermaRecords,
     activeCashSession, currentUser, users,
   } = useStore()
 
@@ -624,6 +921,7 @@ export default function Dashboard() {
       categories={categories}
       returns={returns}
       clients={clients}
+      mermaRecords={mermaRecords || []}
     />
   )
 }

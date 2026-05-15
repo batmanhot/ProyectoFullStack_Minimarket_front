@@ -34,6 +34,7 @@ const Settings   = lazy(() => import('./features/settings/Settings'))
 const LoyaltyConsulta = lazy(() => import('./features/loyalty/LoyaltyConsulta'))
 const Quotations = lazy(() => import('./features/quotations/Quotations'))
 const Merma           = lazy(() => import('./features/merma/Merma'))
+const Trazabilidad    = lazy(() => import('./features/trazabilidad/Trazabilidad'))
 const CustomerDisplay = lazy(() => import('./features/pos/CustomerDisplay'))
 
 
@@ -44,7 +45,7 @@ const PAGES = {
   cash: Cash, clients: Clients, reports: Reports,
   users: Users, audit: Audit, alerts: Alerts,
   discounts: Discounts, tickets: Tickets, returns: Returns,
-  settings: Settings, loyalty: LoyaltyConsulta, quotations: Quotations, merma: Merma, 'customer-display': CustomerDisplay,
+  settings: Settings, loyalty: LoyaltyConsulta, quotations: Quotations, merma: Merma, trazabilidad: Trazabilidad, 'customer-display': CustomerDisplay,
 }
 
 // ── PageFallback — spinner mientras carga el módulo lazy ──────────────────────
