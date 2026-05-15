@@ -109,14 +109,16 @@ export default function Login() {
           background-image: url(/bg_login.png);
           background-size: cover;
           background-position: center 30%;
-          filter: brightness(0.30) saturate(0.7);
+          filter: brightness(0.55) saturate(0.85);
         }
         .login-overlay {
           position: absolute; inset: 0;
-          background: linear-gradient(135deg,
-            rgba(5,15,40,0.98) 0%,
-            rgba(8,22,60,0.92) 40%,
-            rgba(10,30,80,0.65) 100%);
+          background: linear-gradient(to right,
+            rgba(2,8,26,0.68) 0%,
+            rgba(2,8,26,0.60) 28%,
+            rgba(4,14,38,0.38) 46%,
+            rgba(4,12,34,0.22) 65%,
+            rgba(4,12,34,0.06) 100%);
         }
         .login-dots {
           position: absolute; inset: 0; opacity: 0.035;
@@ -133,26 +135,34 @@ export default function Login() {
           min-height: 100dvh;
         }
 
-        /* DESKTOP: dos columnas */
-        @media (min-width: 900px) {
+        /* DESKTOP: dos columnas — card a la izquierda, branding a la derecha */
+        @media (min-width: 768px) {
           .login-layout { flex-direction: row; align-items: stretch; }
           .login-left {
             flex: 1;
             display: flex; flex-direction: column; justify-content: center;
-            padding: 60px 56px;
+            align-items: flex-end;
+            padding: 60px 60px 60px 0;
             min-width: 0;
+            order: 2;
           }
           .login-right {
-            width: 440px; flex-shrink: 0;
+            width: 420px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
-            padding: 32px 36px 32px 0;
+            padding: 32px 24px 32px 36px;
+            order: 1;
           }
           .login-card { width: 100%; }
-          .login-left-inner { max-width: 520px; }
+          .login-left-inner { max-width: 500px; width: 100%; }
+        }
+        @media (min-width: 1024px) {
+          .login-right { width: 460px; }
+          .login-left { padding: 60px 72px 60px 0; }
+          .login-left-inner { max-width: 540px; }
         }
 
-        /* MOBILE/TABLET: columna única — card primero, branding debajo */
-        @media (max-width: 899px) {
+        /* MOBILE: columna única — card primero, branding debajo */
+        @media (max-width: 767px) {
           .login-layout {
             flex-direction: column;
             align-items: center;
@@ -188,13 +198,13 @@ export default function Login() {
 
         /* ── Card ── */
         .login-card-inner {
-          background: rgba(255,255,255,0.045);
-          border: 1px solid rgba(255,255,255,0.10);
+          background: rgba(4,10,28,0.72);
+          border: 1px solid rgba(255,255,255,0.12);
           border-radius: 22px;
           padding: 32px 28px;
-          backdrop-filter: blur(28px);
-          -webkit-backdrop-filter: blur(28px);
-          box-shadow: 0 24px 80px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.07) inset;
+          backdrop-filter: blur(32px);
+          -webkit-backdrop-filter: blur(32px);
+          box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.07) inset;
           animation: fadeUp .5s ease both;
         }
 
@@ -259,20 +269,22 @@ export default function Login() {
 
         /* ── Feature card animada ── */
         .feat-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.09);
+          background: rgba(0,0,0,0.40);
+          border: 1px solid rgba(255,255,255,0.14);
           border-radius: 16px;
           padding: 18px 20px;
           margin-bottom: 20px;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
         }
 
         /* ── Badge sector ── */
         .sector-badge {
           display: inline-flex; align-items: center; gap: 7px;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.09);
+          background: rgba(0,0,0,0.35);
+          border: 1px solid rgba(255,255,255,0.13);
           border-radius: 30px; padding: 5px 13px;
-          font-size: 11px; color: rgba(255,255,255,0.4);
+          font-size: 11px; color: rgba(255,255,255,0.65);
           font-weight: 500; margin: 3px;
         }
 
@@ -400,11 +412,12 @@ export default function Login() {
               {/* Badge */}
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '7px',
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.11)',
+                background: 'rgba(0,0,0,0.30)', border: '1px solid rgba(255,255,255,0.18)',
                 borderRadius: '30px', padding: '5px 13px', marginBottom: '24px',
+                backdropFilter: 'blur(4px)',
               }}>
                 <span style={{ fontSize: '13px' }}>🛒</span>
-                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: 700 }}>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.85)', letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: 700 }}>
                   Sistema POS · Retail Minorista
                 </span>
               </div>
@@ -421,7 +434,7 @@ export default function Login() {
               }}>
                 Gestión inteligente
               </h2>
-              <p className="h-desc" style={{ fontSize: '15px', color: 'rgba(255,255,255,0.50)', lineHeight: 1.75, margin: '0 0 36px', maxWidth: '400px' }}>
+              <p className="h-desc" style={{ fontSize: '15px', color: 'rgba(255,255,255,0.88)', lineHeight: 1.75, margin: '0 0 36px', maxWidth: '400px' }}>
                 Solución completa para microempresas de venta minorista. Bodega, ferretería, calzado, farmacia y más.
               </p>
 
@@ -437,7 +450,7 @@ export default function Login() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginBottom: '2px' }}>{FEATURES[tick].label}</div>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)' }}>{FEATURES[tick].desc}</div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)' }}>{FEATURES[tick].desc}</div>
                   </div>
                   {/* Indicadores */}
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
@@ -457,7 +470,7 @@ export default function Login() {
                 {FEATURES.map((f, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: i === tick ? 1 : 0.38, transition: 'opacity .3s' }}>
                     <span style={{ fontSize: '12px' }}>{f.icon}</span>
-                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.70)', fontWeight: 500 }}>{f.label}</span>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.90)', fontWeight: 500 }}>{f.label}</span>
                   </div>
                 ))}
               </div>
