@@ -39,6 +39,27 @@ export function ExcelButton({ onClick, label = 'Excel', className = '' }) {
   )
 }
 
+const ICON_IMPORT = (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="17,8 12,3 7,8"/>
+    <line x1="12" y1="3" x2="12" y2="15"/>
+  </svg>
+)
+
+export function ImportButton({ onClick, label = 'Importar', className = '' }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-violet-50 text-violet-700 border border-violet-200 rounded-lg hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800 dark:hover:bg-violet-900/30 transition-colors ${className}`}
+    >
+      {ICON_IMPORT}
+      {label}
+    </button>
+  )
+}
+
 export function PDFButton({ onClick, label = 'PDF', className = '' }) {
   return (
     <button

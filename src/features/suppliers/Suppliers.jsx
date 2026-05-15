@@ -6,7 +6,8 @@ import { supplierSchema } from '../../shared/schemas/index'
 import { supplierService } from '../../services/index'
 import { formatCurrency, formatDate } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
-import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
+import { ExcelButton, PDFButton, ImportButton } from '../../shared/components/ui/ExportButtons'
+import ExcelImportModal from '../../shared/components/ui/ExcelImportModal'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import Modal from '../../shared/components/ui/Modal'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -42,8 +43,9 @@ function SupplierForm({ supplier, onClose }) {
 
 export default function Suppliers() {
   const { suppliers, products, purchases, businessConfig, addAuditLog } = useStore()
-  const [search, setSearch] = useState('')
-  const [modal, setModal]   = useState(null)
+  const [search,      setSearch]      = useState('')
+  const [modal,       setModal]       = useState(null)
+  const [importOpen,  setImportOpen]  = useState(false)
   const dq = useDebounce(search, 150)
 
   const filtered = useMemo(() => {
@@ -84,6 +86,7 @@ export default function Suppliers() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div><h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Proveedores</h1><p className="text-sm text-gray-400 dark:text-slate-500">{filtered.length} registros</p></div>
         <div className="flex gap-2 flex-wrap">
+          <ImportButton onClick={() => setImportOpen(true)} label="Importar Excel" />
           <ExcelButton onClick={handleExportExcel} />
           <PDFButton   onClick={handleExportPDF} />
           <button onClick={() => setModal({ type: 'form', data: null })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
@@ -123,6 +126,7 @@ export default function Suppliers() {
       )}
 
       {modal?.type === 'form' && <Modal title={modal.data ? 'Editar proveedor' : 'Nuevo proveedor'} onClose={() => setModal(null)}><SupplierForm supplier={modal.data} onClose={() => setModal(null)}/></Modal>}
+      {importOpen && <ExcelImportModal entityType="suppliers" onClose={() => setImportOpen(false)} />}
     </div>
   )
 }

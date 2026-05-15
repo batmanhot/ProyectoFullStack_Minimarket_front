@@ -6,7 +6,8 @@ import { productSchema } from '../../shared/schemas/index'
 import { productService } from '../../services/index'
 import { formatCurrency, formatDate } from '../../shared/utils/helpers'
 import { exportToExcel } from '../../shared/utils/export'
-import { ExcelButton } from '../../shared/components/ui/ExportButtons'
+import { ExcelButton, ImportButton } from '../../shared/components/ui/ExportButtons'
+import ExcelImportModal from '../../shared/components/ui/ExcelImportModal'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import { StockBadge, ExpiryBadge } from '../../shared/components/ui/Badge'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -731,12 +732,13 @@ function BrandForm({ brand, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function ProductsView({ products, categories, brands, suppliers, businessConfig, addAuditLog }) {
   const { deleteProduct } = useStore()
-  const [search, setSearch]     = useState('')
-  const [catFilter, setCatFilter] = useState('')
+  const [search, setSearch]       = useState('')
+  const [catFilter, setCatFilter]   = useState('')
   const [brandFilter, setBrandFilter] = useState('')
-  const [status, setStatus]     = useState('active')
-  const [modal, setModal]       = useState(null)
+  const [status, setStatus]       = useState('active')
+  const [modal, setModal]         = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [importOpen, setImportOpen] = useState(false)
   const dq = useDebounce(search, 150)
 
   const filtered = useMemo(() => {
@@ -820,6 +822,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
             </button>
           ))}
         </div>
+        <ImportButton onClick={() => setImportOpen(true)} label="Importar Excel" />
         <ExcelButton onClick={handleExportExcel} />
         {/* Etiquetas de precio 58mm */}
         <button
@@ -936,6 +939,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
           onConfirm={() => handleDelete(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}/>
       )}
+      {importOpen && <ExcelImportModal entityType="products" onClose={() => setImportOpen(false)} />}
     </div>
   )
 }
@@ -948,6 +952,7 @@ function CategoriesView({ categories, products }) {
   const [search, setSearch]         = useState('')
   const [modal, setModal]           = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [importOpen, setImportOpen] = useState(false)
   const dq = useDebounce(search, 150)
 
   const filtered = useMemo(() => {
@@ -996,6 +1001,7 @@ function CategoriesView({ categories, products }) {
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar categoría..."
           className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <ImportButton onClick={() => setImportOpen(true)} label="Importar Excel" />
         <button onClick={() => setModal({ data: null })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
@@ -1080,6 +1086,7 @@ function CategoriesView({ categories, products }) {
           onConfirm={() => handleDelete(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}/>
       )}
+      {importOpen && <ExcelImportModal entityType="categories" onClose={() => setImportOpen(false)} />}
     </div>
   )
 }
@@ -1092,6 +1099,7 @@ function BrandsView({ brands, products }) {
   const [search, setSearch]             = useState('')
   const [modal, setModal]               = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [importOpen, setImportOpen]     = useState(false)
   const dq = useDebounce(search, 150)
 
   const filtered = useMemo(() => {
@@ -1146,6 +1154,7 @@ function BrandsView({ brands, products }) {
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar marca..."
           className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <ImportButton onClick={() => setImportOpen(true)} label="Importar Excel" />
         <button onClick={() => setModal({ data: null })}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
@@ -1234,6 +1243,7 @@ function BrandsView({ brands, products }) {
           onConfirm={() => handleDelete(deleteTarget)}
           onCancel={() => setDeleteTarget(null)}/>
       )}
+      {importOpen && <ExcelImportModal entityType="brands" onClose={() => setImportOpen(false)} />}
     </div>
   )
 }

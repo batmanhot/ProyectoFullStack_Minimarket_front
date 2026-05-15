@@ -6,7 +6,8 @@ import { clientSchema } from '../../shared/schemas/index'
 import { clientService } from '../../services/index'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
-import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
+import { ExcelButton, PDFButton, ImportButton } from '../../shared/components/ui/ExportButtons'
+import ExcelImportModal from '../../shared/components/ui/ExcelImportModal'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import Modal from '../../shared/components/ui/Modal'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -248,9 +249,10 @@ function ClientDetail({ client, sales, onClose }) {
 
 export default function Clients() {
   const { clients, sales, debtPayments, businessConfig, addAuditLog } = useStore()
-  const [search, setSearch]   = useState('')
-  const [modal, setModal]     = useState(null)
-  const [activeTab, setActiveTab] = useState('clientes')
+  const [search,      setSearch]      = useState('')
+  const [modal,       setModal]       = useState(null)
+  const [activeTab,   setActiveTab]   = useState('clientes')
+  const [importOpen,  setImportOpen]  = useState(false)
   const dq = useDebounce(search, 150)
 
   const debtTotal = clients.filter(c => c.isActive && c.currentDebt>0).reduce((a,c) => a+(c.currentDebt||0), 0)
@@ -333,6 +335,7 @@ export default function Clients() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <ImportButton onClick={() => setImportOpen(true)} label="Importar Excel" />
           <ExcelButton onClick={handleExportExcel} />
           <PDFButton   onClick={handleExportPDF} />
           <button onClick={() => setModal({ type: 'form', data: null })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
@@ -558,6 +561,7 @@ export default function Clients() {
       {modal?.type === 'form' && <Modal title={modal.data ? 'Editar cliente' : 'Nuevo cliente'} onClose={() => setModal(null)}><ClientForm client={modal.data} onClose={() => setModal(null)}/></Modal>}
       {modal?.type === 'detail' && <Modal title={modal.data.name} subtitle={`${modal.data.documentType}: ${modal.data.documentNumber}`} onClose={() => setModal(null)}><ClientDetail client={modal.data} sales={sales} onClose={() => setModal(null)}/></Modal>}
       {modal?.type === 'debt' && <Modal title="Registrar pago de deuda" subtitle={`Deuda actual: ${formatCurrency(modal.data.currentDebt||0)}`} onClose={() => setModal(null)}><DebtPaymentForm client={modal.data} onClose={() => setModal(null)}/></Modal>}
+      {importOpen && <ExcelImportModal entityType="clients" onClose={() => setImportOpen(false)} />}
     </div>
   )
 }
