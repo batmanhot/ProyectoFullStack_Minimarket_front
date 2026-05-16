@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePOSBroadcast, buildCartForDisplay } from './POSBroadcast'
 import { useStore, selectCartCount } from '../../store/index'
-import { saleService } from '../../services/index'
-import { calcCartTotals, fuzzySearch, formatCurrency } from '../../shared/utils/helpers'
+import { saleService, discountTicketService } from '../../services/index'
+import { fuzzySearch, formatCurrency } from '../../shared/utils/helpers'
 import { useDebounce } from '../../shared/hooks/useDebounce'
 import { StockBadge, ExpiryBadge } from '../../shared/components/ui/Badge'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -10,23 +10,16 @@ import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import PaymentPanel from './components/PaymentPanel'
 import SaleTicket from './components/SaleTicket'
 import toast from 'react-hot-toast'
-import { evaluateDiscounts } from '../../shared/utils/discountEngine'
 import { calcStockDisponible } from '../../shared/utils/inventoryEngine'
-
-
-// ── F5: LoyaltyBadge ahora vive dentro de PaymentPanel (donde es visible) ────
-// import LoyaltyBadge from './components/LoyaltyBadge'  ← ya no necesario aquí
-// ─────────────────────────────────────────────────────────────────────────────
-// ── F2: Hold / Suspender venta ───────────────────────────────────────────────
 import { useCartHold }    from './hooks/useCartHold'
 import HeldCartsPanel     from './components/HeldCartsPanel'
-// ────────────────────────────────────────────────────────────────────────────
+import { usePOSTotals }   from './hooks/usePOSTotals'
 
 export default function POS({ onNavigate }) {
   const {
-    products, productVariants, cart, clients, discountCampaigns, currentUser, activeCashSession, systemConfig, businessConfig,
+    products, productVariants, cart, clients, currentUser, activeCashSession, systemConfig, businessConfig,
     redeemDiscountTicket,
-    addToCart, updateCartItem, removeFromCart, clearCart,
+    addToCart, updateCartItem, removeFromCart, clearCart, restoreCart,
   } = useStore()
 
   const cartCount = useStore(selectCartCount)
@@ -61,27 +54,15 @@ export default function POS({ onNavigate }) {
   }
 
   const handleRecoverCart = (holdId) => {
-    // recoverCart (Zustand) es SÍNCRONO — devuelve los ítems en el mismo ciclo
-    // y ya eliminó el hold del store antes de retornar.
     const items = recoverCart(holdId)
     if (!items || items.length === 0) {
       toast.error('No se pudo recuperar la venta')
       return
     }
-
-    // Restaurar carrito completo con todos los campos originales
-    // (unitPrice, discount, _key, subtotal, etc.)
-    const restoredItems = items.map(item => ({
-      ...item,
-      _key: item._key || item.productId,
-      id:   crypto.randomUUID(),
-    }))
-
-    useStore.setState({ cart: restoredItems })
+    restoreCart(items)
     setShowHeldCarts(false)
-
     toast.success(
-      `Venta recuperada — ${restoredItems.length} producto(s) cargados al carrito`,
+      `Venta recuperada — ${items.length} producto(s) cargados al carrito`,
       { icon: '▶️', duration: 2500 }
     )
   }
@@ -102,60 +83,27 @@ export default function POS({ onNavigate }) {
 
   const searchRef  = useRef()
   const debouncedQ = useDebounce(search, 150)
-  const totals     = calcCartTotals(cart)
-  // Aplicar descuento global encima
+
   const globalDiscAmt = parseFloat(globalDiscount) || 0
-  const finalTotal    = Math.max(0, parseFloat((totals.total - globalDiscAmt).toFixed(2)))
   const ticketDiscAmt = appliedTicket ? appliedTicket.discountAmt : 0
 
-  // ── Motor de descuentos automáticos MEJORADO ────────────────────────────────
-  const autoDiscountResult = (() => {
-    try {
-      return evaluateDiscounts(cart, products, discountCampaigns || [])
-    } catch {
-      return {
-        itemDiscounts: cart.map(item => ({ ...item, campaignDiscount: 0, netTotal: item.subtotal, discountDetails: [] })),
-        globalDiscounts: [],
-        totalCampaignSaving: 0,
-        summary: { byItem: 0, byGlobal: 0, total: 0 }
-      }
-    }
-  })()
+  const {
+    mergedCartItems,
+    autoDiscountResult,
+    subtotalBruto,
+    totalDescuentos,
+    totalAPagar,
+    baseImponible,
+    igvCalculado,
+    igvRate,
+    totalCampaignSaving,
+    totalManualDiscount,
+    totalItemDiscounts,
+  } = usePOSTotals(cart, globalDiscAmt, ticketDiscAmt)
 
-  // Merge descuentos manuales con automáticos
-  const mergedCartItems = cart.map(cartItem => {
-    const autoItem = autoDiscountResult.itemDiscounts.find(i => 
-      (i._key === cartItem._key || i.productId === cartItem.productId)
-    ) || { campaignDiscount: 0, netTotal: cartItem.subtotal, discountDetails: [] }
-    
-    const manualDiscount = cartItem.discount || 0
-    const totalDiscount = autoItem.campaignDiscount + manualDiscount
-    const netTotal = autoItem.netTotal - manualDiscount // campaña primero, luego manual
-    
-    return {
-      ...cartItem,
-      ...autoItem,
-      manualDiscount,
-      totalDiscount,
-      netTotal: parseFloat(netTotal.toFixed(2))
-    }
-  })
-
-  const totalCampaignSaving = autoDiscountResult.totalCampaignSaving
-  const totalManualDiscount = mergedCartItems.reduce((a, i) => a + (i.manualDiscount || 0), 0)
-  const totalItemDiscounts  = mergedCartItems.reduce((a, i) => a + i.totalDiscount, 0)
-  // Regla 1: Subtotal Bruto = suma columna SUBTOTAL (unitPrice × qty, sin descuentos)
-  const subtotalBruto    = parseFloat(mergedCartItems.reduce((a, i) => a + i.subtotal, 0).toFixed(2))
-  // Regla 2: Descuentos Totales = suma columna DESCUENTO + dto. global + ticket
-  const totalDescuentos  = parseFloat((totalItemDiscounts + globalDiscAmt + ticketDiscAmt).toFixed(2))
-  // Regla 1: Total a Pagar = Subtotal Bruto - Descuentos Totales
-  const totalAPagar      = parseFloat(Math.max(0, subtotalBruto - totalDescuentos).toFixed(2))
-  // IGV está incluido en el precio → descomposición: Base = TotalAPagar / (1 + igvRate)
-  const igvRate          = parseFloat(systemConfig?.igvRate ?? businessConfig?.igvRate ?? 0.18)
-  const igvFactor        = 1 + igvRate
-  const baseImponible    = parseFloat((totalAPagar / igvFactor).toFixed(2))
-  const igvCalculado     = parseFloat((totalAPagar - baseImponible).toFixed(2))
-  const totalFinal       = totalAPagar
+  const totalFinal = totalAPagar
+  // finalTotal se usa sólo para calcular el descuento de ticket antes de aplicarlo
+  const finalTotal = Math.max(0, parseFloat((subtotalBruto - globalDiscAmt).toFixed(2)))
 
   // ── Búsqueda: productos + variantes ──────────────────────────────────────
   const activeProducts = products.filter(p => p.isActive)
@@ -283,20 +231,13 @@ export default function POS({ onNavigate }) {
     toast.success('Descuento aplicado', { duration: 1000 })
   }
 
-  // Validar y pre-aplicar ticket (sin marcar como usado aún — se usa al completar la venta)
-  const handleCheckTicket = () => {
+  // Validar ticket usando el servicio — única fuente de verdad para las reglas
+  const handleCheckTicket = async () => {
     setTicketError('')
     if (!ticketCode.trim()) return
-    const state = useStore.getState()
-    const tickets = state.discountTickets || []
-    const ticket  = tickets.find(t => t.code.toUpperCase() === ticketCode.trim().toUpperCase())
-    if (!ticket) { setTicketError('Código no encontrado'); return }
-    if (!ticket.isActive)  { setTicketError('Este ticket está desactivado'); return }
-    if (ticket.used)        { setTicketError('Este ticket ya fue utilizado'); return }
-    const now = new Date()
-    if (ticket.validFrom && now < new Date(ticket.validFrom)) { setTicketError('El ticket aún no está vigente'); return }
-    if (ticket.validTo && now > new Date(ticket.validTo + 'T23:59:59')) { setTicketError('El ticket ha vencido'); return }
-    // Calcular descuento según el total actual
+    const result = await discountTicketService.validate(ticketCode.trim())
+    if (result.error) { setTicketError(result.error); return }
+    const ticket = result.data
     let discountAmt = 0
     if (ticket.discountType === 'pct') {
       discountAmt = parseFloat((finalTotal * ticket.discountValue / 100).toFixed(2))

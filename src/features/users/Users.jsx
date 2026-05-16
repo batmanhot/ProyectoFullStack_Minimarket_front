@@ -9,6 +9,8 @@ import { zodResolver }        from '@hookform/resolvers/zod'
 import { userSchema }         from '../../shared/schemas/index'
 import { formatDate }         from '../../shared/utils/helpers'
 import { ROLES }              from '../../config/app'
+import { PLANS }              from '../../config/plans'
+import { useTenantSafe }      from '../../context/TenantContext'
 import { RoleBadge }          from '../../shared/components/ui/Badge'
 import Modal                  from '../../shared/components/ui/Modal'
 import ConfirmModal           from '../../shared/components/ui/ConfirmModal'
@@ -53,11 +55,16 @@ const RC = {
 }
 
 // ─── Formulario de usuario ────────────────────────────────────────────────────
-function UserForm({ user, onClose }) {
+function UserForm({ user, onClose, availableRoles }) {
   const { addUser, updateUser, users } = useStore()
+
+  // Rol por defecto: el primero disponible en el plan (o cajero si está disponible)
+  const defaultRole = availableRoles.includes('cajero') ? 'cajero'
+    : availableRoles[availableRoles.length - 1] ?? 'cajero'
+
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
     resolver: zodResolver(userSchema),
-    defaultValues: user || { role: 'cajero', isActive: true },
+    defaultValues: user || { role: defaultRole, isActive: true },
   })
   const selectedRole = watch('role')
   const rolePages    = ROLES[selectedRole]?.pages || []
@@ -93,8 +100,16 @@ function UserForm({ user, onClose }) {
           <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Rol *</label>
           <select {...register('role')}
             className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100">
-            {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            {Object.entries(ROLES)
+              .filter(([k]) => availableRoles.includes(k))
+              .map(([k, v]) => <option key={k} value={k}>{v.label}</option>)
+            }
           </select>
+          {availableRoles.length < Object.keys(ROLES).length && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              🔒 Tu plan solo permite los roles mostrados. Actualiza para desbloquear Gerente y Supervisor.
+            </p>
+          )}
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Email *</label>
@@ -274,6 +289,22 @@ export default function Users() {
   const [search,     setSearch]     = useState('')
   const [roleFilter, setRoleFilter] = useState('todos')
 
+  // ── Límites del plan ──────────────────────────────────────────────────────────
+  const tenantCtx      = useTenantSafe()
+  const plan           = tenantCtx?.plan ?? 'trial'
+  const planCfg        = PLANS[plan]
+  const maxUsers       = planCfg?.limits?.users ?? 1
+  const availableRoles = planCfg?.availableRoles ?? ['admin']
+  const atLimit        = maxUsers !== null && users.length >= maxUsers
+
+  const handleNewUser = () => {
+    if (atLimit) {
+      toast.error(`Tu plan ${planCfg?.label} permite máximo ${maxUsers} usuario${maxUsers > 1 ? 's' : ''}. Actualiza tu plan para agregar más.`, { duration: 6000 })
+      return
+    }
+    setModal({ type: 'form', data: null })
+  }
+
   const filtered = useMemo(() => {
     let list = users
     if (search.trim()) {
@@ -316,13 +347,20 @@ export default function Users() {
             {kpis.activos} activos · {kpis.inactivos} inactivos · {kpis.total} total
           </p>
         </div>
-        <button onClick={() => setModal({ type: 'form', data: null })}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-          </svg>
-          Nuevo usuario
-        </button>
+        <div className="flex items-center gap-3">
+          {maxUsers !== null && (
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${atLimit ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
+              {users.length}/{maxUsers} usuarios ({planCfg?.label})
+            </span>
+          )}
+          <button onClick={handleNewUser}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${atLimit ? 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+            </svg>
+            {atLimit ? 'Límite alcanzado' : 'Nuevo usuario'}
+          </button>
+        </div>
       </div>
 
       {/* KPIs por rol */}
@@ -449,7 +487,7 @@ export default function Users() {
 
       {modal?.type === 'form' && (
         <Modal title={modal.data ? 'Editar usuario' : 'Nuevo usuario'} onClose={() => setModal(null)}>
-          <UserForm user={modal.data} onClose={() => setModal(null)}/>
+          <UserForm user={modal.data} onClose={() => setModal(null)} availableRoles={availableRoles}/>
         </Modal>
       )}
       {confirm && (

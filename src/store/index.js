@@ -32,6 +32,16 @@ import { create }                      from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { getInitialDemoState }          from '../data/seedData'
 import { isCampaignActive }             from '../shared/utils/discountEngine'
+import { APP_CONFIG }                   from '../config/app'
+
+// Deriva el tenantSlug de la URL al momento de cargar el módulo.
+// Como el store es un singleton, el slug queda fijo para toda la sesión,
+// que es el comportamiento correcto: cada URL /app/<slug> tiene su propio store.
+// Para cambiar de tenant el usuario debe navegar a otra URL (full reload).
+const _getTenantSlug = () =>
+  window.location.pathname.match(/\/app\/([^/]+)/)?.[1] ?? 'demo'
+
+const _STORE_KEY = `mm_store_v5_${_getTenantSlug()}`
 
 // ─── Slices ───────────────────────────────────────────────────────────────────
 import { createAuditSlice }         from './slices/auditSlice'
@@ -52,8 +62,9 @@ export const useStore = create(
     persist(
       (set, get) => ({
 
-        // 1. Datos iniciales del demo (productos, ventas, clientes, etc.)
-        ...getInitialDemoState(),
+        // 1. Datos iniciales: solo en modo demo (sin API). En modo API la
+        //    data viene del backend y reemplaza este estado en cada fetch.
+        ...(APP_CONFIG.useApi ? {} : getInitialDemoState()),
 
         // 2. Slices — ORDEN IMPORTANTE: auditSlice va primero
         ...createAuditSlice(set, get),
@@ -73,22 +84,81 @@ export const useStore = create(
           set({ ...initial, currentUser: get().currentUser })
         },
 
-        // ─── Cargar datos demo ricos ──────────────────────────────────────────
-        // Inyecta 30 días de ventas históricas con variedad de métodos de pago,
-        // descuentos y horarios realistas. No resetea maestros ni configuración.
-        loadDemoData: () => {
-          // Reutiliza getInitialDemoState que ya tiene SEED_SALES actualizado
-          const freshSales = getInitialDemoState().sales
+        // ─── Limpiar todos los datos transaccionales (solo modo demo) ─────────
+        // Borra toda la data operativa registrada por el usuario dejando el
+        // sistema en blanco para que el cliente pueda ingresar su propia data.
+        // Conserva: configuración, usuarios del sistema, categorías y marcas.
+        clearUserData: () => {
           set({
-            sales:          freshSales,
-            stockMovements: [],
-            purchases:      [],
-            cashSessions:   [],
-            auditLog:       [],
-            notifications:  [],
-            nextInvoice:    Math.max(...freshSales.map(s =>
+            products:          [],
+            productVariants:   [],
+            stockMovements:    [],
+            sales:             [],
+            clients:           [],
+            suppliers:         [],
+            purchases:         [],
+            cashSessions:      [],
+            activeCashSession: null,
+            debtPayments:      [],
+            cart:              [],
+            nextInvoice:       1,
+            auditLog:          [],
+            notifications:     [],
+            discountCampaigns: [],
+            discountTickets:   [],
+            returns:           [],
+          })
+        },
+
+        // ─── Cargar datos demo ricos ──────────────────────────────────────────
+        // Inyecta 30 días de ventas históricas y todos los maestros (productos,
+        // clientes, proveedores, etc.) necesarios para que las referencias sean
+        // consistentes. Respeta la configuración del tenant: IGV, usuario activo
+        // y configuración del negocio no se sobreescriben.
+        loadDemoData: () => {
+          const { systemConfig, businessConfig, currentUser } = get()
+          const seed = getInitialDemoState()
+
+          // Ajustar IGV de cada venta al configurado en este tenant
+          const igvRate = parseFloat(systemConfig?.igvRate ?? 0.18)
+          const adjustedSales = seed.sales.map(sale => {
+            if (Math.abs(igvRate - 0.18) < 0.001) return sale
+            const igv  = parseFloat((sale.total / (1 + igvRate) * igvRate).toFixed(2))
+            const base = parseFloat((sale.total - igv).toFixed(2))
+            return { ...sale, igv, baseImponible: base, igvRate }
+          })
+
+          set({
+            // ── Maestros: siempre inyectar seed para garantizar consistencia
+            //    con los productId/clientId referenciados en las ventas demo.
+            products:          seed.products,
+            productVariants:   [],
+            categories:        seed.categories,
+            brands:            seed.brands,
+            clients:           seed.clients,
+            suppliers:         seed.suppliers,
+            users:             seed.users,
+            // ── Transaccionales
+            sales:             adjustedSales,
+            stockMovements:    [],
+            purchases:         [],
+            cashSessions:      [],
+            activeCashSession: null,
+            debtPayments:      [],
+            discountCampaigns: [],
+            discountTickets:   [],
+            returns:           [],
+            mermaRecords:      [],
+            auditLog:          [],
+            notifications:     [],
+            cart:              [],
+            nextInvoice:       Math.max(...adjustedSales.map(s =>
               parseInt(s.invoiceNumber?.split('-')[1] || '0')
             )) + 1,
+            // ── Preservar configuración y sesión del tenant
+            businessConfig:    businessConfig ?? seed.businessConfig,
+            systemConfig:      systemConfig,
+            currentUser:       currentUser,
           })
         },
 
@@ -96,7 +166,7 @@ export const useStore = create(
 
       // ─── Configuración de persistencia ────────────────────────────────────
       {
-        name: 'mm_store_v5',  // v5 → sesión limpia al actualizar desde v4
+        name: _STORE_KEY,  // aislado por tenant: mm_store_v5_<slug>
 
         // Solo persiste los datos necesarios.
         // systemConfig NO viene de seedData, se define en configSlice,

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"f:\\\\desarrollo\\\\Proyectos\\\\Proyecto FullStack Punto de Ventas - Minimarket\\\\front\\\\minimarket\" -Directory)",
+      "Bash(Select-Object -First 20)"
+    ]
+  }
+}

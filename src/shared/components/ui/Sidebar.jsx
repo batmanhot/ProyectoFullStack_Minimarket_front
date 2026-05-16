@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useStore, selectLowStockProducts, selectNearExpiryProducts, selectUnreadNotifications } from '../../../store/index'
 import { ROLES, SECTORS, canAccess } from '../../../config/app'
+import { canUsePlan, PLANS } from '../../../config/plans'
+import { useTenantSafe } from '../../../context/TenantContext'
 import toast from 'react-hot-toast'
 
 const NAV_GROUPS = [
@@ -32,6 +34,7 @@ const NAV_GROUPS = [
     { key:'audit',      label:'Auditoría',            icon:'🔍' },
     { key:'users',      label:'Usuarios',             icon:'⚙️' },
     { key:'settings',   label:'Configuración',        icon:'🛠️' },
+    { key:'about',      label:'Acerca del Sistema',   icon:'ℹ️' },
   ]},
 ]
 
@@ -56,7 +59,14 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
   const [collapsed, setCollapsed]       = useState(false)
   const [showThemePicker, setShowThemePicker] = useState(false)
 
-  const role = ROLES[currentUser?.role]
+  const role       = ROLES[currentUser?.role]
+  const tenantCtx  = useTenantSafe()
+  const plan       = tenantCtx?.plan ?? 'trial'
+  const planCfg    = PLANS[plan]
+  const planLabel  = planCfg?.label ?? 'Trial'
+
+  // Devuelve true si el módulo está incluido en el plan activo
+  const isPlanAllowed = (key) => canUsePlan(plan, key)
 
   const handleResetConfirm = () => {
     resetDemo(selectedSector || undefined)
@@ -144,17 +154,24 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
       {/* Nav agrupado */}
       <nav className="flex-1 overflow-y-auto py-2">
         {NAV_GROUPS.map(group => {
-          const allowed = group.items.filter(i => canAccess(currentUser?.role, i.key))
-          if (allowed.length===0) return null
+          // Ítems que el rol permite (visibles) — los bloqueados por plan se muestran con candado
+          const visible = group.items.filter(i => canAccess(currentUser?.role, i.key))
+          if (visible.length === 0) return null
           return (
             <div key={group.label} className="mb-1">
               <p className="px-4 py-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">{group.label}</p>
-              {allowed.map(item => {
-                const badge = getBadge(item.key)
+              {visible.map(item => {
+                const badge      = getBadge(item.key)
+                const planOk     = isPlanAllowed(item.key)
+                const isActive   = currentPage === item.key
+
+                // Módulo bloqueado por plan → invisible (el usuario no sabe lo que no tiene)
+                if (!planOk) return null
+
                 return (
                   <button key={item.key} onClick={() => onNavigate(item.key)}
                     style={{ width: 'calc(100% - 8px)', marginLeft: '4px' }}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${currentPage===item.key ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200'}`}>
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200'}`}>
                     <div className="flex items-center gap-2.5">
                       <span className="text-base leading-none">{item.icon}</span>
                       {item.label}

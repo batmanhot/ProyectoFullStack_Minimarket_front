@@ -80,6 +80,10 @@ export const createSalesSlice = (set, get) => ({
 
   clearCart: () => set({ cart: [] }),
 
+  // Restaura un carrito completo desde un snapshot (p.ej. venta en espera).
+  // Acepta ítems ya formateados con todos sus campos (_key, unitPrice, subtotal…).
+  restoreCart: (items) => set({ cart: items }),
+
   // ─── Ventas ────────────────────────────────────────────────────────────────
   addSale: (sale) => {
     get().addAuditLog({
