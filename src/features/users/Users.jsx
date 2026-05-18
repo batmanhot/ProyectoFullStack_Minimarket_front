@@ -57,6 +57,7 @@ const RC = {
 // ─── Formulario de usuario ────────────────────────────────────────────────────
 function UserForm({ user, onClose, availableRoles }) {
   const { addUser, updateUser, users } = useStore()
+  const [changePassword, setChangePassword] = useState(!user)
 
   // Rol por defecto: el primero disponible en el plan (o cajero si está disponible)
   const defaultRole = availableRoles.includes('cajero') ? 'cajero'
@@ -70,12 +71,17 @@ function UserForm({ user, onClose, availableRoles }) {
   const rolePages    = ROLES[selectedRole]?.pages || []
 
   const onSubmit = (data) => {
+    const { confirmPassword, ...rest } = data
+
     if (user) {
-      updateUser(user.id, data)
+      const updates = { ...rest }
+      if (!changePassword || !rest.password) delete updates.password
+      updateUser(user.id, updates)
       toast.success('Usuario actualizado')
     } else {
-      if (users.find(u => u.username === data.username)) { toast.error('El nombre de usuario ya existe'); return }
-      addUser({ ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
+      if (!rest.password) { toast.error('Debes establecer una contraseña'); return }
+      if (users.find(u => u.username === rest.username)) { toast.error('El nombre de usuario ya existe'); return }
+      addUser({ ...rest, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
       toast.success('Usuario creado')
     }
     onClose()
@@ -118,6 +124,36 @@ function UserForm({ user, onClose, availableRoles }) {
           {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
         </div>
       </div>
+
+      {/* ── Contraseña ─────────────────────────────────────────────────────── */}
+      {user && (
+        <div className="flex items-center gap-2">
+          <input type="checkbox" id="chgPwd" checked={changePassword} onChange={e => setChangePassword(e.target.checked)} className="rounded"/>
+          <label htmlFor="chgPwd" className="text-sm text-gray-600 dark:text-slate-300 cursor-pointer select-none">Cambiar contraseña</label>
+        </div>
+      )}
+
+      {changePassword && (
+        <div className="grid grid-cols-2 gap-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+          <div className="col-span-2">
+            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-3">
+              {user ? '🔑 Nueva contraseña' : '🔑 Contraseña de acceso *'}
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Contraseña *</label>
+            <input {...register('password')} type="password" placeholder="Mínimo 6 caracteres" autoComplete="new-password"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"/>
+            {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Confirmar contraseña *</label>
+            <input {...register('confirmPassword')} type="password" placeholder="Repite la contraseña" autoComplete="new-password"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"/>
+            {errors.confirmPassword && <p className="text-xs text-red-500 mt-1">{errors.confirmPassword.message}</p>}
+          </div>
+        </div>
+      )}
 
       {/* Preview de módulos del rol */}
       <div className={`rounded-xl border p-4 ${RC[selectedRole]?.light} ${RC[selectedRole]?.border}`}>

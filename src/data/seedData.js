@@ -98,11 +98,11 @@ export const SEED_CLIENTS = [
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
 export const SEED_USERS = [
-  { id: 'usr-001', username: 'admin',      fullName: 'Administrador General',   email: 'admin@negocio.pe',      role: 'admin',      isActive: true, createdAt: subtractDays(120) },
-  { id: 'usr-002', username: 'cajero1',    fullName: 'Rosa Sánchez López',       email: 'rsanchez@negocio.pe',   role: 'cajero',     isActive: true, createdAt: subtractDays(90)  },
-  { id: 'usr-003', username: 'cajero2',    fullName: 'Jorge Torres Huanca',      email: 'jtorres@negocio.pe',    role: 'cajero',     isActive: true, createdAt: subtractDays(60)  },
-  { id: 'usr-004', username: 'supervisor', fullName: 'Patricia Mendoza Gil',     email: 'pmendoza@negocio.pe',   role: 'supervisor', isActive: true, createdAt: subtractDays(100) },
-  { id: 'usr-005', username: 'gerente',    fullName: 'Carlos Rimac Paredes',     email: 'crimac@negocio.pe',     role: 'gerente',    isActive: true, createdAt: subtractDays(120) },
+  { id: 'usr-001', username: 'admin',      password: 'admin123',  fullName: 'Administrador General',   email: 'admin@negocio.pe',      role: 'admin',      isActive: true, createdAt: subtractDays(120) },
+  { id: 'usr-002', username: 'cajero1',    password: 'cajero123', fullName: 'Rosa Sánchez López',       email: 'rsanchez@negocio.pe',   role: 'cajero',     isActive: true, createdAt: subtractDays(90)  },
+  { id: 'usr-003', username: 'cajero2',    password: 'cajero123', fullName: 'Jorge Torres Huanca',      email: 'jtorres@negocio.pe',    role: 'cajero',     isActive: true, createdAt: subtractDays(60)  },
+  { id: 'usr-004', username: 'supervisor', password: 'super123',  fullName: 'Patricia Mendoza Gil',     email: 'pmendoza@negocio.pe',   role: 'supervisor', isActive: true, createdAt: subtractDays(100) },
+  { id: 'usr-005', username: 'gerente',    password: 'gerente123',fullName: 'Carlos Rimac Paredes',     email: 'crimac@negocio.pe',     role: 'gerente',    isActive: true, createdAt: subtractDays(120) },
 ]
 
 // ─── GENERADOR DE VENTAS HISTÓRICAS RICAS (30 días) ──────────────────────────

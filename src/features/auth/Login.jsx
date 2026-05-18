@@ -33,10 +33,11 @@ const ROLE_COLORS = {
 }
 
 export default function Login() {
-  const { setCurrentUser, businessConfig } = useStore()
+  const { setCurrentUser, businessConfig, systemConfig } = useStore()
   const tenantCtx   = useTenantSafe()
   const tenantSlug  = tenantCtx?.tenantSlug ?? 'demo'
   const businessName = tenantCtx?.tenant?.businessName ?? businessConfig?.name
+  const demoMode    = systemConfig?.demoMode !== false
 
   const plan           = tenantCtx?.plan ?? 'trial'
   const availableRoles = PLANS[plan]?.availableRoles ?? ['admin']
@@ -46,6 +47,8 @@ export default function Login() {
 
   const [loading, setLoading]       = useState(false)
   const [username, setUsername]     = useState('')
+  const [password, setPassword]     = useState('')
+  const [showPass, setShowPass]     = useState(false)
   const [activeRole, setActiveRole] = useState(null)
   const [tick, setTick]             = useState(0)
   const [hovered, setHovered]       = useState(null)
@@ -74,9 +77,9 @@ export default function Login() {
 
   const handleManualLogin = async (e) => {
     e.preventDefault()
-    if (!username.trim() || loading) return
+    if (!username.trim() || !password.trim() || loading) return
     setLoading(true)
-    const result = await authService.loginWithCredentials(username.trim(), tenantSlug)
+    const result = await authService.loginWithCredentials(username.trim(), password.trim(), tenantSlug)
     if (result.data) {
       setCurrentUser(result.data)
       toast.success(`Bienvenido, ${result.data.fullName}`)
@@ -535,60 +538,70 @@ export default function Login() {
 
             <div className="section-sep"/>
 
-            {/* ── ACCESO RÁPIDO — sección demo ─────────────────────────── */}
-            <div className="demo-section">
-              <div className="quick-label">
-                <p className="quick-label-text">Acceso rápido — Demo</p>
-                <span className="plan-chip">Plan {planLabel}</span>
-              </div>
+            {/* ── ACCESO RÁPIDO — sección demo (solo en modo demo) ─────── */}
+            {demoMode && (
+              <div className="demo-section">
+                <div className="quick-label">
+                  <p className="quick-label-text">Acceso rápido — Demo</p>
+                  <span className="plan-chip">Plan {planLabel}</span>
+                </div>
 
-              <div className="role-grid">
-                {DEMO_ROLES.map(({ role, icon, desc }) => {
-                  const cfg  = ROLES[role]
-                  const c    = ROLE_COLORS[role]
-                  const isAct = activeRole === role && loading
-                  const isHov = hovered === role && !loading
-                  return (
-                    <button
-                      key={role}
-                      className="role-btn"
-                      disabled={loading}
-                      onClick={() => handleDemoLogin(role)}
-                      onMouseEnter={() => setHovered(role)}
-                      onMouseLeave={() => setHovered(null)}
-                      style={{
-                        background:  (isAct || isHov) ? c.bg     : 'rgba(255,255,255,0.04)',
-                        borderColor: (isAct || isHov) ? c.border : 'rgba(255,255,255,0.08)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '13px' }}>{icon}</span>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: (isAct||isHov) ? c.text : 'rgba(255,255,255,0.80)' }}>
-                          {cfg.label}
-                        </span>
-                        {isAct && (
-                          <svg className="spin" style={{ width:'11px', height:'11px', marginLeft:'auto', color: c.text }} fill="none" viewBox="0 0 24 24">
-                            <circle style={{opacity:.25}} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                            <path style={{opacity:.75}} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                          </svg>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.28)', paddingLeft: '1px' }}>{desc}</span>
-                    </button>
-                  )
-                })}
+                <div className="role-grid">
+                  {DEMO_ROLES.map(({ role, icon, desc }) => {
+                    const cfg  = ROLES[role]
+                    const c    = ROLE_COLORS[role]
+                    const isAct = activeRole === role && loading
+                    const isHov = hovered === role && !loading
+                    return (
+                      <button
+                        key={role}
+                        className="role-btn"
+                        disabled={loading}
+                        onClick={() => handleDemoLogin(role)}
+                        onMouseEnter={() => setHovered(role)}
+                        onMouseLeave={() => setHovered(null)}
+                        style={{
+                          background:  (isAct || isHov) ? c.bg     : 'rgba(255,255,255,0.04)',
+                          borderColor: (isAct || isHov) ? c.border : 'rgba(255,255,255,0.08)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '13px' }}>{icon}</span>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: (isAct||isHov) ? c.text : 'rgba(255,255,255,0.80)' }}>
+                            {cfg.label}
+                          </span>
+                          {isAct && (
+                            <svg className="spin" style={{ width:'11px', height:'11px', marginLeft:'auto', color: c.text }} fill="none" viewBox="0 0 24 24">
+                              <circle style={{opacity:.25}} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path style={{opacity:.75}} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.28)', paddingLeft: '1px' }}>{desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* ── LOGIN MANUAL — sección principal ─────────────────────── */}
             <div className="login-section">
-              <div className="divider">
-                <div className="divider-line"/>
-                <span className="divider-text">o ingresa tu usuario</span>
-                <div className="divider-line"/>
-              </div>
+              {demoMode && (
+                <div className="divider">
+                  <div className="divider-line"/>
+                  <span className="divider-text">o ingresa tus credenciales</span>
+                  <div className="divider-line"/>
+                </div>
+              )}
+              {!demoMode && (
+                <p style={{ fontSize:'13px', fontWeight:600, color:'rgba(255,255,255,0.55)', margin:'0 0 12px' }}>
+                  Ingresa tus credenciales para acceder
+                </p>
+              )}
 
-              <form onSubmit={handleManualLogin} style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+              <form onSubmit={handleManualLogin} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Usuario */}
                 <div style={{ position: 'relative' }}>
                   <svg style={{ position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', width:'14px', height:'14px', opacity:.3, pointerEvents:'none' }} fill="none" viewBox="0 0 24 24" stroke="white">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -597,14 +610,40 @@ export default function Login() {
                     className="login-input"
                     value={username}
                     onChange={e => setUsername(e.target.value)}
-                    placeholder="admin, cajero1, gerente..."
+                    placeholder="Usuario"
                     autoComplete="username"
                   />
                 </div>
+                {/* Contraseña */}
+                <div style={{ position: 'relative' }}>
+                  <svg style={{ position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', width:'14px', height:'14px', opacity:.3, pointerEvents:'none' }} fill="none" viewBox="0 0 24 24" stroke="white">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                  </svg>
+                  <input
+                    className="login-input"
+                    type={showPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Contraseña"
+                    autoComplete="current-password"
+                    style={{ paddingRight: '38px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(s => !s)}
+                    style={{ position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', padding:'4px', opacity:.4, color:'white' }}
+                  >
+                    {showPass
+                      ? <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                      : <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    }
+                  </button>
+                </div>
+
                 <button
                   type="submit"
-                  className={`login-submit ${username.trim() && !loading ? 'active' : 'inactive'}`}
-                  disabled={loading || !username.trim()}
+                  className={`login-submit ${username.trim() && password.trim() && !loading ? 'active' : 'inactive'}`}
+                  disabled={loading || !username.trim() || !password.trim()}
                 >
                   {loading && !activeRole
                     ? <><svg className="spin" style={{ width:'15px', height:'15px' }} fill="none" viewBox="0 0 24 24"><circle style={{opacity:.25}} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path style={{opacity:.75}} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Ingresando...</>
@@ -612,15 +651,20 @@ export default function Login() {
                   }
                 </button>
               </form>
+
+              {demoMode && (
+                <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.22)', textAlign:'center', marginTop:'8px', lineHeight:1.5 }}>
+                  Demo: <span style={{ color:'rgba(56,189,248,0.60)' }}>admin / admin123 · cajero1 / cajero123</span>
+                </p>
+              )}
             </div>
 
             {/* ── FOOTER ───────────────────────────────────────────────── */}
             <div className="card-footer">
-              <p className="footer-note">
-                Aplicación demo para presentaciones comerciales<br/>
-                <span style={{ color: 'rgba(56,189,248,0.50)' }}>Datos simulados · Sin conexión a servidor</span>
-              </p>
-            </div>
+              {demoMode
+                ? <p className="footer-note">Aplicación demo para presentaciones comerciales<br/><span style={{ color: 'rgba(56,189,248,0.50)' }}>Datos simulados · Sin conexión a servidor</span></p>
+                : <p className="footer-note">Sistema POS · Ingresa con las credenciales asignadas<br/><span style={{ color: 'rgba(56,189,248,0.50)' }}>Acceso seguro con usuario y contraseña</span></p>
+              }</div>
 
           </div>
         </div>

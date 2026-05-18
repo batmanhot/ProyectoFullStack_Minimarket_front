@@ -33,17 +33,19 @@ export const authService = {
    * Este es el flujo real de producción.
    *
    * @param {string} username
+   * @param {string} password
    * @param {string} tenantSlug
    */
-  async loginWithCredentials(username, tenantSlug = 'demo') {
+  async loginWithCredentials(username, password, tenantSlug = 'demo') {
     await delay(350)
     if (USE_API) {
-      const { data } = await api.post('/auth/login', { username, tenantSlug })
+      const { data } = await api.post('/auth/login', { username, password, tenantSlug })
       localStorage.setItem('mm_token', data.token)
       return ok(data.user)
     }
     const user = gs().users.find(u => u.username === username && u.isActive)
     if (!user) return fail('Usuario o contraseña incorrectos')
+    if (user.password && user.password !== password) return fail('Usuario o contraseña incorrectos')
     return ok({
       ...user,
       tenantId:   `tenant_${tenantSlug}`,

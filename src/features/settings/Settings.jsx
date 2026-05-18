@@ -312,19 +312,44 @@ export default function Settings() {
 
       {/* ── TAB POS ─────────────────────────────────────────────────────────── */}
       {activeTab === 'pos' && (
-        <Section title="🖥️ Punto de venta y caja">
-          <Field label="Requerir caja abierta para vender" sub="Bloquea el POS si la caja no está aperturada">
-            <Toggle value={sys.requireCashToSell !== false} onChange={v => setSys({...sys, requireCashToSell: v})}/>
-          </Field>
-          <Field label="Imprimir ticket automáticamente" sub="Abre ventana de impresión al completar la venta">
-            <Toggle value={sys.printAutomatically === true} onChange={v => setSys({...sys, printAutomatically: v})}/>
-          </Field>
-          <Field label="Pie del ticket" sub="Texto que aparece al final de cada boleta">
-            <input value={sys.ticketFooter||''} onChange={e => setSys({...sys, ticketFooter: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 dark:bg-slate-700 dark:text-slate-100"
-              placeholder="¡Gracias por su compra!"/>
-          </Field>
-        </Section>
+        <>
+          <Section title="🖥️ Punto de venta y caja">
+            <Field label="Requerir caja abierta para vender" sub="Bloquea el POS si la caja no está aperturada">
+              <Toggle value={sys.requireCashToSell !== false} onChange={v => setSys({...sys, requireCashToSell: v})}/>
+            </Field>
+            <Field label="Imprimir ticket automáticamente" sub="Abre ventana de impresión al completar la venta">
+              <Toggle value={sys.printAutomatically === true} onChange={v => setSys({...sys, printAutomatically: v})}/>
+            </Field>
+            <Field label="Pie del ticket" sub="Texto que aparece al final de cada boleta">
+              <input value={sys.ticketFooter||''} onChange={e => setSys({...sys, ticketFooter: e.target.value})}
+                className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 dark:bg-slate-700 dark:text-slate-100"
+                placeholder="¡Gracias por su compra!"/>
+            </Field>
+          </Section>
+
+          <Section title="🚀 Modo de operación">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-sm text-amber-700 dark:text-amber-400 mb-4">
+              ⚠️ <strong>Modo Demo</strong>: muestra botones de acceso rápido en el login para facilitar presentaciones y pruebas. Desactívalo cuando el sistema esté en producción con usuarios y contraseñas reales configurados.
+            </div>
+            <Field label="Modo demo activo" sub="Muestra accesos rápidos por rol en la pantalla de login — desactiva en producción">
+              <Toggle value={sys.demoMode !== false} onChange={v => setSys({...sys, demoMode: v})}/>
+            </Field>
+            {sys.demoMode !== false && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-700 dark:text-blue-400">
+                <p className="font-semibold mb-2">Credenciales del demo:</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[['admin','admin123'],['cajero1','cajero123'],['cajero2','cajero123'],['supervisor','super123'],['gerente','gerente123']].map(([u,p]) => (
+                    <div key={u} className="bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
+                      <span className="font-mono font-bold">{u}</span>
+                      <span className="text-blue-400 mx-1">/</span>
+                      <span className="font-mono">{p}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Section>
+        </>
       )}
 
       {/* ── TAB AUDITORÍA ───────────────────────────────────────────────────── */}

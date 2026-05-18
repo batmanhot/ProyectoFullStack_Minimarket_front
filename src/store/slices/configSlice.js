@@ -25,6 +25,7 @@ export const createConfigSlice = (set, get) => ({
     invoicePrefix:      'B001',
     printAutomatically: false,
     auditEnabled:       true,
+    demoMode:           true,
   },
 
   updateSystemConfig: (updates) => {

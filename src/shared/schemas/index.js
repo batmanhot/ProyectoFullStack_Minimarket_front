@@ -82,11 +82,22 @@ export const supplierSchema = z.object({
 
 // ─── USUARIO ──────────────────────────────────────────────────────────────────
 export const userSchema = z.object({
-  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/, 'Solo letras, números y _'),
-  fullName: z.string().min(3).max(100),
-  email:    z.string().email('Email inválido'),
-  role:     z.enum(['admin','gerente','supervisor','cajero']),
-  isActive: z.boolean().default(true),
+  username:        z.string().min(3).max(50).regex(/^[a-zA-Z0-9_]+$/, 'Solo letras, números y _'),
+  fullName:        z.string().min(3).max(100),
+  email:           z.string().email('Email inválido'),
+  role:            z.enum(['admin','gerente','supervisor','cajero']),
+  isActive:        z.boolean().default(true),
+  password:        z.string().optional(),
+  confirmPassword: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.password) {
+    if (data.password.length < 6) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Mínimo 6 caracteres' })
+    }
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['confirmPassword'], message: 'Las contraseñas no coinciden' })
+    }
+  }
 })
 
 // ─── PAGO (item dentro de una venta) ─────────────────────────────────────────
