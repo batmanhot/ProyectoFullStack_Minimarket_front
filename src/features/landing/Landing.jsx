@@ -28,6 +28,21 @@ const GLOBAL_CSS = `
   @keyframes pulse-ring { 0% { transform: scale(.9); opacity:.7 } 70% { transform: scale(1.15); opacity:0 } 100% { transform: scale(1.15); opacity:0 } }
   .feat-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.10) !important; transform: translateY(-3px); transition: all .22s; }
   .plan-card:hover { transform: translateY(-4px); transition: all .2s; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-bottom: 44px; }
+  .hero-title { font-size: 68px; font-weight: 900; line-height: 1.05; color: #fff; margin: 0 0 22px; letter-spacing: -3px; }
+  .hero-section { max-width: 1200px; margin: 0 auto; padding: 88px 28px 110px; text-align: center; position: relative; z-index: 10; }
+  .hero-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+    .hero-title { font-size: 36px; letter-spacing: -1.5px; }
+    .hero-section { padding: 52px 20px 64px; }
+    .hero-buttons { flex-direction: column; align-items: stretch; }
+    .hero-buttons button { width: 100%; justify-content: center; }
+  }
 `
 
 export default function Landing() {
@@ -80,14 +95,14 @@ export default function Landing() {
         </nav>
 
         {/* ── Hero content ── */}
-        <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '88px 28px 110px', textAlign: 'center', position: 'relative', zIndex: 10 }}>
+        <section className="hero-section">
 
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '24px', padding: '6px 18px', marginBottom: '30px' }}>
             <Star size={13} color="#a78bfa" fill="#a78bfa" />
             <span style={{ fontSize: '12px', color: '#c4b5fd', fontWeight: 600, letterSpacing: '0.04em' }}>{tagline}</span>
           </div>
 
-          <h1 style={{ fontSize: '68px', fontWeight: 900, lineHeight: 1.05, color: '#fff', margin: '0 0 22px', letterSpacing: '-3px' }}>
+          <h1 className="hero-title">
             Gestiona tu negocio
             <br />
             <span style={{ background: 'linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
@@ -100,7 +115,7 @@ export default function Landing() {
             <br />Ventas, inventario, reportes y fidelización — todo integrado.
           </p>
 
-          <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="hero-buttons">
             <button onClick={() => navigate('/register')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '15px 32px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg,#2563eb,#7c3aed)', color: '#fff', fontSize: '15px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 36px rgba(99,102,241,0.50)' }}>
               Registrar mi negocio — gratis 30 días <ArrowRight size={16} />
             </button>
@@ -119,7 +134,7 @@ export default function Landing() {
 
       {/* ══════════════════════════ STATS STRIP ═══════════════════════════════ */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '36px 28px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        <div className="stats-grid" style={{ maxWidth: '1200px', margin: '0 auto', padding: '36px 28px' }}>
           {STATS.map(({ value, label, color }) => (
             <div key={label} style={{ textAlign: 'center', padding: '8px' }}>
               <div style={{ fontSize: '38px', fontWeight: 900, color, lineHeight: 1, letterSpacing: '-1px' }}>{value}</div>
@@ -300,7 +315,7 @@ export default function Landing() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '52px 28px 32px' }}>
 
           {/* ── 3 columnas principales ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '40px', marginBottom: '44px' }}>
+          <div className="footer-grid">
 
             {/* Col 1 — Marca */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
