@@ -25,23 +25,30 @@ export default function InstallPWA() {
     }
 
     // Capturar el evento beforeinstallprompt
+    let promptTimer = null
     const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
-      
-      // Mostrar banner después de 30 segundos (dar tiempo al usuario de explorar)
-      setTimeout(() => {
-        const alreadyDismissed = localStorage.getItem('pwa-install-dismissed')
-        if (!alreadyDismissed) {
-          setShowInstallPrompt(true)
-        }
-      }, 30000)
+
+      const alreadyDismissed = localStorage.getItem('pwa-install-dismissed')
+      if (alreadyDismissed) return
+
+      // Mostrar banner a los 5 segundos o al primer scroll (lo que ocurra primero)
+      const show = () => {
+        clearTimeout(promptTimer)
+        window.removeEventListener('scroll', show)
+        setShowInstallPrompt(true)
+      }
+
+      promptTimer = setTimeout(show, 5000)
+      window.addEventListener('scroll', show, { once: true })
     }
 
     window.addEventListener('beforeinstallprompt', handler)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler)
+      clearTimeout(promptTimer)
     }
   }, [])
 
