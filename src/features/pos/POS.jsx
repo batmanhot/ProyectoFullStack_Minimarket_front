@@ -791,15 +791,32 @@ export default function POS({ onNavigate }) {
       {/* Panel de pago */}
       {showPayment && (
         <Suspense fallback={null}>
-          <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/40">
-            <div className="bg-white h-full w-96 shadow-2xl flex flex-col">
-              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-800">Cobrar venta</h2>
-                <button onClick={() => setShowPayment(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={e => { if (e.target === e.currentTarget) setShowPayment(false) }}>
+            <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-gray-800">Cobrar venta</h2>
+                    <p className="text-xs text-gray-400">Total: <span className="font-semibold text-gray-700">{formatCurrency(totalAPagar)}</span></p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPayment(false)}
+                  title="Cerrar (Esc)"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
                 </button>
               </div>
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto">
                 <PaymentPanel
                   total={totalAPagar}
                   clients={clients}

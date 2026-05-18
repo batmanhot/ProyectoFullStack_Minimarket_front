@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useStore } from '../../store/index'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -69,6 +69,63 @@ export function printPriceLabels(products, businessConfig) {
   if (!win) { toast.error('Activa las ventanas emergentes para imprimir etiquetas'); return }
   win.document.write(buildLabelHTML(products, businessConfig))
   win.document.close()
+}
+
+function PriceLabelsModal({ products, businessConfig, onClose }) {
+  const iframeRef = useRef(null)
+  const html = buildLabelHTML(products, businessConfig)
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="flex flex-col flex-1 m-4 rounded-2xl overflow-hidden shadow-2xl bg-white">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-lg">🏷️</div>
+            <div>
+              <h2 className="text-base font-bold text-gray-800">Vista previa — Etiquetas de precio</h2>
+              <p className="text-xs text-gray-400">{products.length} producto{products.length !== 1 ? 's' : ''} · Formato 58mm</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => iframeRef.current?.contentWindow?.print()}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-bold rounded-xl transition-colors shadow-sm shadow-blue-200">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+              </svg>
+              Imprimir etiquetas
+            </button>
+            <button
+              onClick={onClose}
+              title="Cerrar (Esc)"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="flex-1 bg-gray-100 overflow-hidden">
+          <iframe
+            ref={iframeRef}
+            srcDoc={html}
+            className="w-full h-full border-0"
+            title="Vista previa de etiquetas"
+          />
+        </div>
+      </div>
+    </div>
+  )
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -739,6 +796,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
   const [modal, setModal]         = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [labelsModal, setLabelsModal] = useState(null)
   const dq = useDebounce(search, 150)
 
   const filtered = useMemo(() => {
@@ -826,9 +884,13 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
         <ExcelButton onClick={handleExportExcel} />
         {/* Etiquetas de precio 58mm */}
         <button
-          onClick={() => printPriceLabels(filtered.filter(p => p.isActive), businessConfig)}
+          onClick={() => {
+            const prods = filtered.filter(p => p.isActive)
+            if (!prods.length) { toast.error('No hay productos para imprimir'); return }
+            setLabelsModal(prods)
+          }}
           className="px-3 py-2 text-sm border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-          title="Imprimir etiquetas de precio 58mm con código de barras">
+          title="Vista previa de etiquetas de precio 58mm">
           🏷️ Etiquetas
         </button>
         <button onClick={() => setModal({ type: 'form', data: null })}
@@ -902,9 +964,9 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
                         </button>
                         {/* Etiqueta individual */}
                         <button
-                          onClick={() => printPriceLabels([p], businessConfig)}
+                          onClick={() => setLabelsModal([p])}
                           className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg"
-                          title="Imprimir etiqueta de precio">
+                          title="Vista previa etiqueta de precio">
                           <span className="text-xs">🏷️</span>
                         </button>
                         {p.isActive && (
@@ -940,6 +1002,13 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
           onCancel={() => setDeleteTarget(null)}/>
       )}
       {importOpen && <ExcelImportModal entityType="products" onClose={() => setImportOpen(false)} />}
+      {labelsModal && (
+        <PriceLabelsModal
+          products={labelsModal}
+          businessConfig={businessConfig}
+          onClose={() => setLabelsModal(null)}
+        />
+      )}
     </div>
   )
 }
