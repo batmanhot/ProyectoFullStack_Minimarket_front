@@ -329,12 +329,12 @@ export default function Trazabilidad() {
           { label: 'Lotes activos',        value: stats.activeBatches,  icon: '✅', cls: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' },
           { label: 'Lotes vencidos',       value: stats.expiredBatches, icon: '⚠️', cls: stats.expiredBatches > 0 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'bg-gray-50 dark:bg-gray-800 text-gray-400' },
         ].map(s => (
-          <div key={s.label} className={`rounded-xl p-4 ${s.cls}`}>
+          <div key={s.label} className={`rounded-xl p-3 sm:p-4 overflow-hidden min-w-0 ${s.cls}`}>
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="text-base leading-none">{s.icon}</span>
               <span className="text-xs font-medium text-gray-500 dark:text-slate-400">{s.label}</span>
             </div>
-            <div className="text-3xl font-bold">{s.value}</div>
+            <div className="text-xl sm:text-3xl font-bold truncate">{s.value}</div>
           </div>
         ))}
       </div>

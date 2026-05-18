@@ -48,10 +48,10 @@ const TABS = [
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 function KpiCard({ label, value, color = 'text-gray-800 dark:text-slate-100', sub }) {
   return (
-    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
-      <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">{label}</p>
-      <p className={`text-xl font-semibold ${color}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
+    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
+      <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 leading-tight">{label}</p>
+      <p className={`text-base sm:text-xl font-semibold truncate ${color}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 leading-tight">{sub}</p>}
     </div>
   )
 }

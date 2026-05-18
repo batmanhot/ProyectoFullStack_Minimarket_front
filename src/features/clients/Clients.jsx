@@ -491,17 +491,17 @@ export default function Clients() {
           <div className="space-y-4">
             {/* KPI */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
                 <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Total pagos registrados</p>
-                <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{sortedPayments.length}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-slate-100 truncate">{sortedPayments.length}</p>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl p-4">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
                 <p className="text-xs text-green-600 mb-1">Total cobrado en deudas</p>
-                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{formatCurrency(totalCobrado)}</p>
+                <p className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-400 truncate">{formatCurrency(totalCobrado)}</p>
               </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
                 <p className="text-xs text-blue-600 mb-1">Clientes que pagaron</p>
-                <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{new Set(sortedPayments.map(p => p.clientId)).size}</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-700 dark:text-blue-400 truncate">{new Set(sortedPayments.map(p => p.clientId)).size}</p>
               </div>
             </div>
 

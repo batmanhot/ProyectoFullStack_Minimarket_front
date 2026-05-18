@@ -144,12 +144,12 @@ function KpiCard({ label, value, sub, color = 'gray', icon }) {
     blue:   'text-blue-700 dark:text-blue-300',
   }
   return (
-    <div className={`rounded-2xl border bg-gradient-to-br ${colors[color]} p-5 flex flex-col gap-1`}>
+    <div className={`rounded-2xl border bg-gradient-to-br ${colors[color]} p-4 sm:p-5 flex flex-col gap-1 overflow-hidden min-w-0`}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
         <span className="text-lg">{icon}</span>
       </div>
-      <p className={`text-3xl font-black tracking-tight ${textColors[color]}`}>{value}</p>
+      <p className={`text-xl sm:text-3xl font-black tracking-tight truncate ${textColors[color]}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
     </div>
   )

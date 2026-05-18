@@ -913,9 +913,9 @@ export default function Quotations({ onNavigate }) {
           { label: 'Convertidas',     value: kpis.convertidas,           color: 'text-green-600 dark:text-green-400' },
           { label: 'Monto pendiente', value: formatCurrency(kpis.monto), color: 'text-blue-600 dark:text-blue-400' },
         ].map(k => (
-          <div key={k.label} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+          <div key={k.label} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
             <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">{k.label}</p>
-            <p className={`text-2xl font-semibold ${k.color}`}>{k.value}</p>
+            <p className={`text-lg sm:text-2xl font-semibold truncate ${k.color}`}>{k.value}</p>
           </div>
         ))}
       </div>

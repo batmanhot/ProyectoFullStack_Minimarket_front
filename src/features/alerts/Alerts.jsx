@@ -286,25 +286,25 @@ export default function Alerts() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+        <div className="bg-red-50 border border-red-100 rounded-xl p-3 overflow-hidden min-w-0">
           <p className="text-xs text-red-600 mb-1">🔴 Prioridad Alta</p>
-          <p className="text-2xl font-bold text-red-700">{counts.altas}</p>
+          <p className="text-lg sm:text-2xl font-bold text-red-700 truncate">{counts.altas}</p>
         </div>
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 overflow-hidden min-w-0">
           <p className="text-xs text-amber-600 mb-1">🟡 En proceso</p>
-          <p className="text-2xl font-bold text-amber-700">{counts.en_proceso}</p>
+          <p className="text-lg sm:text-2xl font-bold text-amber-700 truncate">{counts.en_proceso}</p>
         </div>
-        <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl p-3">
+        <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl p-3 overflow-hidden min-w-0">
           <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">📋 Total detectadas</p>
-          <p className="text-2xl font-bold text-gray-700">{counts.total}</p>
+          <p className="text-lg sm:text-2xl font-bold text-gray-700 truncate">{counts.total}</p>
         </div>
-        <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
+        <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 overflow-hidden min-w-0">
           <p className="text-xs text-orange-600 mb-1">🔴 Activas</p>
-          <p className="text-2xl font-bold text-orange-700">{counts.activas}</p>
+          <p className="text-lg sm:text-2xl font-bold text-orange-700 truncate">{counts.activas}</p>
         </div>
-        <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+        <div className="bg-green-50 border border-green-100 rounded-xl p-3 overflow-hidden min-w-0">
           <p className="text-xs text-green-600 mb-1">✅ Subsanadas</p>
-          <p className="text-2xl font-bold text-green-700">{counts.subsanadas}</p>
+          <p className="text-lg sm:text-2xl font-bold text-green-700 truncate">{counts.subsanadas}</p>
         </div>
       </div>
 

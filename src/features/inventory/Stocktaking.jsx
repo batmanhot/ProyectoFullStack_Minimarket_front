@@ -428,9 +428,9 @@ function StepReview({ productsToCount, counts, onConfirm, onBack, applying }) {
           { label: 'Faltantes',      value: faltantes.length, color: 'bg-red-50 dark:bg-red-900/20',      text: 'text-red-600 dark:text-red-400',      icon: '⚠️' },
           { label: 'Sin contar',     value: sinContar,        color: 'bg-gray-50 dark:bg-slate-800/50',   text: 'text-gray-500 dark:text-slate-400',   icon: '—'  },
         ].map(k => (
-          <div key={k.label} className={`${k.color} rounded-xl p-4`}>
+          <div key={k.label} className={`${k.color} rounded-xl p-3 sm:p-4 overflow-hidden min-w-0`}>
             <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">{k.label}</p>
-            <p className={`text-2xl font-bold ${k.text}`}>{k.icon} {k.value}</p>
+            <p className={`text-lg sm:text-2xl font-bold truncate ${k.text}`}>{k.icon} {k.value}</p>
           </div>
         ))}
       </div>
@@ -550,16 +550,16 @@ function StepDone({ summary, onNewCount, onBack }) {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{summary.total}</p>
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 sm:p-4 text-center overflow-hidden min-w-0">
+          <p className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-slate-100 truncate">{summary.total}</p>
           <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Productos contados</p>
         </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{summary.adjusted}</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 sm:p-4 text-center overflow-hidden min-w-0">
+          <p className="text-lg sm:text-2xl font-bold text-blue-700 dark:text-blue-400 truncate">{summary.adjusted}</p>
           <p className="text-xs text-blue-500 dark:text-blue-500 mt-1">Ajustes aplicados</p>
         </div>
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{summary.sinDiff}</p>
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 sm:p-4 text-center overflow-hidden min-w-0">
+          <p className="text-lg sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400 truncate">{summary.sinDiff}</p>
           <p className="text-xs text-emerald-500 mt-1">Sin diferencia</p>
         </div>
       </div>

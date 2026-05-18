@@ -83,18 +83,18 @@ const pct = (curr, prev) => {
 function KPI({ label, value, trend, icon, color = 'text-gray-800 dark:text-slate-100', sub }) {
   const up = trend >= 0
   return (
-    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
-      <div className="flex items-start justify-between mb-1">
-        <p className="text-xs text-gray-500 dark:text-slate-400">{label}</p>
-        {icon && <span className="text-xl opacity-40">{icon}</span>}
+    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
+      <div className="flex items-start justify-between mb-1 gap-1">
+        <p className="text-xs text-gray-500 dark:text-slate-400 leading-tight">{label}</p>
+        {icon && <span className="text-base sm:text-xl opacity-40 shrink-0">{icon}</span>}
       </div>
-      <p className={`text-2xl font-semibold ${color}`}>{value}</p>
+      <p className={`text-base sm:text-xl lg:text-2xl font-semibold truncate ${color}`}>{value}</p>
       {trend !== undefined && trend !== null && (
-        <p className={`text-xs font-medium mt-1 ${up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+        <p className={`text-xs font-medium mt-1 leading-tight ${up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
           {up ? '↑' : '↓'} {Math.abs(trend)}% vs período anterior
         </p>
       )}
-      {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 leading-tight">{sub}</p>}
     </div>
   )
 }
@@ -125,7 +125,7 @@ function DashboardCajero({ currentUser, sales, activeCashSession, products }) {
     : 0
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
       {/* Header personalizado */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -238,7 +238,7 @@ function DashboardSupervisor({ sales, products, categories, returns, currentUser
   }, [todaySales])
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
       <div>
         <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Panel Operativo</h1>
         <p className="text-sm text-gray-400 dark:text-slate-500">Supervisión del día · {new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' })}</p>
@@ -711,7 +711,7 @@ function DashboardEjecutivo({ sales, products, categories, returns, clients, mer
   ]
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
       {/* Header + selector período */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>

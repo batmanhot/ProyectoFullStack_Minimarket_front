@@ -286,9 +286,9 @@ export default function Merma() {
           { label: 'En devolución',    value: kpis.enDevolucion,                 color: 'text-amber-600 dark:text-amber-400'},
           { label: 'Pérdida total',    value: formatCurrency(kpis.totalLoss),    color: 'text-red-700 dark:text-red-400'   },
         ].map(k => (
-          <div key={k.label} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
+          <div key={k.label} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
             <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">{k.label}</p>
-            <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>
+            <p className={`text-lg sm:text-2xl font-bold truncate ${k.color}`}>{k.value}</p>
           </div>
         ))}
       </div>

@@ -365,13 +365,13 @@ export default function Users() {
 
       {/* KPIs por rol */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{kpis.activos}</p>
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-3 text-center overflow-hidden min-w-0">
+          <p className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-slate-100 truncate">{kpis.activos}</p>
           <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Activos</p>
         </div>
         {ROLE_ORDER.map(role => (
-          <div key={role} className={`rounded-xl border p-3 text-center ${RC[role]?.light} ${RC[role]?.border}`}>
-            <p className="text-2xl font-bold">{kpis.porRol[role] || 0}</p>
+          <div key={role} className={`rounded-xl border p-3 text-center overflow-hidden min-w-0 ${RC[role]?.light} ${RC[role]?.border}`}>
+            <p className="text-lg sm:text-2xl font-bold truncate">{kpis.porRol[role] || 0}</p>
             <p className="text-xs mt-0.5 opacity-80">{ROLES[role]?.label}</p>
           </div>
         ))}

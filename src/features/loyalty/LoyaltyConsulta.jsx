@@ -64,17 +64,17 @@ function ClientResult({ client, config }) {
 
           {/* Puntos */}
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-3 text-center border border-gray-100 dark:border-slate-700">
-              <p className="text-3xl font-black text-gray-900 dark:text-slate-100">{(summary.available || 0).toLocaleString()}</p>
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-3 text-center border border-gray-100 dark:border-slate-700 overflow-hidden min-w-0">
+              <p className="text-xl sm:text-3xl font-black text-gray-900 dark:text-slate-100 truncate">{(summary.available || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Puntos disponibles</p>
               {summary.canRedeem && (
-                <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">
+                <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1 truncate">
                   ≈ {formatCurrency(summary.available * config.pointsValue)}
                 </p>
               )}
             </div>
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-3 text-center border border-gray-100 dark:border-slate-700">
-              <p className="text-3xl font-black text-gray-900 dark:text-slate-100">{(summary.accumulated || 0).toLocaleString()}</p>
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-3 text-center border border-gray-100 dark:border-slate-700 overflow-hidden min-w-0">
+              <p className="text-xl sm:text-3xl font-black text-gray-900 dark:text-slate-100 truncate">{(summary.accumulated || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Pts. acumulados</p>
               <p className="text-xs text-gray-300 dark:text-slate-600 mt-0.5">Determina el nivel</p>
             </div>
@@ -104,16 +104,16 @@ function ClientResult({ client, config }) {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
-            <p className="text-lg font-bold text-green-600 dark:text-green-400">+{summary.totalEarned.toLocaleString()}</p>
+          <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center overflow-hidden min-w-0">
+            <p className="text-sm sm:text-lg font-bold text-green-600 dark:text-green-400 truncate">+{summary.totalEarned.toLocaleString()}</p>
             <p className="text-xs text-green-500 dark:text-green-500">Ganados</p>
           </div>
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 text-center">
-            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{summary.totalRedeemed.toLocaleString()}</p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 text-center overflow-hidden min-w-0">
+            <p className="text-sm sm:text-lg font-bold text-amber-600 dark:text-amber-400 truncate">{summary.totalRedeemed.toLocaleString()}</p>
             <p className="text-xs text-amber-500">Canjeados</p>
           </div>
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
-            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(summary.totalSavings)}</p>
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center overflow-hidden min-w-0">
+            <p className="text-sm sm:text-lg font-bold text-blue-600 dark:text-blue-400 truncate">{formatCurrency(summary.totalSavings)}</p>
             <p className="text-xs text-blue-500">Ahorro</p>
           </div>
         </div>

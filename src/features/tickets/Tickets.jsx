@@ -471,21 +471,21 @@ export default function Tickets() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4">
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
           <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Total tickets</p>
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{kpis.total}</p>
+          <p className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-slate-100 truncate">{kpis.total}</p>
         </div>
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
           <p className="text-xs text-green-600 dark:text-green-400 mb-1">🟢 Vigentes</p>
-          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{kpis.vigentes}</p>
+          <p className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-300 truncate">{kpis.vigentes}</p>
         </div>
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
           <p className="text-xs text-red-500 dark:text-red-400 mb-1">✅ Canjeados</p>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-300">{kpis.canjeados}</p>
+          <p className="text-lg sm:text-2xl font-bold text-red-600 dark:text-red-300 truncate">{kpis.canjeados}</p>
         </div>
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4">
+        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
           <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">⏰ Vencidos</p>
-          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{kpis.vencidos}</p>
+          <p className="text-lg sm:text-2xl font-bold text-amber-700 dark:text-amber-300 truncate">{kpis.vencidos}</p>
         </div>
       </div>
 

@@ -400,10 +400,10 @@ export default function DiscountTickets() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-gray-50 rounded-xl p-4"><p className="text-xs text-gray-500 mb-1">Total tickets</p><p className="text-2xl font-bold text-gray-800">{kpis.total}</p></div>
-        <div className="bg-green-50 rounded-xl p-4"><p className="text-xs text-green-600 mb-1">🟢 Disponibles</p><p className="text-2xl font-bold text-green-700">{kpis.available}</p></div>
-        <div className="bg-gray-100 rounded-xl p-4"><p className="text-xs text-gray-500 mb-1">✓ Canjeados</p><p className="text-2xl font-bold text-gray-600">{kpis.used}</p></div>
-        <div className="bg-orange-50 rounded-xl p-4"><p className="text-xs text-orange-600 mb-1">⏰ Vencidos</p><p className="text-2xl font-bold text-orange-600">{kpis.expired}</p></div>
+        <div className="bg-gray-50 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0"><p className="text-xs text-gray-500 mb-1">Total tickets</p><p className="text-lg sm:text-2xl font-bold text-gray-800 truncate">{kpis.total}</p></div>
+        <div className="bg-green-50 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0"><p className="text-xs text-green-600 mb-1">🟢 Disponibles</p><p className="text-lg sm:text-2xl font-bold text-green-700 truncate">{kpis.available}</p></div>
+        <div className="bg-gray-100 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0"><p className="text-xs text-gray-500 mb-1">✓ Canjeados</p><p className="text-lg sm:text-2xl font-bold text-gray-600 truncate">{kpis.used}</p></div>
+        <div className="bg-orange-50 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0"><p className="text-xs text-orange-600 mb-1">⏰ Vencidos</p><p className="text-lg sm:text-2xl font-bold text-orange-600 truncate">{kpis.expired}</p></div>
       </div>
 
       {/* Filtros */}

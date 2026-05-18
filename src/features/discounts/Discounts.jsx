@@ -106,9 +106,9 @@ export default function Discounts() {
           { label: '📅 Programadas', value: kpis.scheduled, bg: 'bg-blue-50',   text: 'text-blue-700'  },
           { label: '⏰ Vencidas',    value: kpis.expired,   bg: 'bg-gray-50 dark:bg-slate-800/50',  text: 'text-gray-500 dark:text-slate-400' },
         ].map((k) => (
-          <div key={k.label} className={`${k.bg} rounded-xl p-4`}>
+          <div key={k.label} className={`${k.bg} rounded-xl p-3 sm:p-4 overflow-hidden min-w-0`}>
             <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">{k.label}</p>
-            <p className={`text-2xl font-bold ${k.text}`}>{k.value}</p>
+            <p className={`text-lg sm:text-2xl font-bold truncate ${k.text}`}>{k.value}</p>
           </div>
         ))}
       </div>
