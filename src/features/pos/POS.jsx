@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { usePOSBroadcast, buildCartForDisplay } from './POSBroadcast'
 import { useStore, selectCartCount } from '../../store/index'
 import { saleService, discountTicketService } from '../../services/index'
@@ -7,12 +7,12 @@ import { useDebounce } from '../../shared/hooks/useDebounce'
 import { StockBadge, ExpiryBadge } from '../../shared/components/ui/Badge'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
-import PaymentPanel from './components/PaymentPanel'
-import SaleTicket from './components/SaleTicket'
+const PaymentPanel = lazy(() => import('./components/PaymentPanel'))
+const SaleTicket   = lazy(() => import('./components/SaleTicket'))
 import toast from 'react-hot-toast'
 import { calcStockDisponible } from '../../shared/utils/inventoryEngine'
 import { useCartHold }    from './hooks/useCartHold'
-import HeldCartsPanel     from './components/HeldCartsPanel'
+const HeldCartsPanel = lazy(() => import('./components/HeldCartsPanel'))
 import { usePOSTotals }   from './hooks/usePOSTotals'
 
 export default function POS({ onNavigate }) {
@@ -824,26 +824,28 @@ export default function POS({ onNavigate }) {
 
       {/* Panel de pago */}
       {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/40">
-          <div className="bg-white h-full w-96 shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-800">Cobrar venta</h2>
-              <button onClick={() => setShowPayment(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <PaymentPanel
-                total={totalAPagar}
-                clients={clients}
-                onConfirm={handleCompleteSale}
-                processing={processing}
-                onClientChange={setSelectedClientId}
-                onLoyaltyRedeem={() => {}}
-              />
+        <Suspense fallback={null}>
+          <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/40">
+            <div className="bg-white h-full w-96 shadow-2xl flex flex-col">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+                <h2 className="font-semibold text-gray-800">Cobrar venta</h2>
+                <button onClick={() => setShowPayment(false)} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <PaymentPanel
+                  total={totalAPagar}
+                  clients={clients}
+                  onConfirm={handleCompleteSale}
+                  processing={processing}
+                  onClientChange={setSelectedClientId}
+                  onLoyaltyRedeem={() => {}}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </Suspense>
       )}
 
       {showClearConfirm && (
@@ -853,19 +855,23 @@ export default function POS({ onNavigate }) {
       )}
 
       {showTicket && completedSale && (
-        <SaleTicket sale={completedSale} onClose={() => { setShowTicket(false); setCompletedSale(null) }}/>
+        <Suspense fallback={null}>
+          <SaleTicket sale={completedSale} onClose={() => { setShowTicket(false); setCompletedSale(null) }}/>
+        </Suspense>
       )}
 
       {/* ── F2: Panel de ventas en espera ──────────────────────────────────
            Se abre al pulsar "▶️ En espera (N)". Muestra la cola de holds
            con label, ítems y total. Permite recuperar o descartar cada uno. */}
       {showHeldCarts && (
-        <HeldCartsPanel
-          heldCarts={heldCarts}
-          onRecover={handleRecoverCart}
-          onDiscard={(id) => { discardHold(id); if (heldCarts.length <= 1) setShowHeldCarts(false) }}
-          onClose={() => setShowHeldCarts(false)}
-        />
+        <Suspense fallback={null}>
+          <HeldCartsPanel
+            heldCarts={heldCarts}
+            onRecover={handleRecoverCart}
+            onDiscard={(id) => { discardHold(id); if (heldCarts.length <= 1) setShowHeldCarts(false) }}
+            onClose={() => setShowHeldCarts(false)}
+          />
+        </Suspense>
       )}
       {/* ─────────────────────────────────────────────────────────────────── */}
     </div>

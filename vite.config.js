@@ -16,10 +16,11 @@ export default defineConfig({
           'ui-vendor': ['lucide-react', 'react-hot-toast'],
           'form-vendor': ['react-hook-form', 'zod'],
           'chart-vendor': ['recharts'],
+          'pdf-vendor': ['jspdf', 'html2canvas'],
         }
       }
     },
-    // Generar source maps para debugging
+    chunkSizeWarningLimit: 650,
     sourcemap: true,
   },
 
