@@ -146,8 +146,8 @@ function KpiCard({ label, value, sub, color = 'gray', icon }) {
   return (
     <div className={`rounded-2xl border bg-gradient-to-br ${colors[color]} p-4 sm:p-5 flex flex-col gap-1 overflow-hidden min-w-0`}>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
-        <span className="text-lg">{icon}</span>
+        <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide leading-tight">{label}</span>
+        <span className="text-lg shrink-0 ml-1">{icon}</span>
       </div>
       <p className={`text-xl sm:text-3xl font-black tracking-tight truncate ${textColors[color]}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
@@ -414,7 +414,7 @@ export default function Returns() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6">
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -557,7 +557,7 @@ export default function Returns() {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <p className="text-xs text-gray-400 dark:text-slate-500">Total pagado</p>
-                        <p className="text-2xl font-black text-violet-700 dark:text-violet-300">{formatCurrency(foundSale.total)}</p>
+                        <p className="text-lg sm:text-2xl font-black text-violet-700 dark:text-violet-300 truncate">{formatCurrency(foundSale.total)}</p>
                         <p className="text-xs text-gray-400">{foundSale.items?.length} producto(s) · {foundSale.items?.reduce((a,i)=>a+i.quantity,0)} unidades</p>
                       </div>
                     </div>
