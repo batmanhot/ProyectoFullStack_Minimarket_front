@@ -17,6 +17,7 @@ const KEYS = {
   renewals: 'mm_mock_renewals_v1',
   prices:   'mm_mock_prices_v1',
   site:     'mm_mock_site_v1',
+  limits:   'mm_saas_plan_limits_v1',
 }
 
 const _load = (key) => {
@@ -86,6 +87,14 @@ const DEFAULT_RENEWALS = [
 // ─── Precios configurables (editables desde SuperAdmin) ──────────────────────
 const DEFAULT_PRICES = { basic: 49, pro: 99, enterprise: 199 }
 
+// ─── Límites por plan (editables desde SuperAdmin) ───────────────────────────
+export const DEFAULT_PLAN_LIMITS = {
+  trial:      { products: 100,  users: 1  },
+  basic:      { products: 500,  users: 3  },
+  pro:        { products: 2000, users: 10 },
+  enterprise: { products: null, users: null },
+}
+
 // ─── Configuración del sitio/landing (editable desde SuperAdmin) ──────────────
 export const DEFAULT_SITE_SETTINGS = {
   brandName:   'MiniMarket POS',
@@ -106,6 +115,7 @@ let _accesses = _load(KEYS.accesses) ?? [...DEFAULT_ACCESSES]
 let _renewals = _load(KEYS.renewals) ?? [...DEFAULT_RENEWALS]
 let _prices   = _load(KEYS.prices)   ?? { ...DEFAULT_PRICES }
 let _site     = _load(KEYS.site)     ?? { ...DEFAULT_SITE_SETTINGS }
+let _limits   = _load(KEYS.limits)   ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
 
 // Contadores derivados de los datos existentes para evitar IDs duplicados
 let _accessIdx  = Math.max(0, ..._accesses.map(a => parseInt(a.id.split('_')[1]) || 0)) + 1
@@ -117,9 +127,10 @@ const _flush = () => {
   _save(KEYS.renewals, _renewals)
 }
 
-// Lectura sincrónica para Landing (no async)
-export const getStoredPrices        = () => _load(KEYS.prices) ?? { ...DEFAULT_PRICES }
-export const getStoredSiteSettings  = () => _load(KEYS.site)   ?? { ...DEFAULT_SITE_SETTINGS }
+// Lectura sincrónica para Landing y hooks de plan (no async)
+export const getStoredPrices        = () => _load(KEYS.prices)  ?? { ...DEFAULT_PRICES }
+export const getStoredSiteSettings  = () => _load(KEYS.site)    ?? { ...DEFAULT_SITE_SETTINGS }
+export const getStoredPlanLimits    = () => _load(KEYS.limits)  ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
 
 // ─── Servicio ─────────────────────────────────────────────────────────────────
 export const tenantService = {
@@ -373,6 +384,28 @@ export const tenantService = {
     return ok({ ..._prices })
   },
 
+  // ── Límites por plan ────────────────────────────────────────────────────────
+
+  async getLimits() {
+    await delay(50)
+    if (USE_API) {
+      const { data } = await api.get('/admin/plan-limits')
+      return ok(data)
+    }
+    return ok(JSON.parse(JSON.stringify(_limits)))
+  },
+
+  async updateLimits(newLimits) {
+    await delay(180)
+    if (USE_API) {
+      const { data } = await api.put('/admin/plan-limits', newLimits)
+      return ok(data)
+    }
+    _limits = JSON.parse(JSON.stringify(newLimits))
+    _save(KEYS.limits, _limits)
+    return ok(JSON.parse(JSON.stringify(_limits)))
+  },
+
   // ── Configuración del sitio ─────────────────────────────────────────────────
 
   async getSiteSettings() {
@@ -402,10 +435,12 @@ export const tenantService = {
     _renewals = [...DEFAULT_RENEWALS]
     _prices   = { ...DEFAULT_PRICES }
     _site     = { ...DEFAULT_SITE_SETTINGS }
+    _limits   = JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
     _accessIdx  = DEFAULT_ACCESSES.length + 1
     _renewalIdx = DEFAULT_RENEWALS.length + 1
     _flush()
-    _save(KEYS.prices, _prices)
-    _save(KEYS.site,   _site)
+    _save(KEYS.prices,  _prices)
+    _save(KEYS.site,    _site)
+    _save(KEYS.limits,  _limits)
   },
 }

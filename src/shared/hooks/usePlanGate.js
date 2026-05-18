@@ -17,6 +17,7 @@ import { useTenantSafe }         from '../../context/TenantContext'
 import { useStore }              from '../../store/index'
 import { canUsePlan, PLANS, getMinPlanForFeature } from '../../config/plans'
 import { ROLES }                 from '../../config/app'
+import { getStoredPlanLimits }   from '../../services/tenantService'
 
 export const usePlanGate = (page) => {
   const tenantCtx  = useTenantSafe()
@@ -48,16 +49,24 @@ export const usePlanGate = (page) => {
 /**
  * Variante para verificar acceso sin un page específico —
  * útil para chequear límites (maxProducts, maxUsers, etc.)
+ *
+ * Merge: overrides del superadmin (localStorage) > defaults de plans.js
+ * Los cambios del superadmin se aplican en el próximo render/navegación.
  */
 export const usePlanLimits = () => {
   const tenantCtx = useTenantSafe()
   const plan      = tenantCtx?.plan ?? 'trial'
   const cfg       = PLANS[plan]
+  const stored    = getStoredPlanLimits()
+  const override  = stored[plan] ?? {}
+
+  const maxProducts = override.products  !== undefined ? override.products  : (cfg?.limits?.products  ?? 100)
+  const maxUsers    = override.users     !== undefined ? override.users     : (cfg?.limits?.users     ?? 1)
 
   return {
     plan,
-    maxProducts:    cfg?.limits?.products  ?? 100,
-    maxUsers:       cfg?.limits?.users     ?? 1,
+    maxProducts,
+    maxUsers,
     exportData:     cfg?.limits?.exportData ?? false,
     multiCash:      cfg?.limits?.multiCash  ?? false,
     availableRoles: cfg?.availableRoles    ?? ['admin'],

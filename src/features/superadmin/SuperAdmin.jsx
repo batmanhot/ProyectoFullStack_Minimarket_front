@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tenantService } from '../../services/tenantService'
+import { tenantService, DEFAULT_PLAN_LIMITS } from '../../services/tenantService'
 import { PLANS, PLAN_ORDER, BONUS_DAYS, BILLING_CYCLES, CYCLE_ORDER, getAccessExpiry, getPlanPrice, getTotalPrice, daysUntilExpiry, getAccessStatus, ACCESS_STATUS_CONFIG } from '../../config/plans'
 import { SECTORS } from '../../config/app'
 import {
   Shield, Users, Package, TrendingUp, RefreshCw, LogOut, ExternalLink,
   RotateCcw, Plus, Edit2, Trash2, X, Check, ChevronRight, Clock, History, DollarSign, Save,
-  Globe, Phone, Mail, MapPin, MessageCircle,
+  Globe, Phone, Mail, MapPin, MessageCircle, Sliders,
 } from 'lucide-react'
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
@@ -682,6 +682,163 @@ function PricesTab() {
   )
 }
 
+// ─── LimitsTab — Límites de productos y usuarios por plan ─────────────────────
+const PLAN_COLORS = {
+  trial:      { accent: '#64748b', bg: '#f1f5f9', border: '#e2e8f0' },
+  basic:      { accent: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  pro:        { accent: '#7c3aed', bg: '#f3e8ff', border: '#ddd6fe' },
+  enterprise: { accent: '#d97706', bg: '#fef3c7', border: '#fde68a' },
+}
+
+function LimitsTab() {
+  const [limits,  setLimits]  = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [saved,   setSaved]   = useState(false)
+  const [error,   setError]   = useState('')
+
+  useEffect(() => {
+    tenantService.getLimits().then(r => { if (r.data) setLimits(r.data) })
+  }, [])
+
+  const handleChange = (planId, field, rawVal) => {
+    const val = rawVal === '' || rawVal === 'null' ? null : parseInt(rawVal, 10)
+    setLimits(prev => ({
+      ...prev,
+      [planId]: { ...prev[planId], [field]: isNaN(val) ? null : val },
+    }))
+  }
+
+  const save = async () => {
+    setLoading(true); setError('')
+    const r = await tenantService.updateLimits(limits)
+    setLoading(false)
+    if (r.error) { setError(r.error); return }
+    setSaved(true); setTimeout(() => setSaved(false), 3000)
+  }
+
+  const reset = () => {
+    setLimits(JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS)))
+    setSaved(false)
+  }
+
+  if (!limits) return <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>Cargando...</div>
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: '0 0 3px' }}>Límites por plan</h2>
+          <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+            Configura cuántos productos y usuarios permite cada plan. <strong>null</strong> = ilimitado.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={reset} style={{ padding: '9px 16px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            Restaurar defaults
+          </button>
+          <button onClick={save} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 20px', borderRadius: '8px', border: 'none', background: loading ? '#94a3b8' : saved ? '#16a34a' : '#2563eb', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            {saved ? <><Check size={14} /> Guardado</> : <><Save size={14} /> Guardar límites</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Info banner */}
+      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 16px', fontSize: '12px', color: '#1d4ed8', marginBottom: '20px' }}>
+        ℹ️ Los cambios se aplican de inmediato en todos los negocios al guardar. Dejar el campo vacío equivale a <strong>ilimitado</strong>. Los cambios en Usuarios también actualizan la pantalla de gestión de usuarios de cada negocio.
+      </div>
+
+      {/* Cards por plan */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+        {PLAN_ORDER.map(planId => {
+          const plan   = PLANS[planId]
+          const c      = PLAN_COLORS[planId]
+          const def    = DEFAULT_PLAN_LIMITS[planId]
+          const cur    = limits[planId] ?? {}
+          const isUnlimited = planId === 'enterprise'
+
+          return (
+            <div key={planId} style={{ background: '#fff', border: `1px solid ${c.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+              {/* Card header */}
+              <div style={{ background: c.bg, borderBottom: `1px solid ${c.border}`, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <PlanBadge plan={planId} />
+                  {plan.badge && (
+                    <span style={{ fontSize: '10px', fontWeight: 700, background: c.accent, color: '#fff', padding: '2px 8px', borderRadius: '20px' }}>{plan.badge}</span>
+                  )}
+                </div>
+                <span style={{ fontSize: '12px', color: c.accent, fontWeight: 600 }}>
+                  {plan.price === 0 ? 'Gratis' : `S/ ${plan.price}/mes`}
+                </span>
+              </div>
+
+              <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Productos */}
+                <FieldRow label="Máx. Productos">
+                  <div style={{ position: 'relative' }}>
+                    <Package size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                    <input
+                      type={isUnlimited ? 'text' : 'number'}
+                      min={1}
+                      value={isUnlimited ? 'Ilimitado' : (cur.products ?? '')}
+                      readOnly={isUnlimited}
+                      onChange={e => handleChange(planId, 'products', e.target.value)}
+                      placeholder={`Default: ${def.products ?? 'Ilimitado'}`}
+                      style={{ ...inputStyle, paddingLeft: '30px', fontWeight: 700, background: isUnlimited ? '#f8fafc' : '#fff', color: isUnlimited ? '#94a3b8' : '#0f172a', cursor: isUnlimited ? 'not-allowed' : 'text' }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    Default: <strong>{def.products ?? 'Ilimitado'}</strong>
+                    {!isUnlimited && cur.products !== def.products && <span style={{ color: '#f59e0b', marginLeft: '6px' }}>✎ modificado</span>}
+                  </div>
+                </FieldRow>
+
+                {/* Usuarios */}
+                <FieldRow label="Máx. Usuarios">
+                  <div style={{ position: 'relative' }}>
+                    <Users size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+                    <input
+                      type={isUnlimited ? 'text' : 'number'}
+                      min={1}
+                      value={isUnlimited ? 'Ilimitado' : (cur.users ?? '')}
+                      readOnly={isUnlimited}
+                      onChange={e => handleChange(planId, 'users', e.target.value)}
+                      placeholder={`Default: ${def.users ?? 'Ilimitado'}`}
+                      style={{ ...inputStyle, paddingLeft: '30px', fontWeight: 700, background: isUnlimited ? '#f8fafc' : '#fff', color: isUnlimited ? '#94a3b8' : '#0f172a', cursor: isUnlimited ? 'not-allowed' : 'text' }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    Default: <strong>{def.users ?? 'Ilimitado'}</strong>
+                    {!isUnlimited && cur.users !== def.users && <span style={{ color: '#f59e0b', marginLeft: '6px' }}>✎ modificado</span>}
+                  </div>
+                </FieldRow>
+
+                {/* Preview resumen */}
+                <div style={{ background: c.bg, borderRadius: '8px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <div style={{ color: c.accent }}>
+                    <span style={{ fontWeight: 700 }}>📦 </span>
+                    {isUnlimited || cur.products === null ? 'Productos ilimitados' : `Hasta ${cur.products} productos`}
+                  </div>
+                  <div style={{ color: c.accent }}>
+                    <span style={{ fontWeight: 700 }}>👥 </span>
+                    {isUnlimited || cur.users === null ? 'Usuarios ilimitados' : `Hasta ${cur.users} usuarios`}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {error && <div style={{ marginTop: '16px', fontSize: '13px', color: '#dc2626', background: '#fef2f2', padding: '10px 14px', borderRadius: '8px' }}>{error}</div>}
+
+      <div style={{ marginTop: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 16px', fontSize: '12px', color: '#64748b' }}>
+        <strong style={{ color: '#374151' }}>Nota:</strong> El plan <em>Empresarial</em> siempre es ilimitado y no es editable. Los límites se guardan en el almacenamiento local del navegador hasta integrar el backend.
+      </div>
+    </div>
+  )
+}
+
 // ─── SiteTab — Configuración del sitio / landing ──────────────────────────────
 const SITE_FIELDS = [
   {
@@ -838,6 +995,7 @@ const TABS = [
   { id: 'access',  label: 'Gestión de Accesos',  icon: Package      },
   { id: 'history', label: 'Historial',           icon: History      },
   { id: 'prices',  label: 'Precios',             icon: DollarSign   },
+  { id: 'limits',  label: 'Límites de plan',     icon: Sliders      },
   { id: 'site',    label: 'Sitio web',           icon: Globe        },
 ]
 
@@ -926,6 +1084,7 @@ export default function SuperAdmin() {
             {tab === 'access'  && <AccessTab />}
             {tab === 'history' && <HistoryTab />}
             {tab === 'prices'  && <PricesTab />}
+            {tab === 'limits'  && <LimitsTab />}
             {tab === 'site'    && <SiteTab />}
           </div>
         </div>
