@@ -14,22 +14,24 @@
  */
 
 import { useMemo } from 'react'
-import { formatDate } from '../../../shared/utils/helpers'
-import { isToday, isThisWeek, isThisMonth } from '../../../shared/utils/helpers'
+import { formatDate, isToday, isThisWeek, isThisMonth, getUnitCost } from '../../../shared/utils/helpers'
 
 // ─── Constante interna ────────────────────────────────────────────────────────
 const IGV_RATE = 0.18
 
 /**
  * @param {{
- *   sales:      Array,
- *   products:   Array,
- *   categories: Array,
- *   returns:    Array,
- *   range:      'today'|'week'|'month'|'all'
+ *   sales:        Array,
+ *   products:     Array,
+ *   categories:   Array,
+ *   returns:      Array,
+ *   range:        'today'|'week'|'month'|'all',
+ *   systemConfig: Object
  * }} param
  */
-export function useReportMetrics({ sales, products, categories, returns = [], range }) {
+
+export function useReportMetrics({ sales, products, categories, returns = [], range, systemConfig }) {
+  const costMethod = systemConfig?.costMethod || 'peps'
 
   // ── 1. Ventas filtradas por rango de fecha ─────────────────────────────────
   // Incluye 'completada', 'dev-parcial' y 'devolucion': todas son transacciones reales
@@ -52,13 +54,11 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
     const avgTicket = count > 0 ? total / count : 0
     const igv       = (total / (1 + IGV_RATE)) * IGV_RATE
 
-    // Utilidad: precio venta - costo. Si priceBuy es 0, usa 70% del precio de venta.
+    // Utilidad: precio venta - costo según método configurado (PEPS o CPP).
     const utilidad = filteredSales.reduce((acc, s) =>
       acc + s.items.reduce((a2, item) => {
         const product = products.find((pr) => pr.id === item.productId)
-        const cost    = product?.priceBuy > 0
-          ? product.priceBuy
-          : item.unitPrice * 0.7          // estimado conservador
+        const cost    = getUnitCost(product, item.unitPrice, costMethod)
         return a2 + (item.unitPrice - cost) * item.quantity
       }, 0), 0
     )
@@ -150,7 +150,8 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
     )
 
     const lista = products.filter((p) => p.isActive && !movedIds.has(p.id))
-    const capitalInmovilizado = lista.reduce((acc, p) => acc + (p.priceBuy || 0) * p.stock, 0)
+    const capitalInmovilizado = lista.reduce((acc, p) =>
+      acc + getUnitCost(p, p.priceSell || 0, costMethod) * (p.stock || 0), 0)
 
     return {
       lista:               lista.sort((a, b) => (b.priceBuy * b.stock) - (a.priceBuy * a.stock)),
@@ -205,34 +206,34 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
   , [products])
 
   // ── 10. RENTABILIDAD POR PRODUCTO ─────────────────────────────────────────
-  // Usa el costMethod configurado: 'peps' (precio de compra actual) o
-  // 'costo_promedio' (precio promedio ponderado calculado desde compras).
   const rentabilidadProductos = useMemo(() => {
     const map = {}
 
     filteredSales.forEach(s => {
       s.items?.forEach(item => {
-        const product = products.find(p => p.id === item.productId)
+        const product   = products.find(p => p.id === item.productId)
         if (!product) return
 
         const qty       = item.quantity || 1
         const precioVta = item.unitPrice || 0
-        // Costo según método configurado (PEPS por defecto = priceBuy actual)
-        const costo     = product.priceBuy > 0 ? product.priceBuy : precioVta * 0.7
+        const costo     = getUnitCost(product, precioVta, costMethod)
+        const hasCost   = (costMethod === 'cpp')
+          ? (product.costAverage > 0 || product.priceBuy > 0)
+          : product.priceBuy > 0
 
         if (!map[item.productId]) {
           map[item.productId] = {
-            id:          item.productId,
-            name:        item.productName,
-            barcode:     product.barcode,
-            categoryId:  product.categoryId,
-            unitCost:    costo,
-            unitPrice:   precioVta,
-            qtySold:     0,
-            revenue:     0,
-            costTotal:   0,
-            utilidad:    0,
-            hasCost:     product.priceBuy > 0,
+            id:         item.productId,
+            name:       item.productName,
+            barcode:    product.barcode,
+            categoryId: product.categoryId,
+            unitCost:   costo,
+            unitPrice:  precioVta,
+            qtySold:    0,
+            revenue:    0,
+            costTotal:  0,
+            utilidad:   0,
+            hasCost,
           }
         }
 
@@ -246,16 +247,16 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
     return Object.values(map)
       .map(p => ({
         ...p,
-        revenue:   parseFloat(p.revenue.toFixed(2)),
-        costTotal: parseFloat(p.costTotal.toFixed(2)),
-        utilidad:  parseFloat(p.utilidad.toFixed(2)),
-        margenPct: p.revenue > 0
+        revenue:        parseFloat(p.revenue.toFixed(2)),
+        costTotal:      parseFloat(p.costTotal.toFixed(2)),
+        utilidad:       parseFloat(p.utilidad.toFixed(2)),
+        margenPct:      p.revenue > 0
           ? parseFloat((p.utilidad / p.revenue * 100).toFixed(1))
           : 0,
         margenNegativo: p.utilidad < 0,
       }))
       .sort((a, b) => b.utilidad - a.utilidad)
-  }, [filteredSales, products])
+  }, [filteredSales, products, costMethod])
 
   // ── 11. RENTABILIDAD POR CATEGORÍA ────────────────────────────────────────
   const rentabilidadCategorias = useMemo(() => {
@@ -292,7 +293,45 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
       .sort((a, b) => b.utilidad - a.utilidad)
   }, [rentabilidadProductos, categories])
 
-  // ── 12. RESUMEN EJECUTIVO DE RENTABILIDAD ─────────────────────────────────
+  // ── 12. INVENTARIO VALORIZADO (snapshot contable actual) ─────────────────
+  const inventarioValorizado = useMemo(() => {
+    const activeProducts = products.filter(p => p.isActive && (p.stock || 0) > 0)
+
+    const rows = activeProducts.map(p => {
+      const unitCost   = getUnitCost(p, p.priceSell || 0, costMethod)
+      const stockValue = parseFloat((unitCost * (p.stock || 0)).toFixed(2))
+      const cat        = p.categoryId
+      return {
+        id:         p.id,
+        name:       p.name,
+        barcode:    p.barcode,
+        categoryId: cat,
+        stock:      p.stock || 0,
+        unit:       p.unit || 'u',
+        unitCost:   parseFloat(unitCost.toFixed(4)),
+        stockValue,
+        hasCost:    (costMethod === 'cpp')
+          ? (p.costAverage > 0 || p.priceBuy > 0)
+          : p.priceBuy > 0,
+      }
+    }).sort((a, b) => b.stockValue - a.stockValue)
+
+    const totalValue   = parseFloat(rows.reduce((a, r) => a + r.stockValue, 0).toFixed(2))
+    const totalSKUs    = rows.length
+    const sinCosto     = rows.filter(r => !r.hasCost).length
+
+    // Desglose por categoría
+    const catMap = {}
+    rows.forEach(r => {
+      if (!catMap[r.categoryId]) catMap[r.categoryId] = { value: 0, skus: 0 }
+      catMap[r.categoryId].value += r.stockValue
+      catMap[r.categoryId].skus  += 1
+    })
+
+    return { rows, totalValue, totalSKUs, sinCosto, catMap }
+  }, [products, costMethod])
+
+  // ── 13. RESUMEN EJECUTIVO DE RENTABILIDAD ─────────────────────────────────
   const rentabilidadKPIs = useMemo(() => {
     const totalRevenue  = rentabilidadProductos.reduce((a,p) => a+p.revenue,   0)
     const totalCost     = rentabilidadProductos.reduce((a,p) => a+p.costTotal, 0)
@@ -322,6 +361,8 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
     sinMovimiento,
     returnMetrics,
     productsSinCosto,
+    costMethod,
+    inventarioValorizado,
     // Rentabilidad
     rentabilidadProductos,
     rentabilidadCategorias,

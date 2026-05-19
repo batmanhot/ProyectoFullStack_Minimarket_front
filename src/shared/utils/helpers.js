@@ -87,6 +87,19 @@ export const calcBilletes = (amount) => {
   return result
 }
 
+// ─── VALORIZACIÓN DE INVENTARIO ───────────────────────────────────────────────
+// Fuente única de verdad: usada por Kardex, Reportes y cualquier cálculo de costo
+// PEPS  → priceBuy (última compra registrada)
+// CPP   → costAverage si > 0, si no priceBuy
+// Ambos → fallback 70% de fallbackPrice (precio de venta) cuando no hay costo registrado
+export function getUnitCost(product, fallbackPrice, costMethod) {
+  if (costMethod === 'cpp') {
+    const cpp = product?.costAverage > 0 ? product.costAverage : product?.priceBuy
+    return cpp > 0 ? cpp : (fallbackPrice || 0) * 0.7
+  }
+  return product?.priceBuy > 0 ? product.priceBuy : (fallbackPrice || 0) * 0.7
+}
+
 // ─── STOCK ────────────────────────────────────────────────────────────────────
 export const isLowStock  = (p) => p.stock > 0 && p.stock <= p.stockMin
 export const isOutOfStock = (p) => p.stock === 0

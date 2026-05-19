@@ -23,6 +23,8 @@ import { useReportMetrics }                            from './hooks/useReportMe
 import Modal                                            from '../../shared/components/ui/Modal'
 import { saleService }                                 from '../../services/index'
 import toast                                           from 'react-hot-toast'
+import { useTenantSafe }                               from '../../context/TenantContext'
+import { canUsePlan, PLANS, PLAN_ORDER }               from '../../config/plans'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const COLORS = ['#378ADD', '#5DCAA5', '#EF9F27', '#D85A30', '#7F77DD', '#D4537E']
@@ -35,14 +37,15 @@ const RANGES = [
 ]
 
 const TABS = [
-  { key: 'ventas',          label: 'Ventas por día'     },
-  { key: 'productos',       label: 'Productos top'      },
-  { key: 'categorias',      label: 'Por categoría'      },
-  { key: 'rentabilidad',    label: '📈 Rentabilidad'    },
-  { key: 'detalle_venta',   label: 'Detalle ventas'     },
-  { key: 'devoluciones',    label: 'Devoluciones'       },
-  { key: 'deuda',           label: 'Cuentas por cobrar' },
-  { key: 'inmovilizado',    label: 'Sin movimiento'     },
+  { key: 'ventas',               label: 'Ventas por día'      },
+  { key: 'productos',            label: 'Productos top'       },
+  { key: 'categorias',           label: 'Por categoría'       },
+  { key: 'rentabilidad',         label: '📈 Rentabilidad'     },
+  { key: 'detalle_venta',        label: 'Detalle ventas'      },
+  { key: 'devoluciones',         label: 'Devoluciones'        },
+  { key: 'deuda',                label: 'Cuentas por cobrar'  },
+  { key: 'inmovilizado',         label: 'Sin movimiento'      },
+  { key: 'inventario_valorizado', label: '🏦 Inv. Valorizado', planRequired: 'enterprise' },
 ]
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
@@ -146,6 +149,8 @@ function ExcelPreviewModal({ title, rows, filename, onClose, onDownload }) {
 
 export default function Reports() {
   const { sales, products, clients, categories, returns = [], businessConfig, systemConfig, addAuditLog, currentUser } = useStore()
+  const tenantCtx  = useTenantSafe()
+  const currentPlan = tenantCtx?.plan ?? 'trial'
 
   const [range, setRange]           = useState('month')
   const [activeTab, setActiveTab]   = useState('ventas')
@@ -166,10 +171,12 @@ export default function Reports() {
     sinMovimiento,
     returnMetrics,
     productsSinCosto,
+    costMethod,
+    inventarioValorizado,
     rentabilidadProductos,
     rentabilidadCategorias,
     rentabilidadKPIs,
-  } = useReportMetrics({ sales, products, categories, returns, range })
+  } = useReportMetrics({ sales, products, categories, returns, range, systemConfig })
 
   const operacionesRows = useMemo(() => filteredSales.map((s) => {
     const descuentos    = s.totalDescuentos || s.discount || 0
@@ -383,19 +390,25 @@ export default function Reports() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1 flex-wrap">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-              activeTab === t.key
-                ? 'bg-white shadow text-blue-600'
-                : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
-            }`}>
-            {t.label}
-            {t.key === 'devoluciones' && returnMetrics.count > 0 && (
-              <span className="ml-1.5 text-[10px] bg-red-100 text-red-600 px-1 rounded-full">{returnMetrics.count}</span>
-            )}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const locked = t.planRequired && !canUsePlan(currentPlan, t.planRequired)
+          return (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1 ${
+                activeTab === t.key
+                  ? 'bg-white shadow text-blue-600'
+                  : locked
+                  ? 'text-gray-400 dark:text-slate-600 cursor-pointer'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
+              }`}>
+              {t.label}
+              {locked && <span className="text-[10px]">🔒</span>}
+              {t.key === 'devoluciones' && returnMetrics.count > 0 && (
+                <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded-full">{returnMetrics.count}</span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* ══ TAB: Ventas por día ══════════════════════════════════════════════ */}
@@ -517,15 +530,15 @@ export default function Reports() {
 
           {/* Método activo */}
           <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border ${
-            (systemConfig?.costMethod || 'peps') === 'peps'
+            costMethod === 'peps'
               ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
               : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
           }`}>
-            <span>{(systemConfig?.costMethod || 'peps') === 'peps' ? '🕐' : '⚖️'}</span>
+            <span>{costMethod === 'peps' ? '🕐' : '⚖️'}</span>
             <span>
               Método de valorización activo:
               <strong className="ml-1">
-                {(systemConfig?.costMethod || 'peps') === 'peps'
+                {costMethod === 'peps'
                   ? 'PEPS — Primero en entrar, primero en salir'
                   : 'Costo Promedio Ponderado (CPP)'}
               </strong>
@@ -990,6 +1003,131 @@ export default function Reports() {
           </table>
         </div>
       )}
+
+      {/* ══ TAB: Inventario Valorizado (solo plan Empresarial) ══════════════ */}
+      {activeTab === 'inventario_valorizado' && (() => {
+        const locked = !canUsePlan(currentPlan, 'enterprise')
+        if (locked) {
+          const enterprisePlan = PLANS['enterprise']
+          return (
+            <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-3xl">🔒</div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-800 dark:text-slate-100">Reporte exclusivo del plan Empresarial</h3>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 max-w-sm">
+                  El inventario valorizado es un reporte contable que muestra el valor monetario de tu stock según el método de valorización activo (PEPS o CPP). Útil para cierres mensuales y auditorías.
+                </p>
+              </div>
+              <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-700 dark:text-blue-300 max-w-sm">
+                Disponible en el plan <strong>{enterprisePlan?.label}</strong> — S/ {enterprisePlan?.price}/mes · Usuarios y productos ilimitados · Soporte prioritario 24/7
+              </div>
+            </div>
+          )
+        }
+
+        const { rows, totalValue, totalSKUs, sinCosto, catMap } = inventarioValorizado
+        const handleExportInvVal = () => {
+          exportToExcel(
+            rows.map(r => ({
+              Producto:        r.name,
+              Código:          r.barcode,
+              'Stock':         r.stock,
+              'Unidad':        r.unit,
+              'Costo unitario': r.unitCost.toFixed(2),
+              'Valor en stock': r.stockValue.toFixed(2),
+              'Con costo':     r.hasCost ? 'Sí' : 'Estimado',
+            })),
+            `inventario_valorizado_${new Date().toISOString().slice(0,10)}`
+          )
+        }
+
+        return (
+          <div className="space-y-5">
+            {/* Método activo */}
+            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border ${
+              costMethod === 'peps'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
+                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+            }`}>
+              <span>{costMethod === 'peps' ? '🕐' : '⚖️'}</span>
+              <span>Método activo: <strong>{costMethod === 'peps' ? 'PEPS' : 'Costo Promedio Ponderado (CPP)'}</strong> — snapshot al {new Date().toLocaleDateString('es-PE')}</span>
+              <ExcelButton className="ml-auto" onClick={handleExportInvVal} />
+            </div>
+
+            {sinCosto > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-700 dark:text-amber-300">
+                ⚠️ <span><strong>{sinCosto} producto{sinCosto > 1 ? 's' : ''} sin precio de compra registrado</strong> — su valor se estimó al 70% del precio de venta. Completa el campo "Precio de compra" en el Catálogo para mayor precisión.</span>
+              </div>
+            )}
+
+            {/* KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <KpiCard label="Valor total del inventario" value={formatCurrency(totalValue)} color="text-blue-600 dark:text-blue-400" sub="Stock × costo unitario"/>
+              <KpiCard label="SKUs activos con stock" value={totalSKUs} sub="Productos únicos"/>
+              <KpiCard label="Con costo registrado" value={`${totalSKUs - sinCosto} / ${totalSKUs}`} color={(totalSKUs - sinCosto) === totalSKUs ? 'text-green-600' : 'text-amber-600'} sub="Exactos vs estimados"/>
+              <KpiCard label="Mayor valor inmovilizado" value={rows[0] ? formatCurrency(rows[0].stockValue) : '—'} sub={rows[0]?.name?.substring(0, 20) || ''}/>
+            </div>
+
+            {/* Tabla */}
+            <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-slate-200">Detalle por producto</h3>
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Ordenado por valor en stock descendente</p>
+              </div>
+              {rows.length === 0 ? (
+                <NoData msg="No hay productos activos con stock" />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
+                        {['Producto', 'Stock', 'Costo unit.', 'Valor en stock', '% del total', ''].map(h =>
+                          <th key={h} className="text-left text-xs font-medium text-gray-500 dark:text-slate-400 px-4 py-2.5">{h}</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                      {rows.map(r => {
+                        const pct = totalValue > 0 ? (r.stockValue / totalValue * 100) : 0
+                        return (
+                          <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                            <td className="px-4 py-2.5">
+                              <div className="text-sm font-medium text-gray-800 dark:text-slate-100">{r.name}</div>
+                              <div className="text-xs text-gray-400 dark:text-slate-500">{r.barcode}</div>
+                            </td>
+                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300">{r.stock} {r.unit}</td>
+                            <td className="px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300">
+                              {formatCurrency(r.unitCost)}
+                              {!r.hasCost && <span className="ml-1 text-[10px] text-amber-500">est.</span>}
+                            </td>
+                            <td className="px-4 py-2.5 text-sm font-semibold text-gray-800 dark:text-slate-100">{formatCurrency(r.stockValue)}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-full h-1.5 min-w-[40px]">
+                                  <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, pct)}%` }}/>
+                                </div>
+                                <span className="text-xs text-gray-500 dark:text-slate-400 w-9 text-right">{pct.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5"/>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 dark:bg-slate-800/50 border-t-2 border-gray-200 dark:border-slate-600">
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-700 dark:text-slate-200" colSpan={3}>TOTAL INVENTARIO</td>
+                        <td className="px-4 py-3 text-base font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalValue)}</td>
+                        <td colSpan={2}/>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {excelPreview && (
         <ExcelPreviewModal

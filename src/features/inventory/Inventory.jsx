@@ -5,7 +5,7 @@ import Stocktaking from './Stocktaking'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { stockAdjustSchema } from '../../shared/schemas/index'
 import { productService } from '../../services/index'
-import { formatCurrency, formatDate, formatDateTime, isLowStock, isOutOfStock, isExpired, isNearExpiry, stockDaysLeft } from '../../shared/utils/helpers'
+import { formatCurrency, formatDate, formatDateTime, isLowStock, isOutOfStock, isExpired, isNearExpiry, stockDaysLeft, getUnitCost } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
 import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
 import { useDebounce } from '../../shared/hooks/useDebounce'
@@ -71,7 +71,9 @@ function StockAdjustForm({ product, currentUser, onClose }) {
 }
 
 // ── Kardex por producto — con valorización ────────────────────────────────────
-function ProductKardex({ product, movements, onClose }) {
+function ProductKardex({ product, movements, onClose, systemConfig }) {
+  const costMethod = systemConfig?.costMethod || 'peps'
+  const refCost = getUnitCost(product, product.priceSell || 0, costMethod)
   const productMovements = movements
     .filter(m => m.productId === product.id)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) // cronológico para saldo
@@ -111,7 +113,7 @@ function ProductKardex({ product, movements, onClose }) {
     return acc
   }, { entradas: 0, salidas: 0, merma: 0, valorEntradas: 0, valorSalidas: 0, valorMerma: 0 })
 
-  const valorInventario = parseFloat((product.stock * (product.priceBuy || 0)).toFixed(2))
+  const valorInventario = parseFloat((product.stock * refCost).toFixed(2))
   const hasCost = (m) => m.unitCost != null && m.unitCost > 0
 
   return (
@@ -127,7 +129,7 @@ function ProductKardex({ product, movements, onClose }) {
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
           <p className="text-xs text-blue-500 dark:text-blue-400 mb-1">Valor en inventario</p>
           <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(valorInventario)}</p>
-          <p className="text-xs text-blue-400 dark:text-blue-500">@ {formatCurrency(product.priceBuy || 0)}/u</p>
+          <p className="text-xs text-blue-400 dark:text-blue-500">@ {formatCurrency(refCost)}/u · {costMethod === 'cpp' ? 'CPP' : 'PEPS'}</p>
         </div>
         <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
           <p className="text-xs text-green-500 mb-1">Entradas valorizadas</p>
@@ -257,7 +259,7 @@ function ProductKardex({ product, movements, onClose }) {
 
 // ── Página principal ───────────────────────────────────────────────────────────
 export default function Inventory() {
-  const { products, categories, suppliers, stockMovements, currentUser, businessConfig, addAuditLog } = useStore()
+  const { products, categories, suppliers, stockMovements, currentUser, businessConfig, systemConfig, addAuditLog } = useStore()
   const [search, setSearch]       = useState('')
   const [categoryFilter, setCatF] = useState('')
   const [tab, setTab]             = useState('products')
@@ -458,7 +460,7 @@ export default function Inventory() {
       {/* Modal Kardex por producto — punto 3 */}
       {modal?.type === 'kardex' && (
         <Modal title={`Movimientos — ${modal.data.name}`} subtitle={`${modal.data.barcode} · Stock actual: ${modal.data.stock} ${modal.data.unit}`} size="lg" onClose={() => setModal(null)}>
-          <ProductKardex product={modal.data} movements={stockMovements} onClose={() => setModal(null)}/>
+          <ProductKardex product={modal.data} movements={stockMovements} onClose={() => setModal(null)} systemConfig={systemConfig}/>
         </Modal>
       )}
     </div>
