@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tenantService, DEFAULT_PLAN_LIMITS } from '../../services/tenantService'
+import { tenantService, DEFAULT_PLAN_LIMITS, DEFAULT_ALERT_THRESHOLDS } from '../../services/tenantService'
 import { PLANS, PLAN_ORDER, BONUS_DAYS, BILLING_CYCLES, CYCLE_ORDER, getAccessExpiry, getPlanPrice, getTotalPrice, daysUntilExpiry, getAccessStatus, ACCESS_STATUS_CONFIG } from '../../config/plans'
 import { SECTORS } from '../../config/app'
 import {
   Shield, Users, Package, TrendingUp, RefreshCw, LogOut, ExternalLink,
   RotateCcw, Plus, Edit2, Trash2, X, Check, ChevronRight, Clock, History, DollarSign, Save,
-  Globe, Phone, Mail, MapPin, MessageCircle, Sliders,
+  Globe, Phone, Mail, MapPin, MessageCircle, Sliders, Bell,
 } from 'lucide-react'
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
@@ -839,6 +839,163 @@ function LimitsTab() {
   )
 }
 
+// ─── AlertsTab — Configuración de umbrales de alerta de vencimiento ──────────
+const ALERT_LEVELS = [
+  {
+    key: 'warning',
+    label: 'Aviso',
+    desc: 'Primera alerta suave. El sistema muestra un indicador amarillo en el sidebar.',
+    icon: '⏳',
+    bg: '#fef9c3', border: '#fde047', text: '#854d0e', accent: '#ca8a04',
+  },
+  {
+    key: 'urgent',
+    label: 'Urgente',
+    desc: 'Segunda alerta. El indicador cambia a naranja y el tono del mensaje se intensifica.',
+    icon: '⚠️',
+    bg: '#fff7ed', border: '#fb923c', text: '#9a3412', accent: '#ea580c',
+  },
+  {
+    key: 'critical',
+    label: 'Crítico',
+    desc: 'Última alerta antes del vencimiento. Indicador rojo — máxima urgencia.',
+    icon: '🚨',
+    bg: '#fef2f2', border: '#fca5a5', text: '#991b1b', accent: '#dc2626',
+  },
+]
+
+function AlertsTab() {
+  const [form,    setForm]    = useState({ ...DEFAULT_ALERT_THRESHOLDS })
+  const [loading, setLoading] = useState(false)
+  const [saved,   setSaved]   = useState(false)
+  const [error,   setError]   = useState('')
+
+  useEffect(() => {
+    tenantService.getAlertThresholds().then(r => { if (r.data) setForm({ ...r.data }) })
+  }, [])
+
+  const handleChange = (key, raw) => {
+    const val = parseInt(raw, 10)
+    if (!isNaN(val) && val >= 1) setForm(f => ({ ...f, [key]: val }))
+  }
+
+  const save = async () => {
+    setLoading(true); setError('')
+    const r = await tenantService.updateAlertThresholds(form)
+    setLoading(false)
+    if (r.error) { setError(r.error); return }
+    setSaved(true); setTimeout(() => setSaved(false), 3000)
+  }
+
+  const reset = () => { setForm({ ...DEFAULT_ALERT_THRESHOLDS }); setError(''); setSaved(false) }
+
+  // Validación en vivo para el botón guardar
+  const isValid = form.critical >= 1
+    && form.urgent >= 1
+    && form.warning >= 1
+    && form.critical < form.urgent
+    && form.urgent < form.warning
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: '0 0 3px' }}>Alertas de vencimiento</h2>
+          <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+            Define cuántos días antes del vencimiento se activa cada nivel de alerta en la aplicación de los negocios.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={reset} style={{ padding: '9px 16px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            Restaurar defaults
+          </button>
+          <button onClick={save} disabled={loading || !isValid} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 20px', borderRadius: '8px', border: 'none', background: loading ? '#94a3b8' : !isValid ? '#cbd5e1' : saved ? '#16a34a' : '#2563eb', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: (loading || !isValid) ? 'not-allowed' : 'pointer' }}>
+            {saved ? <><Check size={14} /> Guardado</> : <><Save size={14} /> Guardar</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Regla invariante */}
+      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 16px', fontSize: '12px', color: '#1d4ed8', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '14px' }}>ℹ️</span>
+        <span>Regla obligatoria: <strong>Crítico &lt; Urgente &lt; Aviso</strong> (todos ≥ 1 día). Ejemplo con defaults: 1 &lt; 3 &lt; 7.</span>
+      </div>
+
+      {/* Cards de niveles */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        {ALERT_LEVELS.map(({ key, label, desc, icon, bg, border, text, accent }) => {
+          const val     = form[key] ?? DEFAULT_ALERT_THRESHOLDS[key]
+          const isModif = val !== DEFAULT_ALERT_THRESHOLDS[key]
+          return (
+            <div key={key} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', overflow: 'hidden' }}>
+              {/* Card header */}
+              <div style={{ background: bg, borderBottom: `1px solid ${border}`, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>{icon}</span>
+                <div>
+                  <div style={{ fontWeight: 700, color: text, fontSize: '13px' }}>{label}</div>
+                  <div style={{ fontSize: '11px', color: accent, marginTop: '1px' }}>Nivel {ALERT_LEVELS.findIndex(l => l.key === key) + 1}</div>
+                </div>
+              </div>
+
+              <div style={{ padding: '18px' }}>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px', lineHeight: 1.55 }}>{desc}</p>
+
+                {/* Input de días */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <input
+                      type="number" min={1} max={365}
+                      value={val}
+                      onChange={e => handleChange(key, e.target.value)}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '10px 48px 10px 12px', borderRadius: '8px', border: `1.5px solid ${isModif ? accent : '#e2e8f0'}`, fontSize: '22px', fontWeight: 800, color: text, outline: 'none', background: isModif ? bg : '#fff' }}
+                    />
+                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: accent, fontWeight: 600 }}>días</span>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
+                  Default: <strong>{DEFAULT_ALERT_THRESHOLDS[key]} días</strong>
+                  {isModif && <span style={{ color: accent, marginLeft: '6px', fontWeight: 600 }}>✎ modificado</span>}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Preview visual de la escala */}
+      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px 18px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '12px' }}>Vista previa de la escala configurada</div>
+        <div style={{ display: 'flex', gap: '0', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e2e8f0', fontSize: '12px' }}>
+          <div style={{ flex: form.warning - form.urgent, background: '#fef9c3', padding: '10px 12px', textAlign: 'center', color: '#854d0e', fontWeight: 600, minWidth: '80px' }}>
+            ⏳ Aviso<br/><span style={{ fontSize: '10px', fontWeight: 400 }}>≤ {form.warning}d</span>
+          </div>
+          <div style={{ flex: form.urgent - form.critical, background: '#fff7ed', padding: '10px 12px', textAlign: 'center', color: '#9a3412', fontWeight: 600, borderLeft: '1px solid #e2e8f0', minWidth: '80px' }}>
+            ⚠️ Urgente<br/><span style={{ fontSize: '10px', fontWeight: 400 }}>≤ {form.urgent}d</span>
+          </div>
+          <div style={{ flex: form.critical, background: '#fef2f2', padding: '10px 12px', textAlign: 'center', color: '#991b1b', fontWeight: 600, borderLeft: '1px solid #e2e8f0', minWidth: '80px' }}>
+            🚨 Crítico<br/><span style={{ fontSize: '10px', fontWeight: 400 }}>≤ {form.critical}d</span>
+          </div>
+        </div>
+        {!isValid && (
+          <div style={{ marginTop: '10px', fontSize: '12px', color: '#dc2626', fontWeight: 500 }}>
+            ⚠ La escala no es válida. Asegúrate que Crítico &lt; Urgente &lt; Aviso y todos ≥ 1.
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div style={{ marginTop: '14px', fontSize: '13px', color: '#dc2626', background: '#fef2f2', padding: '10px 14px', borderRadius: '8px' }}>{error}</div>
+      )}
+
+      <div style={{ marginTop: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 16px', fontSize: '12px', color: '#64748b' }}>
+        <strong style={{ color: '#374151' }}>¿Dónde se muestran estas alertas?</strong> En el sidebar inferior de cada negocio (alerta pasiva siempre visible) y como un aviso emergente al iniciar sesión (una vez por día). No interrumpen el flujo de trabajo.
+      </div>
+    </div>
+  )
+}
+
 // ─── SiteTab — Configuración del sitio / landing ──────────────────────────────
 const SITE_FIELDS = [
   {
@@ -996,6 +1153,7 @@ const TABS = [
   { id: 'history', label: 'Historial',           icon: History      },
   { id: 'prices',  label: 'Precios',             icon: DollarSign   },
   { id: 'limits',  label: 'Límites de plan',     icon: Sliders      },
+  { id: 'alerts',  label: 'Alertas',             icon: Bell         },
   { id: 'site',    label: 'Sitio web',           icon: Globe        },
 ]
 
@@ -1085,6 +1243,7 @@ export default function SuperAdmin() {
             {tab === 'history' && <HistoryTab />}
             {tab === 'prices'  && <PricesTab />}
             {tab === 'limits'  && <LimitsTab />}
+            {tab === 'alerts'  && <AlertsTab />}
             {tab === 'site'    && <SiteTab />}
           </div>
         </div>

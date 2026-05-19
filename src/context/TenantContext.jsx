@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { tenantService } from '../services/tenantService'
-import { isPlanActive, trialDaysLeft } from '../config/plans'
+import { isPlanActive, trialDaysLeft, getAccessStatus } from '../config/plans'
 
 const TenantContext = createContext(null)
 
@@ -43,13 +43,14 @@ export function TenantProvider({ children }) {
     return () => { cancelled = true }
   }, [tenantSlug])
 
-  const plan      = tenant?.plan ?? 'trial'
-  const planActive = isPlanActive(plan, tenant?.trialEndsAt)
-  const daysLeft   = trialDaysLeft(tenant?.trialEndsAt)
+  const plan         = tenant?.plan ?? 'trial'
+  const planActive   = isPlanActive(plan, tenant?.accessExpiresAt)
+  const daysLeft     = trialDaysLeft(tenant?.accessExpiresAt)
+  const accessStatus = getAccessStatus(tenant?.accessExpiresAt, tenant?.isActive ?? true)
 
   return (
     <TenantContext.Provider value={{
-      tenant, tenantSlug, plan, planActive, daysLeft, loading, error,
+      tenant, tenantSlug, plan, planActive, daysLeft, accessStatus, loading, error,
     }}>
       {children}
     </TenantContext.Provider>

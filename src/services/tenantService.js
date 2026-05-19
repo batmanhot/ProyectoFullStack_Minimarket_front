@@ -12,12 +12,13 @@ const makeSlug = (name)      => name.toLowerCase()
 // aparezca en el SuperAdmin aunque el usuario cambie de URL.
 
 const KEYS = {
-  tenants:  'mm_mock_tenants_v1',
-  accesses: 'mm_mock_accesses_v1',
-  renewals: 'mm_mock_renewals_v1',
-  prices:   'mm_mock_prices_v1',
-  site:     'mm_mock_site_v1',
-  limits:   'mm_saas_plan_limits_v1',
+  tenants:         'mm_mock_tenants_v1',
+  accesses:        'mm_mock_accesses_v1',
+  renewals:        'mm_mock_renewals_v1',
+  prices:          'mm_mock_prices_v1',
+  site:            'mm_mock_site_v1',
+  limits:          'mm_saas_plan_limits_v1',
+  alertThresholds: 'mm_alert_thresholds_v1',
 }
 
 const _load = (key) => {
@@ -95,6 +96,15 @@ export const DEFAULT_PLAN_LIMITS = {
   enterprise: { products: null, users: null },
 }
 
+// ─── Umbrales de alerta de vencimiento (editables desde SuperAdmin) ───────────
+// Días antes del vencimiento en que se activa cada nivel de alerta.
+// Invariante: critical < urgent < warning, todos >= 1.
+export const DEFAULT_ALERT_THRESHOLDS = {
+  warning:  7,   // aviso suave — amarillo
+  urgent:   3,   // urgente    — naranja
+  critical: 1,   // crítico    — rojo
+}
+
 // ─── Configuración del sitio/landing (editable desde SuperAdmin) ──────────────
 export const DEFAULT_SITE_SETTINGS = {
   brandName:   'MiniMarket POS',
@@ -110,12 +120,13 @@ export const DEFAULT_SITE_SETTINGS = {
 
 // ─── Estado mutable persistido ────────────────────────────────────────────────
 // Se lee de localStorage al cargar el módulo; los default solo aplican la primera vez.
-let _tenants  = _load(KEYS.tenants)  ?? { ...DEFAULT_TENANTS }
-let _accesses = _load(KEYS.accesses) ?? [...DEFAULT_ACCESSES]
-let _renewals = _load(KEYS.renewals) ?? [...DEFAULT_RENEWALS]
-let _prices   = _load(KEYS.prices)   ?? { ...DEFAULT_PRICES }
-let _site     = _load(KEYS.site)     ?? { ...DEFAULT_SITE_SETTINGS }
-let _limits   = _load(KEYS.limits)   ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+let _tenants         = _load(KEYS.tenants)         ?? { ...DEFAULT_TENANTS }
+let _accesses        = _load(KEYS.accesses)        ?? [...DEFAULT_ACCESSES]
+let _renewals        = _load(KEYS.renewals)        ?? [...DEFAULT_RENEWALS]
+let _prices          = _load(KEYS.prices)          ?? { ...DEFAULT_PRICES }
+let _site            = _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS }
+let _limits          = _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+let _alertThresholds = _load(KEYS.alertThresholds) ?? { ...DEFAULT_ALERT_THRESHOLDS }
 
 // Contadores derivados de los datos existentes para evitar IDs duplicados
 let _accessIdx  = Math.max(0, ..._accesses.map(a => parseInt(a.id.split('_')[1]) || 0)) + 1
@@ -127,10 +138,11 @@ const _flush = () => {
   _save(KEYS.renewals, _renewals)
 }
 
-// Lectura sincrónica para Landing y hooks de plan (no async)
-export const getStoredPrices        = () => _load(KEYS.prices)  ?? { ...DEFAULT_PRICES }
-export const getStoredSiteSettings  = () => _load(KEYS.site)    ?? { ...DEFAULT_SITE_SETTINGS }
-export const getStoredPlanLimits    = () => _load(KEYS.limits)  ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+// Lectura sincrónica para componentes que no pueden usar async (Sidebar, Landing, hooks)
+export const getStoredPrices           = () => _load(KEYS.prices)          ?? { ...DEFAULT_PRICES }
+export const getStoredSiteSettings     = () => _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS }
+export const getStoredPlanLimits       = () => _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+export const getStoredAlertThresholds  = () => _load(KEYS.alertThresholds) ?? { ...DEFAULT_ALERT_THRESHOLDS }
 
 // ─── Servicio ─────────────────────────────────────────────────────────────────
 export const tenantService = {
@@ -153,6 +165,8 @@ export const tenantService = {
   async register({ businessName, sector, ownerName, ownerEmail, phone = '', password, plan = 'trial', billingCycle = 'monthly' }) {
     await delay(900)
     if (USE_API) {
+      // El backend recibe la contraseña en texto plano y la hashea (bcrypt/argon2).
+      // NUNCA enviar hash desde el frontend — el servidor controla el hashing.
       const { data } = await api.post('/tenants/register', { businessName, sector, ownerName, ownerEmail, phone, password, plan, billingCycle })
       return ok(data)
     }
@@ -161,32 +175,67 @@ export const tenantService = {
     const tenantId        = `tenant_${Date.now()}`
     const accessStartDate = isoNow()
     const accessExpiresAt = getAccessExpiry(accessStartDate, billingCycle)
+    // En el mock la contraseña se guarda en texto plano únicamente para pruebas locales.
+    // En producción el backend la reemplaza por su hash antes de persistir.
+    const ownerPassword   = password
 
-    // Persiste en mock para que SuperAdmin lo vea en cualquier página/reload
+    // ── Tabla de negocios (tenants) ─────────────────────────────────────────────
+    // Todos los campos que el backend necesitará al integrarse.
     _tenants[slug] = {
-      id: tenantId, slug, businessName, sector,
-      ownerName, ownerEmail, phone, plan, billingCycle,
-      accessStartDate, accessExpiresAt,
-      isActive: true, createdAt: accessStartDate,
+      id:               tenantId,
+      slug,
+      businessName,
+      sector,
+      ownerName,
+      ownerEmail,
+      phone,
+      ownerPassword,        // backend hashea antes de guardar en DB
+      plan,
+      billingCycle,
+      accessStartDate,
+      accessExpiresAt,
+      isActive:         true,
+      registrationSource: 'self-service',  // distinguir de los creados por superadmin
+      createdAt:        accessStartDate,
     }
 
-    const accessId  = `access_${_accessIdx++}`
-    const renewalId = `renew_${_renewalIdx++}`
-
+    // ── Tabla de accesos (historial de períodos activos) ────────────────────────
+    const accessId = `access_${_accessIdx++}`
     _accesses.push({
-      id: accessId, tenantId, tenantSlug: slug, businessName, plan,
+      id: accessId, tenantId, tenantSlug: slug,
+      businessName, sector, ownerName, ownerEmail, phone,
+      plan, billingCycle,
       accessStartDate, accessExpiresAt,
-      bonusDays: BONUS_DAYS, notes: 'Registro inicial self-service',
+      bonusDays: BONUS_DAYS,
+      notes: 'Registro inicial self-service',
       createdBy: 'self-register', createdAt: accessStartDate,
     })
+
+    // ── Tabla de renovaciones (historial de cambios de plan) ────────────────────
+    const renewalId = `renew_${_renewalIdx++}`
     _renewals.unshift({
-      id: renewalId, tenantId, businessName, previousPlan: null, newPlan: plan,
+      id: renewalId, tenantId, businessName,
+      previousPlan: null, newPlan: plan,
+      billingCycle,
       accessStartDate, accessExpiresAt,
-      renewedBy: 'self-register', renewedAt: accessStartDate, notes: 'Registro self-service',
+      renewedBy: 'self-register', renewedAt: accessStartDate,
+      notes: 'Activación inicial — registro self-service',
     })
 
     _flush()
-    return ok({ slug, tenantId, plan, accessStartDate, accessExpiresAt })
+
+    // Retorna todos los campos que el frontend necesita para la pantalla de éxito
+    // y que el backend deberá incluir en su respuesta JWT / objeto de sesión.
+    return ok({
+      slug,
+      tenantId,
+      businessName,
+      ownerEmail,
+      plan,
+      billingCycle,
+      accessStartDate,
+      accessExpiresAt,
+    })
   },
 
   async checkSlugAvailable(slug) {
@@ -428,19 +477,48 @@ export const tenantService = {
     return ok({ ..._site })
   },
 
+  // ── Umbrales de alerta de vencimiento ──────────────────────────────────────
+
+  async getAlertThresholds() {
+    await delay(50)
+    if (USE_API) {
+      const { data } = await api.get('/admin/alert-thresholds')
+      return ok(data)
+    }
+    return ok({ ..._alertThresholds })
+  },
+
+  async updateAlertThresholds(thresholds) {
+    await delay(180)
+    if (USE_API) {
+      const { data } = await api.put('/admin/alert-thresholds', thresholds)
+      return ok(data)
+    }
+    // Validar invariante: critical < urgent < warning, todos >= 1
+    if (thresholds.critical < 1 || thresholds.urgent < 1 || thresholds.warning < 1)
+      return fail('Todos los umbrales deben ser al menos 1 día')
+    if (!(thresholds.critical < thresholds.urgent && thresholds.urgent < thresholds.warning))
+      return fail('Debe cumplirse: Crítico < Urgente < Aviso')
+    Object.assign(_alertThresholds, thresholds)
+    _save(KEYS.alertThresholds, _alertThresholds)
+    return ok({ ..._alertThresholds })
+  },
+
   // ── Utilidad: reset del mock (solo desarrollo) ────────────────────────────
   _resetMock() {
-    _tenants  = { ...DEFAULT_TENANTS }
-    _accesses = [...DEFAULT_ACCESSES]
-    _renewals = [...DEFAULT_RENEWALS]
-    _prices   = { ...DEFAULT_PRICES }
-    _site     = { ...DEFAULT_SITE_SETTINGS }
-    _limits   = JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+    _tenants         = { ...DEFAULT_TENANTS }
+    _accesses        = [...DEFAULT_ACCESSES]
+    _renewals        = [...DEFAULT_RENEWALS]
+    _prices          = { ...DEFAULT_PRICES }
+    _site            = { ...DEFAULT_SITE_SETTINGS }
+    _limits          = JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+    _alertThresholds = { ...DEFAULT_ALERT_THRESHOLDS }
     _accessIdx  = DEFAULT_ACCESSES.length + 1
     _renewalIdx = DEFAULT_RENEWALS.length + 1
     _flush()
-    _save(KEYS.prices,  _prices)
-    _save(KEYS.site,    _site)
-    _save(KEYS.limits,  _limits)
+    _save(KEYS.prices,          _prices)
+    _save(KEYS.site,            _site)
+    _save(KEYS.limits,          _limits)
+    _save(KEYS.alertThresholds, _alertThresholds)
   },
 }

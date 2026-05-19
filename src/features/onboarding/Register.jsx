@@ -214,31 +214,37 @@ export default function Register() {
 
   // ── Pantalla de éxito ────────────────────────────────────────────────────────
   if (done) {
-    const isFree = PLANS[done.plan]?.price === 0
-    const cycleDays = BILLING_CYCLES[done.billingCycle ?? 'monthly']?.days ?? 30
+    const isFree    = PLANS[done.plan]?.price === 0
+    const cycle     = done.billingCycle
+    const cycleDays = BILLING_CYCLES[cycle]?.days ?? 30
     return (
       <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg,#22c55e,#16a34a)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
             <Check size={28} color="#fff" strokeWidth={3} />
           </div>
-          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px' }}>¡Tu negocio está listo!</h2>
-          <p style={{ color: '#64748b', marginBottom: '16px', lineHeight: 1.6 }}>
-            Creamos tu workspace en <strong>minimarket.app/app/{done.slug}</strong>
+          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>¡{done.businessName} está listo!</h2>
+          <p style={{ color: '#64748b', marginBottom: '16px', lineHeight: 1.6, fontSize: '14px' }}>
+            Tu workspace fue creado en <strong>minimarket.app/app/{done.slug}</strong>
           </p>
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 18px', marginBottom: '24px', textAlign: 'left', fontSize: '13px', color: '#166534', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div><b>Plan:</b> {PLANS[done.plan]?.label}</div>
-            <div><b>Ciclo:</b> {BILLING_CYCLES[done.billingCycle ?? 'monthly']?.label}</div>
-            <div><b>Vigencia:</b> {cycleDays}d + {BONUS_DAYS}d bonus = {cycleDays + BONUS_DAYS} días</div>
-            <div><b>Vence:</b> {fmtDate(done.accessExpiresAt)}</div>
-            {!isFree && <div><b>Total pagado:</b> S/ {getTotalPrice(done.plan, done.billingCycle ?? 'monthly')}</div>}
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 18px', marginBottom: '24px', textAlign: 'left', fontSize: '13px', color: '#166534', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><b>Plan</b></span><span>{PLANS[done.plan]?.label}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><b>Ciclo de facturación</b></span><span>{BILLING_CYCLES[cycle]?.label}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><b>Vigencia</b></span><span>{cycleDays}d + {BONUS_DAYS}d bonus = {cycleDays + BONUS_DAYS} días</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><b>Acceso hasta</b></span><span>{fmtDate(done.accessExpiresAt)}</span></div>
+            {!isFree && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #bbf7d0', paddingTop: '8px' }}>
+                <span><b>Total a pagar</b></span>
+                <span style={{ fontWeight: 800 }}>S/ {getTotalPrice(done.plan, cycle)}</span>
+              </div>
+            )}
           </div>
           <button onClick={() => { window.location.href = `/app/${done.slug}` }}
             style={{ width: '100%', padding: '13px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#2563eb,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: '15px', cursor: 'pointer' }}>
             Ingresar a mi negocio →
           </button>
           <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
-            Recibirás una confirmación en {form.ownerEmail}
+            Recibirás una confirmación en <strong>{done.ownerEmail}</strong>
           </p>
         </div>
       </div>

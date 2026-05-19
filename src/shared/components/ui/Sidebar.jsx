@@ -3,7 +3,23 @@ import { useStore, selectLowStockProducts, selectNearExpiryProducts, selectUnrea
 import { ROLES, SECTORS, canAccess } from '../../../config/app'
 import { canUsePlan, PLANS } from '../../../config/plans'
 import { useTenantSafe } from '../../../context/TenantContext'
+import { getStoredAlertThresholds } from '../../../services/tenantService'
 import toast from 'react-hot-toast'
+
+// ── Helpers de alerta de vencimiento ─────────────────────────────────────────
+const ALERT_CFG = {
+  warning:  { bg: '#fef9c3', border: '#fde047', text: '#854d0e', icon: '⏳', verb: 'Vence en' },
+  urgent:   { bg: '#fff7ed', border: '#fb923c', text: '#9a3412', icon: '⚠️', verb: 'Vence en' },
+  critical: { bg: '#fef2f2', border: '#fca5a5', text: '#991b1b', icon: '🚨', verb: 'Último día' },
+}
+
+function getAlertLevel(daysLeft, thresholds) {
+  if (daysLeft === null || daysLeft === undefined || daysLeft < 0) return null
+  if (daysLeft <= thresholds.critical) return 'critical'
+  if (daysLeft <= thresholds.urgent)   return 'urgent'
+  if (daysLeft <= thresholds.warning)  return 'warning'
+  return null
+}
 
 const NAV_GROUPS = [
   { label:'Principal',   items:[
@@ -64,6 +80,9 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
   const plan       = tenantCtx?.plan ?? 'trial'
   const planCfg    = PLANS[plan]
   const planLabel  = planCfg?.label ?? 'Trial'
+  const daysLeft   = tenantCtx?.daysLeft ?? null
+  const alertThresholds = getStoredAlertThresholds()
+  const alertLevel = getAlertLevel(daysLeft, alertThresholds)
 
   // Devuelve true si el módulo está incluido en el plan activo
   const isPlanAllowed = (key) => canUsePlan(plan, key)
@@ -106,6 +125,13 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
             )
           })}
         </nav>
+        {/* Indicador de vencimiento en modo colapsado */}
+        {alertLevel && (
+          <div title={daysLeft === 0 ? 'Vence hoy' : `Vence en ${daysLeft} día${daysLeft === 1 ? '' : 's'}`}
+            style={{ margin: '4px auto 2px', width: '28px', height: '28px', borderRadius: '8px', background: ALERT_CFG[alertLevel].bg, border: `1px solid ${ALERT_CFG[alertLevel].border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', cursor: 'default' }}>
+            {ALERT_CFG[alertLevel].icon}
+          </div>
+        )}
         {/* Theme toggle en modo colapsado */}
         <button onClick={onThemeToggle} title={`Tema: ${currentThemeOpt.label}`}
           className="p-3 text-center text-lg border-t border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -209,6 +235,24 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
           )}
         </div>
       </div>
+
+      {/* ── Tira de alerta de vencimiento (solo cuando aplica) ─────────────── */}
+      {alertLevel && (() => {
+        const cfg = ALERT_CFG[alertLevel]
+        return (
+          <div style={{ margin: '0 8px 6px', borderRadius: '10px', background: cfg.bg, border: `1px solid ${cfg.border}`, padding: '8px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <span style={{ fontSize: '13px' }}>{cfg.icon}</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: cfg.text }}>
+                {daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? cfg.verb + ' 1 día' : `${cfg.verb} ${daysLeft} días`}
+              </span>
+            </div>
+            <div style={{ fontSize: '10px', color: cfg.text, opacity: 0.75, lineHeight: 1.4 }}>
+              Plan <strong>{planLabel}</strong> — renueva para continuar
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Acciones */}
       <div className="px-2 py-2 border-t border-gray-100 dark:border-gray-800 space-y-0.5">

@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useStore } from './store/index'
 import { canAccess } from './config/app'
-import { canUsePlan, getMinPlanForFeature } from './config/plans'
+import { canUsePlan, getMinPlanForFeature, PLANS } from './config/plans'
 import { useTheme } from './shared/hooks/useTheme'
 import Sidebar from './shared/components/ui/Sidebar'
 import PlanUpgradePrompt from './shared/components/ui/PlanUpgradePrompt'
@@ -13,8 +13,9 @@ import Login from './features/auth/Login'
 import toast from 'react-hot-toast'
 import { useServiceWorker } from './shared/hooks/useServiceWorker'
 import InstallPWA from './shared/components/InstallPWA'
-import { Wifi, WifiOff } from 'lucide-react'
+import { Wifi, WifiOff, Lock, AlertTriangle, ArrowLeft, PhoneCall } from 'lucide-react'
 import { TenantProvider, useTenantSafe } from './context/TenantContext'
+import { getStoredAlertThresholds } from './services/tenantService'
 
 // ── Rutas públicas ─────────────────────────────────────────────────────────────
 const Landing    = lazy(() => import('./features/landing/Landing'))
@@ -117,6 +118,75 @@ function OnlineIndicator() {
   )
 }
 
+// ── AccessExpiredScreen — pantalla de bloqueo por vencimiento / suspensión ─────
+function AccessExpiredScreen({ tenant, accessStatus }) {
+  const isSuspended = accessStatus === 'suspended'
+  const planLabel   = PLANS[tenant?.plan]?.label ?? tenant?.plan ?? '—'
+  const expiryDate  = tenant?.accessExpiresAt
+    ? new Date(tenant.accessExpiresAt).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 55%,#1e3a8a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '24px', padding: '48px 40px', maxWidth: '460px', width: '100%', textAlign: 'center', backdropFilter: 'blur(12px)' }}>
+
+        {/* Icono */}
+        <div style={{ width: '72px', height: '72px', borderRadius: '20px', background: isSuspended ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', border: `1px solid ${isSuspended ? 'rgba(239,68,68,0.30)' : 'rgba(245,158,11,0.30)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px' }}>
+          {isSuspended
+            ? <Lock size={32} color="#f87171" strokeWidth={1.5} />
+            : <AlertTriangle size={32} color="#fbbf24" strokeWidth={1.5} />
+          }
+        </div>
+
+        {/* Título */}
+        <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#f1f5f9', margin: '0 0 10px', letterSpacing: '-0.5px' }}>
+          {isSuspended ? 'Acceso suspendido' : 'Acceso vencido'}
+        </h1>
+
+        {/* Descripción */}
+        <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.7, margin: '0 0 28px' }}>
+          {isSuspended
+            ? 'Tu cuenta ha sido suspendida temporalmente. Contacta al administrador del sistema para reactivarla.'
+            : 'El período de acceso de este negocio ha vencido. Renueva tu plan para continuar usando el sistema.'
+          }
+        </p>
+
+        {/* Datos del plan */}
+        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px', marginBottom: '28px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {tenant?.businessName && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>Negocio</span>
+              <span style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: 600 }}>{tenant.businessName}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#64748b' }}>Plan</span>
+            <span style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: 600 }}>{planLabel}</span>
+          </div>
+          {expiryDate && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>Venció el</span>
+              <span style={{ fontSize: '13px', color: isSuspended ? '#94a3b8' : '#fca5a5', fontWeight: 600 }}>{expiryDate}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Acciones */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <a href="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px', borderRadius: '10px', background: 'linear-gradient(135deg,#2563eb,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: '14px', textDecoration: 'none' }}>
+            <ArrowLeft size={15} />
+            Ir al inicio
+          </a>
+          <a href="https://wa.me/51925464880" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '13px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#94a3b8', fontWeight: 600, fontSize: '14px', textDecoration: 'none' }}>
+            <PhoneCall size={15} />
+            Contactar soporte
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── TenantApp — lógica principal del negocio ───────────────────────────────────
 // Contiene el sidebar, la navegación interna y todos los módulos.
 // Se mantiene como state-based (sin sub-rutas de React Router) para no
@@ -136,6 +206,36 @@ function TenantApp() {
     return () => window.removeEventListener('role-permissions-changed', handle)
   }, [])
 
+  // Toast de alerta de vencimiento — una vez por sesión (sessionStorage)
+  useEffect(() => {
+    if (!tenantCtx || tenantCtx.loading) return
+    const daysLeft = tenantCtx.daysLeft
+    if (daysLeft === null || daysLeft === undefined || daysLeft < 0) return
+
+    const thresholds = getStoredAlertThresholds()
+    if (daysLeft > thresholds.warning) return
+
+    const todayKey = `mm_expiry_toast_${new Date().toISOString().slice(0, 10)}`
+    if (sessionStorage.getItem(todayKey)) return
+    sessionStorage.setItem(todayKey, '1')
+
+    const isCritical = daysLeft <= thresholds.critical
+    const isUrgent   = daysLeft <= thresholds.urgent
+    const icon       = isCritical ? '🚨' : isUrgent ? '⚠️' : '⏳'
+    const bg         = isCritical ? '#fef2f2' : isUrgent ? '#fff7ed' : '#fef9c3'
+    const color      = isCritical ? '#991b1b' : isUrgent ? '#9a3412' : '#854d0e'
+    const border     = isCritical ? '#fca5a5' : isUrgent ? '#fb923c' : '#fde047'
+    const msg        = daysLeft === 0
+      ? 'Tu acceso vence hoy — renueva antes de que se cierre.'
+      : `Tu acceso vence en ${daysLeft} día${daysLeft === 1 ? '' : 's'}. Renueva para continuar sin interrupciones.`
+
+    toast(msg, {
+      icon,
+      duration: 9000,
+      style: { background: bg, color, border: `1px solid ${border}`, fontWeight: 600, fontSize: '13px', maxWidth: '340px' },
+    })
+  }, [tenantCtx?.loading, tenantCtx?.daysLeft])
+
   const handleNavigate = (page) => {
     if (!canAccess(currentUser?.role, page)) { toast.error('Sin permisos para esta sección'); return }
     setCurrentPage(page)
@@ -143,6 +243,11 @@ function TenantApp() {
 
   if (!currentUser) {
     return <Login />
+  }
+
+  const accessStatus = tenantCtx?.accessStatus
+  if (!tenantCtx?.loading && (accessStatus === 'expired' || accessStatus === 'suspended')) {
+    return <AccessExpiredScreen tenant={tenantCtx?.tenant} accessStatus={accessStatus} />
   }
 
   const Page     = PAGES[currentPage] || PAGES.dashboard

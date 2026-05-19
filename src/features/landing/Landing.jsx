@@ -22,6 +22,39 @@ const STATS = [
 
 const SECTORS = ['Bodega', 'Farmacia', 'Ferretería', 'Boutique', 'Panadería', 'Electrónica', 'Librería', 'Calzado']
 
+const PLAN_DISPLAY_FEATURES = {
+  trial: [
+    'POS con múltiples medios de pago',
+    'Catálogo (hasta 100 productos)',
+    'Control de inventario y stock',
+    'Módulo de clientes',
+    '1 usuario · 1 caja registradora',
+    '30 días completamente gratis',
+  ],
+  basic: [
+    'POS, catálogo e inventario',
+    'Clientes y cobranza',
+    'Compras y proveedores',
+    'Reportes + exportación a Excel',
+    'Hasta 500 productos · 3 usuarios',
+    'Cotizaciones y devoluciones',
+  ],
+  pro: [
+    'Todo lo del plan Básico',
+    'Descuentos y campañas promocionales',
+    'Fidelización y puntos de cliente',
+    'Auditoría y trazabilidad completa',
+    'Hasta 2 000 productos · 10 usuarios',
+    'Multi-caja y alertas automáticas',
+  ],
+  enterprise: [
+    'Todo lo del plan Profesional',
+    'Usuarios ilimitados',
+    'Productos ilimitados',
+    'Soporte prioritario 24/7',
+  ],
+}
+
 // ── Estilos globales inyectados una sola vez ───────────────────────────────────
 const GLOBAL_CSS = `
   @keyframes float { 0%,100% { transform: translateY(0px) } 50% { transform: translateY(-18px) } }
@@ -243,10 +276,7 @@ export default function Landing() {
                   </button>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                    {(plan.features === 'all'
-                      ? ['Todo lo del plan Pro', 'Usuarios ilimitados', 'Productos ilimitados', 'Soporte prioritario 24/7']
-                      : plan.features.slice(0, 6).map(f => f.charAt(0).toUpperCase() + f.slice(1))
-                    ).map(feature => (
+                    {PLAN_DISPLAY_FEATURES[planId].map(feature => (
                       <div key={feature} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <div style={{ width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, background: featured ? 'rgba(255,255,255,0.15)' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Check size={11} color={featured ? '#fff' : '#2563eb'} strokeWidth={3} />
@@ -331,56 +361,64 @@ export default function Landing() {
             </div>
 
             {/* Col 2 — Contacto */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '18px' }}>
                 Soporte y contacto
               </div>
-              {site.phone && (
-                <a href={`tel:${site.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', textDecoration: 'none', transition: 'all .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background='rgba(59,130,246,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Phone size={13} color="#60a5fa" />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {site.phone && (
+                  <a href={`tel:${site.phone}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', textDecoration: 'none', group: true }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                      <Phone size={14} color="#60a5fa" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>Teléfono</div>
+                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.phone}</div>
+                    </div>
+                  </a>
+                )}
+
+                {site.whatsapp && (
+                  <a href={`https://wa.me/${site.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', textDecoration: 'none' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                      <MessageCircle size={14} color="#4ade80" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>WhatsApp</div>
+                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.whatsapp}</div>
+                    </div>
+                  </a>
+                )}
+
+                {site.email && (
+                  <a href={`mailto:${site.email}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', textDecoration: 'none' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                      <Mail size={14} color="#818cf8" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>Correo electrónico</div>
+                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.email}</div>
+                    </div>
+                  </a>
+                )}
+
+                {site.address && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                      <MapPin size={14} color="#fbbf24" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>Ubicación</div>
+                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.address}</div>
+                    </div>
                   </div>
-                  <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>{site.phone}</span>
-                </a>
-              )}
-              {site.whatsapp && (
-                <a href={`https://wa.me/${site.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', textDecoration: 'none', transition: 'all .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background='rgba(34,197,94,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <MessageCircle size={13} color="#4ade80" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>WhatsApp</div>
-                    <div style={{ fontSize: '11px', color: '#475569' }}>{site.whatsapp}</div>
-                  </div>
-                </a>
-              )}
-              {site.email && (
-                <a href={`mailto:${site.email}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', textDecoration: 'none', transition: 'all .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background='rgba(59,130,246,0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Mail size={13} color="#60a5fa" />
-                  </div>
-                  <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>{site.email}</span>
-                </a>
-              )}
-              {site.address && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <MapPin size={13} color="#fbbf24" />
-                  </div>
-                  <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>{site.address}</span>
-                </div>
-              )}
-              {!site.phone && !site.whatsapp && !site.email && !site.address && (
-                <p style={{ fontSize: '12px', color: '#334155', fontStyle: 'italic', margin: 0 }}>Configura los datos de contacto desde SuperAdmin → Sitio web.</p>
-              )}
+                )}
+
+                {!site.phone && !site.whatsapp && !site.email && !site.address && (
+                  <p style={{ fontSize: '12px', color: '#334155', fontStyle: 'italic', margin: 0 }}>Configura los datos de contacto desde SuperAdmin → Sitio web.</p>
+                )}
+              </div>
             </div>
 
             {/* Col 3 — Navegación */}
