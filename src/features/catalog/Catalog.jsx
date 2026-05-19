@@ -15,6 +15,7 @@ import { EmptyState } from '../../shared/components/ui/Skeleton'
 import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import toast from 'react-hot-toast'
+import JsBarcode from 'jsbarcode'
 
 function createSafeId() {
   if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
@@ -24,8 +25,27 @@ function createSafeId() {
 }
 
 // ─── Etiquetas de precio 58mm ──────────────────────────────────────────────────
-// Genera una ventana con etiquetas imprimibles en formato 58mm con código de
-// barras (JsBarcode via CDN), nombre del producto, precio y código.
+// Pre-renderiza los SVGs con JsBarcode (paquete local) antes de abrir la ventana.
+// Sin dependencia de CDN — funciona en Brave, Chrome, Firefox, Edge y sin internet.
+
+function renderBarcodeSVG(value) {
+  try {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    JsBarcode(svg, String(value), {
+      format:       'CODE128',
+      width:        1.2,
+      height:       30,
+      displayValue: false,
+      margin:       0,
+      xmlDocument:  document,
+    })
+    svg.setAttribute('class', 'bc')
+    return svg.outerHTML
+  } catch {
+    return '<svg class="bc"></svg>'
+  }
+}
+
 function buildLabelHTML(products, businessConfig) {
   const bizName = (businessConfig?.name || 'MI NEGOCIO').substring(0, 22)
   const labels  = products.map(p => `
@@ -33,13 +53,12 @@ function buildLabelHTML(products, businessConfig) {
       <div class="biz">${bizName}</div>
       <div class="name">${p.name.substring(0, 32)}</div>
       <div class="price">S/ ${Number(p.priceSell).toFixed(2)}</div>
-      <svg class="bc" data-barcode="${p.barcode}"></svg>
+      ${renderBarcodeSVG(p.barcode)}
       <div class="sku">${p.barcode}${p.sku ? ' · ' + p.sku : ''}</div>
     </div>`
   ).join('')
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquetas de precio</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Courier New',monospace; background:#fff; }
@@ -56,12 +75,7 @@ function buildLabelHTML(products, businessConfig) {
 <body>
 <div class="grid">${labels}</div>
 <button class="fab" onclick="window.print()">🖨️ Imprimir etiquetas</button>
-<script>
-  document.querySelectorAll('.bc').forEach(el => {
-    try { JsBarcode(el, el.dataset.barcode, { format:'CODE128', width:1.2, height:30, displayValue:false, margin:0 }) }
-    catch(e) { el.style.display='none' }
-  })
-</script></body></html>`
+</body></html>`
 }
 
 export function printPriceLabels(products, businessConfig) {
@@ -427,6 +441,22 @@ function ProductForm({ product, onClose }) {
               </div>
             )}
           </div>
+          {/* ────────────────────────────────────────────────────────────────── */}
+
+          {/* ── Número de serie (solo visible cuando stockControl = 'serie') ── */}
+          {watch('stockControl') === 'serie' && (
+            <div className="col-span-2">
+              <label className={labelCls}>Número de serie 🔢</label>
+              <input
+                {...register('serialNumber')}
+                placeholder="Ej: SN-SAM55-001-2024"
+                className={inputCls}
+              />
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                Identificador único de <strong>esta unidad física</strong>. Si tienes 3 TV del mismo modelo con series distintas, crea 3 registros de producto (uno por unidad), cada uno con su propio N° de serie.
+              </p>
+            </div>
+          )}
           {/* ────────────────────────────────────────────────────────────────── */}
 
           {/* ── Tipo de producto: Simple o Bundle/Kit ──────────────────────── */}

@@ -59,6 +59,28 @@ function detectAlerts(products, clients, sales, cashSessions, systemConfig) {
     }
   })
 
+  // 2b. Vencimiento a nivel de lote (FEFO/FIFO)
+  const batchDays = systemConfig?.expiryAlertDays || 30
+  products.filter(p => p.isActive && (p.stockControl === 'lote_fefo' || p.stockControl === 'lote_fifo') && Array.isArray(p.batches)).forEach(p => {
+    p.batches.filter(b => b.quantity > 0 && b.expiryDate).forEach(b => {
+      const days = daysUntil(b.expiryDate)
+      const batchLabel = b.batchNumber || b.id || '?'
+      if (days !== null && days < 0) {
+        alerts.push({ id: id('producto_vencido', `${p.id}::lote::${batchLabel}`), type: 'producto_vencido', entityId: p.id,
+          title: `Lote vencido: ${p.name} (Lote ${batchLabel})`,
+          message: `El lote ${batchLabel} de "${p.name}" venció hace ${Math.abs(days)} día(s) (${formatDate(b.expiryDate)}). Stock del lote: ${b.quantity} unidades. No debe venderse.`,
+          action: 'Ir a Inventario → Ajustar stock con tipo "Merma" para registrar la baja del lote vencido.',
+          createdAt: new Date().toISOString() })
+      } else if (days !== null && days <= batchDays) {
+        alerts.push({ id: id('por_vencer', `${p.id}::lote::${batchLabel}`), type: 'por_vencer', entityId: p.id,
+          title: `Lote próximo a vencer: ${p.name} (Lote ${batchLabel})`,
+          message: `El lote ${batchLabel} de "${p.name}" vence en ${days} día(s) (${formatDate(b.expiryDate)}). Stock del lote: ${b.quantity} unidades.`,
+          action: 'Considerar descuento o promoción para acelerar la salida del lote. El sistema FEFO lo priorizará automáticamente en ventas.',
+          createdAt: new Date().toISOString() })
+      }
+    })
+  })
+
   // 3. Deuda de clientes
   clients.filter(c => c.isActive && (c.currentDebt || 0) > 0).forEach(c => {
     const limitPct = c.creditLimit > 0 ? ((c.currentDebt / c.creditLimit) * 100).toFixed(0) : 100

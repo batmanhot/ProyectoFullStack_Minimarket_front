@@ -209,8 +209,11 @@ function TenantApp() {
   // Toast de alerta de vencimiento — una vez por sesión (sessionStorage)
   useEffect(() => {
     if (!tenantCtx || tenantCtx.loading) return
+    // Si ya está vencido/suspendido, la AccessExpiredScreen lo comunica — no mostrar toast
+    const accessStatus = tenantCtx.accessStatus
+    if (accessStatus === 'expired' || accessStatus === 'suspended') return
     const daysLeft = tenantCtx.daysLeft
-    if (daysLeft === null || daysLeft === undefined || daysLeft < 0) return
+    if (daysLeft === null || daysLeft === undefined || daysLeft <= 0) return
 
     const thresholds = getStoredAlertThresholds()
     if (daysLeft > thresholds.warning) return
@@ -225,9 +228,7 @@ function TenantApp() {
     const bg         = isCritical ? '#fef2f2' : isUrgent ? '#fff7ed' : '#fef9c3'
     const color      = isCritical ? '#991b1b' : isUrgent ? '#9a3412' : '#854d0e'
     const border     = isCritical ? '#fca5a5' : isUrgent ? '#fb923c' : '#fde047'
-    const msg        = daysLeft === 0
-      ? 'Tu acceso vence hoy — renueva antes de que se cierre.'
-      : `Tu acceso vence en ${daysLeft} día${daysLeft === 1 ? '' : 's'}. Renueva para continuar sin interrupciones.`
+    const msg        = `Tu acceso vence en ${daysLeft} día${daysLeft === 1 ? '' : 's'}. Renueva para continuar sin interrupciones.`
 
     toast(msg, {
       icon,

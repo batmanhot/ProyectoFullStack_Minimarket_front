@@ -38,6 +38,107 @@ const Input = ({ value, onChange, type='text', step, min, max, suffix, className
   </div>
 )
 
+// ─── Método de valorización de inventario ────────────────────────────────────
+
+const COST_METHOD_SECTOR_DEFAULT = {
+  bodega:      'peps', panaderia:  'peps', carniceria: 'peps', farmacia: 'peps',
+  ferreteria:  'peps', repuestos:  'peps',
+  boutique:    'cpp',  libreria:   'cpp',  regalos:    'cpp',
+  electronica: 'cpp',  optica:     'cpp',  otro:       'cpp',
+}
+
+const COST_METHODS = [
+  {
+    id:    'peps',
+    label: 'PEPS — Primero en Entrar, Primero en Salir',
+    icon:  '🕐',
+    desc:  'El costo de la salida se toma del lote/compra más antigua. Se alinea perfectamente con las estrategias FEFO y FIFO.',
+    ideal: 'Bodega, farmacia, panadería, carnicería, ferretería, repuestos',
+    color: 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20',
+    badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  },
+  {
+    id:    'cpp',
+    label: 'CPP — Costo Promedio Ponderado',
+    icon:  '⚖️',
+    desc:  'El costo unitario es el promedio de todas las unidades en stock, ponderado por cantidad. Se recalcula en cada compra.',
+    ideal: 'Boutique, librería, electrónica, óptica, tiendas sin control de lotes',
+    color: 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  },
+]
+
+function CostMethodSection({ sys, setSys, sector }) {
+  const current    = sys.costMethod || 'peps'
+  const suggested  = COST_METHOD_SECTOR_DEFAULT[sector] ?? 'peps'
+  const isSuggested = current === suggested
+
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3 border-b border-gray-100 dark:border-slate-700 pb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">💰 Método de valorización de inventario</h3>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+            Define cómo se calcula el costo de los productos cuando salen del almacén. Afecta los reportes de rentabilidad y el costo de ventas (COGS).
+          </p>
+        </div>
+        {!isSuggested && (
+          <button onClick={() => setSys({ ...sys, costMethod: suggested })}
+            className="flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 whitespace-nowrap">
+            Usar sugerido
+          </button>
+        )}
+      </div>
+
+      {/* Sugerencia según sector */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-300">
+        <span>💡</span>
+        <span>
+          Para tu sector <strong>({sector || 'no configurado'})</strong>, el método recomendado es{' '}
+          <strong>{suggested === 'peps' ? 'PEPS' : 'CPP'}</strong>.
+          {isSuggested ? ' ✓ Actualmente estás usando el método correcto.' : ' Considera cambiarlo.'}
+        </span>
+      </div>
+
+      {/* Selector de tarjetas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {COST_METHODS.map(m => {
+          const isActive = current === m.id
+          return (
+            <button key={m.id} onClick={() => setSys({ ...sys, costMethod: m.id })}
+              className={`text-left rounded-xl border-2 p-4 transition-all ${isActive ? m.color : 'border-gray-100 dark:border-slate-700 hover:border-gray-200 dark:hover:border-slate-600'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">{m.icon}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isActive ? m.badge : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'}`}>
+                  {isActive ? 'Activo' : 'Inactivo'}
+                </span>
+                {m.id === suggested && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Recomendado</span>
+                )}
+              </div>
+              <p className="text-sm font-medium text-gray-800 dark:text-slate-100 mb-1">{m.label}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">{m.desc}</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">
+                <span className="font-medium">Ideal para:</span> {m.ideal}
+              </p>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Nota SUNAT */}
+      <div className="flex items-start gap-2 px-3 py-2.5 bg-gray-50 dark:bg-slate-700/50 border border-gray-100 dark:border-slate-700 rounded-lg text-xs text-gray-500 dark:text-slate-400">
+        <span className="flex-shrink-0 mt-0.5">🇵🇪</span>
+        <span>
+          <strong className="text-gray-600 dark:text-slate-300">SUNAT:</strong> Ambos métodos (PEPS y CPP) están aceptados para efectos del Impuesto a la Renta.
+          El método UEPS (LIFO) está <strong>prohibido en Perú</strong> desde 1994 y no está disponible.
+          Una vez declarado el método ante SUNAT, debe aplicarse consistentemente en el ejercicio.
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export default function Settings() {
   const {
     businessConfig, systemConfig,
@@ -51,7 +152,7 @@ export default function Settings() {
   const storeKey   = `mm_store_v5_${tenantSlug}`
 
   const [biz, setBiz]         = useState({ ...businessConfig })
-  const [sys, setSys]         = useState({ ...systemConfig })
+  const [sys, setSys]         = useState({ costMethod: 'peps', ...systemConfig })
   const [saved, setSaved]     = useState(false)
   const [activeTab, setActiveTab] = useState('business')
   const [loadingDemo, setLoadingDemo] = useState(false)
@@ -243,6 +344,36 @@ export default function Settings() {
             </select>
           </Field>
 
+          {/* Nota de valorización según rubro */}
+          {(() => {
+            const sector       = biz.sector || 'bodega'
+            const recommended  = COST_METHOD_SECTOR_DEFAULT[sector] ?? 'peps'
+            const current      = sys.costMethod || 'peps'
+            const match        = recommended === current
+            const recLabel     = recommended === 'peps' ? 'PEPS' : 'CPP'
+            const curLabel     = current      === 'peps' ? 'PEPS' : 'CPP'
+            return (
+              <div className={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-xs border ${
+                match
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
+                  : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+              }`}>
+                <span className="flex-shrink-0 text-sm mt-0.5">{match ? '✅' : '⚠️'}</span>
+                <span>
+                  {match ? (
+                    <>El método de valorización activo (<strong>{curLabel}</strong>) es el correcto para el rubro seleccionado.</>
+                  ) : (
+                    <>
+                      Para el rubro <strong>{SECTORS.find(s => s.value === sector)?.label || sector}</strong> se recomienda el método{' '}
+                      <strong>{recLabel}</strong>, pero actualmente tienes configurado <strong>{curLabel}</strong>.{' '}
+                      Ve a la pestaña <strong>📦 Inventario</strong> para ajustarlo.
+                    </>
+                  )}
+                </span>
+              </div>
+            )
+          })()}
+
           {/* Preview del ticket */}
           <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl p-4">
             <p className="text-xs font-medium text-gray-600 dark:text-slate-300 mb-3">Vista previa — encabezado del ticket</p>
@@ -294,20 +425,24 @@ export default function Settings() {
 
       {/* ── TAB INVENTARIO ─────────────────────────────────────────────────── */}
       {activeTab === 'inventory' && (
-        <Section title="📦 Inventario y stock">
-          <Field label="Stock mínimo por defecto" sub="Valor inicial de stockMin para nuevos productos">
-            <Input type="number" value={sys.lowStockDefault||5} onChange={v => setSys({...sys, lowStockDefault: v})} min="0"/>
-          </Field>
-          <Field label="Alertas de stock habilitadas" sub="Muestra alertas cuando el stock cae al mínimo">
-            <Toggle value={sys.stockAlertEnabled !== false} onChange={v => setSys({...sys, stockAlertEnabled: v})}/>
-          </Field>
-          <Field label="Días de alerta por vencimiento" sub="Días antes del vencimiento para mostrar alerta">
-            <Input type="number" value={sys.expiryAlertDays||30} onChange={v => setSys({...sys, expiryAlertDays: v})} min="1" suffix="días"/>
-          </Field>
-          <Field label="Permitir stock negativo" sub="Permite vender aunque el stock llegue a cero">
-            <Toggle value={sys.allowNegativeStock === true} onChange={v => setSys({...sys, allowNegativeStock: v})}/>
-          </Field>
-        </Section>
+        <div className="space-y-4">
+          <Section title="📦 Inventario y stock">
+            <Field label="Stock mínimo por defecto" sub="Valor inicial de stockMin para nuevos productos">
+              <Input type="number" value={sys.lowStockDefault||5} onChange={v => setSys({...sys, lowStockDefault: v})} min="0"/>
+            </Field>
+            <Field label="Alertas de stock habilitadas" sub="Muestra alertas cuando el stock cae al mínimo">
+              <Toggle value={sys.stockAlertEnabled !== false} onChange={v => setSys({...sys, stockAlertEnabled: v})}/>
+            </Field>
+            <Field label="Días de alerta por vencimiento" sub="Días antes del vencimiento para mostrar alerta">
+              <Input type="number" value={sys.expiryAlertDays||30} onChange={v => setSys({...sys, expiryAlertDays: v})} min="1" suffix="días"/>
+            </Field>
+            <Field label="Permitir stock negativo" sub="Permite vender aunque el stock llegue a cero">
+              <Toggle value={sys.allowNegativeStock === true} onChange={v => setSys({...sys, allowNegativeStock: v})}/>
+            </Field>
+          </Section>
+
+          <CostMethodSection sys={sys} setSys={setSys} sector={biz.sector} />
+        </div>
       )}
 
       {/* ── TAB POS ─────────────────────────────────────────────────────────── */}

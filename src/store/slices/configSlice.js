@@ -26,6 +26,7 @@ export const createConfigSlice = (set, get) => ({
     printAutomatically: false,
     auditEnabled:       true,
     demoMode:           true,
+    costMethod:         'peps',
   },
 
   updateSystemConfig: (updates) => {

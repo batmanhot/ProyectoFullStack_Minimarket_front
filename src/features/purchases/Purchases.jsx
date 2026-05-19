@@ -10,6 +10,103 @@ import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import toast from 'react-hot-toast'
 
+// ── Modal de reposición sugerida ──────────────────────────────────────────────
+function ReplenishmentModal({ products, suppliers, onAdd, onClose }) {
+  const [filterSupplier, setFilterSupplier] = useState('')
+
+  // Productos activos cuyo stock real <= stockMin (y tienen stockMin > 0)
+  const candidates = useMemo(() => {
+    return products
+      .filter(p => p.isActive && p.stockMin > 0 && p.stock <= p.stockMin)
+      .filter(p => !filterSupplier || p.supplierId === filterSupplier)
+      .sort((a, b) => (a.stock / Math.max(a.stockMin, 1)) - (b.stock / Math.max(b.stockMin, 1)))
+  }, [products, filterSupplier])
+
+  const [selected, setSelected] = useState(() => new Set(candidates.map(p => p.id)))
+
+  const toggle = (id) => setSelected(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const handleAdd = () => {
+    const toAdd = candidates.filter(p => selected.has(p.id))
+    onAdd(toAdd)
+    onClose()
+  }
+
+  return (
+    <Modal title="📋 Reposición sugerida" onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-xs text-gray-500 dark:text-slate-400">
+          Productos con stock igual o por debajo del mínimo configurado. Selecciona los que quieres agregar a la orden de compra.
+        </p>
+
+        {/* Filtro por proveedor */}
+        <select value={filterSupplier} onChange={e => setFilterSupplier(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100">
+          <option value="">Todos los proveedores</option>
+          {suppliers.filter(s => s.isActive !== false).map(s =>
+            <option key={s.id} value={s.id}>{s.name}</option>
+          )}
+        </select>
+
+        {candidates.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 dark:text-slate-500 text-sm">
+            🎉 ¡Todo el stock está por encima del mínimo!
+          </div>
+        ) : (
+          <>
+            {/* Seleccionar/deseleccionar todo */}
+            <div className="flex justify-between items-center text-xs text-gray-500 dark:text-slate-400">
+              <span>{selected.size} de {candidates.length} seleccionados</span>
+              <button onClick={() => setSelected(selected.size === candidates.length ? new Set() : new Set(candidates.map(p => p.id)))}
+                className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
+                {selected.size === candidates.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-1 border border-gray-100 dark:border-slate-700 rounded-xl p-2">
+              {candidates.map(p => {
+                const deficit   = p.stockMin - p.stock
+                const supplier  = suppliers.find(s => s.id === p.supplierId)
+                const pctStock  = Math.round((p.stock / p.stockMin) * 100)
+                const isSel     = selected.has(p.id)
+                return (
+                  <button key={p.id} onClick={() => toggle(p.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSel ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 border border-transparent'}`}>
+                    <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${isSel ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-slate-500'}`}>
+                      {isSel && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{p.name}</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500">
+                        {supplier ? supplier.name : 'Sin proveedor'} · Stock: <span className="text-red-500 font-semibold">{p.stock}</span> / Mín: {p.stockMin}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs font-bold text-orange-600 dark:text-orange-400">+{deficit} uds</div>
+                      <div className={`text-xs font-medium ${p.stock === 0 ? 'text-red-500' : 'text-amber-500'}`}>
+                        {p.stock === 0 ? 'Sin stock' : `${pctStock}% del mín`}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <button onClick={handleAdd} disabled={selected.size === 0}
+              className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40">
+              Agregar {selected.size} producto{selected.size !== 1 ? 's' : ''} a la orden
+            </button>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 function NewPurchaseForm({ onClose }) {
   const { suppliers, products, currentUser, systemConfig } = useStore()
   const [supplierId, setSupplierId] = useState('')
@@ -17,6 +114,7 @@ function NewPurchaseForm({ onClose }) {
   const [search, setSearch] = useState('')
   const [notes, setNotes] = useState('')
   const [invoiceRef, setInvoiceRef] = useState('')
+  const [showReplenishment, setShowReplenishment] = useState(false)
   const dq = useDebounce(search, 150)
 
   // Método de valorización configurado (PEPS por defecto)
@@ -71,6 +169,21 @@ function NewPurchaseForm({ onClose }) {
   const removeItem = (pid) => setItems(prev => prev.filter(i => i.productId !== pid))
   const total = items.reduce((a, i) => a + i.quantity * i.priceBuy, 0)
 
+  const handleReplenishment = (selectedProducts) => {
+    selectedProducts.forEach(p => {
+      if (items.find(i => i.productId === p.id)) return
+      setItems(prev => [...prev, {
+        productId:    p.id,
+        productName:  p.name,
+        barcode:      p.barcode,
+        quantity:     Math.max(1, p.stockMin - p.stock),
+        priceBuy:     p.priceBuy,
+        currentStock: p.stock,
+        costAverage:  p.priceBuy,
+      }])
+    })
+  }
+
   const handleConfirm = async () => {
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
@@ -120,7 +233,13 @@ function NewPurchaseForm({ onClose }) {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Agregar productos</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-xs font-medium text-gray-600 dark:text-slate-300">Agregar productos</label>
+          <button type="button" onClick={() => setShowReplenishment(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors">
+            📋 Reposición sugerida
+          </button>
+        </div>
         <div className="relative">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, código o SKU..." className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           {searchResults.length > 0 && (
@@ -138,6 +257,15 @@ function NewPurchaseForm({ onClose }) {
           )}
         </div>
       </div>
+
+      {showReplenishment && (
+        <ReplenishmentModal
+          products={products}
+          suppliers={suppliers}
+          onAdd={handleReplenishment}
+          onClose={() => setShowReplenishment(false)}
+        />
+      )}
 
       {items.length > 0 && (
         <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
