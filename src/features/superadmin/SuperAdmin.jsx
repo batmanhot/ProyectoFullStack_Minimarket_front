@@ -233,13 +233,21 @@ function AccessFormModal({ access, tenantOptions, onClose, onDone }) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
-  const cycleDays     = BILLING_CYCLES[cycle]?.days ?? 30
-  const previewExpiry = getAccessExpiry(new Date(accessStartDate).toISOString(), cycle)
+  const cycleDays = BILLING_CYCLES[cycle]?.days ?? 30
+
+  // Parsear como hora local (no UTC) para evitar desfase de un día por timezone.
+  // Guardar como null si la cadena está incompleta o es inválida mientras el usuario escribe.
+  const parsedStart = accessStartDate.length === 10
+    ? new Date(accessStartDate + 'T00:00:00')
+    : null
+  const startIsValid  = parsedStart !== null && !isNaN(parsedStart.getTime())
+  const previewExpiry = startIsValid ? getAccessExpiry(parsedStart.toISOString(), cycle) : null
 
   const submit = async () => {
-    if (!tenantId) { setError('Selecciona un negocio'); return }
+    if (!tenantId)     { setError('Selecciona un negocio'); return }
+    if (!startIsValid) { setError('Ingresa una fecha de inicio válida'); return }
     setLoading(true); setError('')
-    const isoStart = new Date(accessStartDate).toISOString()
+    const isoStart = parsedStart.toISOString()
     const r = isEdit
       ? await tenantService.updateAccess(access.id, { plan, billingCycle: cycle, accessStartDate: isoStart, bonusDays: Number(bonusDays), notes })
       : await tenantService.createAccess({ tenantId, plan, billingCycle: cycle, accessStartDate: isoStart, bonusDays: Number(bonusDays), notes })
@@ -289,9 +297,11 @@ function AccessFormModal({ access, tenantOptions, onClose, onDone }) {
           <input type="date" value={accessStartDate} onChange={e => setAccessStartDate(e.target.value)} style={inputStyle} />
         </FieldRow>
 
-        <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#64748b' }}>
-          Vencimiento calculado: <strong style={{ color: '#0f172a' }}>{fmtDate(previewExpiry)}</strong>
-          &nbsp;({cycleDays}d + {bonusDays} bonus = {cycleDays + Number(bonusDays)}d)
+        <div style={{ background: startIsValid ? '#f8fafc' : '#fef2f2', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: startIsValid ? '#64748b' : '#dc2626' }}>
+          {startIsValid
+            ? <>Vencimiento calculado: <strong style={{ color: '#0f172a' }}>{fmtDate(previewExpiry)}</strong>&nbsp;({cycleDays}d + {bonusDays} bonus = {cycleDays + Number(bonusDays)}d)</>
+            : 'Ingresa una fecha de inicio válida para ver el vencimiento calculado.'
+          }
         </div>
 
         <FieldRow label="Notas">
