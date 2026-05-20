@@ -33,6 +33,53 @@ function playBeep({ freq = 1800, duration = 0.08, volume = 0.35 } = {}) {
   } catch (_) {}
 }
 
+// ── Modal de selección de variante ───────────────────────────────────────────
+function VariantSelectorModal({ product, variants, onSelect, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-purple-600 px-5 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-white">{product.name}</h3>
+            <p className="text-xs text-purple-200 mt-0.5">Selecciona una variante para agregar al carrito</p>
+          </div>
+          <button onClick={onClose} className="text-purple-200 hover:text-white transition-colors">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className="divide-y divide-gray-100 dark:divide-slate-700 max-h-80 overflow-y-auto">
+          {variants.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">
+              Sin variantes registradas para este producto.<br/>
+              <span className="text-xs">Ve al Catálogo → edita el producto → Variantes.</span>
+            </div>
+          ) : variants.map((v, idx) => {
+            const label = Object.values(v.attributes || {}).join(' · ') || '(sin atributos)'
+            const price = v.priceSell || product.priceSell
+            const outOfStock = (v.stock ?? 0) <= 0
+            return (
+              <button key={v.id || idx} onClick={(e) => { e.stopPropagation(); if (!outOfStock) onSelect(v) }} disabled={outOfStock}
+                className={`w-full flex items-center justify-between px-5 py-3 text-left transition-colors ${outOfStock ? 'opacity-40 cursor-not-allowed bg-gray-50 dark:bg-slate-800/50' : 'hover:bg-purple-50 dark:hover:bg-purple-900/20'}`}>
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {v.barcode}{v.sku ? ` · ${v.sku}` : ''}
+                    {' · '}Stock: <span className={outOfStock ? 'text-red-500 font-semibold' : 'text-gray-500'}>{v.stock}</span>
+                  </p>
+                </div>
+                <div className="text-right shrink-0 ml-4">
+                  <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(price)}</p>
+                  {outOfStock && <p className="text-xs text-red-500 font-medium">Sin stock</p>}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function POS({ onNavigate }) {
   const {
     products, productVariants, cart, clients, currentUser, activeCashSession, systemConfig, businessConfig,
@@ -42,9 +89,15 @@ export default function POS({ onNavigate }) {
 
   const cartCount = useStore(selectCartCount)
 
-  const [search, setSearch]               = useState('')
-  const [showResults, setShowResults]     = useState(false)
-  const [processing, setProcessing]       = useState(false)
+  const [search, setSearch]                         = useState('')
+  const [showResults, setShowResults]               = useState(false)
+  const [processing, setProcessing]                 = useState(false)
+  const [variantSelectProduct, _setVariantSelectProduct] = useState(null)
+  const variantSelectProductRef = useRef(null)
+  const setVariantSelectProduct = (p) => {
+    variantSelectProductRef.current = p
+    _setVariantSelectProduct(p)
+  }
   // ── F5: cliente seleccionado en el panel de pago (para mostrar sus puntos) ─
   const [selectedClientId, setSelectedClientId] = useState(null)
   const selectedClient = clients.find(c => c.id === selectedClientId) || null
@@ -177,7 +230,7 @@ export default function POS({ onNavigate }) {
     actionsRef.current = {
       focusSearch: () => searchRef.current?.focus(),
       clearSearch: () => { setSearch(''); setShowResults(false) },
-      openPayment: () => { if (cart.length > 0 && activeCashSession) setShowPayment(true) },
+      openPayment: () => { if (cart.length > 0 && activeCashSession) { setVariantSelectProduct(null); setShowPayment(true) } },
       promptClear: () => { if (cart.length > 0) setShowClearConfirm(true) },
     }
 
@@ -214,18 +267,53 @@ export default function POS({ onNavigate }) {
   }
 
   const handleSelectProduct = (product) => {
+    // Producto con variantes encontrado por nombre (sin variante específica) → mostrar selector
+    if (product.hasVariants && !product._variant) {
+      const variants = productVariants.filter(v => v.productId === product.id)
+      if (variants.length > 0) {
+        setVariantSelectProduct(product)
+        setSearch(''); setShowResults(false)
+        return
+      }
+      // Sin variantes registradas aún → agregar como producto padre normal
+    }
     const available = getAvailableStock(product)
     if (available <= 0) { toast.error(`${product.name} sin stock`); return }
-    addToCart(product)
+    addToCart(product, 1, product._variant?.id || null)
     playBeep()
     setSearch(''); setShowResults(false)
     searchRef.current?.focus()
     toast.success(`${product.name} agregado`, { duration: 1000, icon: '✓' })
   }
 
+  const handleSelectVariant = useCallback((variant) => {
+    const product = variantSelectProductRef.current
+    if (!product || !variant) return
+    setVariantSelectProduct(null)
+    const attrLabel = Object.values(variant.attributes || {}).join(' · ')
+    // Construir el objeto enriquecido que se pasará a addToCart.
+    // CRÍTICO: product.name aquí es el nombre BASE del producto padre (sin variante
+    // previa), porque variantSelectProductRef.current siempre apunta al producto
+    // padre original tal como viene del catálogo (nunca al objeto enriched anterior).
+    const enriched = {
+      ...product,
+      _variant:  variant,
+      name:      attrLabel ? `${product.name} (${attrLabel})` : product.name,
+      barcode:   variant.barcode || product.barcode || '',
+      stock:     variant.stock ?? product.stock,
+      priceSell: variant.priceSell || product.priceSell,
+    }
+    if ((variant.stock ?? 0) <= 0) { toast.error('Sin stock para esta variante'); return }
+    addToCart(enriched, 1, variant.id)
+    playBeep()
+    searchRef.current?.focus()
+    toast.success(`${enriched.name} agregado`, { duration: 1200, icon: '✓' })
+  }, [addToCart]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleUpdateQty = (key, newQty) => {
-    const item    = cart.find(i => i._key===key || i.productId===key)
-    const product = products.find(p => p.id===item?.productId)
+    // Busca SOLO por _key para no confundir variantes del mismo producto
+    const item    = cart.find(i => i._key === key)
+    const product = products.find(p => p.id === item?.productId)
     if (!product) return
     if (newQty <= 0) { removeFromCart(key); return }
     const available = getAvailableStock(product)
@@ -312,6 +400,9 @@ export default function POS({ onNavigate }) {
       toast(`⚠️ Stock bajo: ${lowAfterSale.map(p=>p.name).join(', ')}`, { duration: 5000 })
 
     setShowPayment(false)
+    setVariantSelectProduct(null)
+    setSearch('')
+    setShowResults(false)
     setGlobalDiscount('')
     setDiscountEdit({})
     setSelectedClientId(null)  // F5: limpiar cliente al completar venta
@@ -772,7 +863,7 @@ export default function POS({ onNavigate }) {
 
     {/* Cobrar */}
     <button
-      onClick={() => setShowPayment(true)}
+      onClick={() => { setVariantSelectProduct(null); setShowPayment(true) }}
       disabled={cart.length === 0}
       className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-4 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-blue-300">
       <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -833,7 +924,7 @@ export default function POS({ onNavigate }) {
 
       {showClearConfirm && (
         <ConfirmModal title="¿Vaciar el carrito?" message="Se eliminarán todos los productos del carrito." confirmLabel="Vaciar" variant="danger"
-          onConfirm={() => { clearCart(); setShowClearConfirm(false); setGlobalDiscount(''); setDiscountEdit({}) }}
+          onConfirm={() => { clearCart(); setShowClearConfirm(false); setGlobalDiscount(''); setDiscountEdit({}); setVariantSelectProduct(null) }}
           onCancel={() => setShowClearConfirm(false)}/>
       )}
 
@@ -857,8 +948,20 @@ export default function POS({ onNavigate }) {
         </Suspense>
       )}
       {/* ─────────────────────────────────────────────────────────────────── */}
+
     </div>
   </div>
+
+  {/* ── Selector de variante — al nivel del div raíz, fuera de todos los paneles ─── */}
+  {variantSelectProduct && (
+    <VariantSelectorModal
+      key={variantSelectProduct.id}
+      product={variantSelectProduct}
+      variants={productVariants.filter(v => v.productId === variantSelectProduct.id)}
+      onSelect={handleSelectVariant}
+      onClose={() => setVariantSelectProduct(null)}
+    />
+  )}
 </div>
   )
 }

@@ -34,8 +34,12 @@ export function usePOSTotals(cart, globalDiscAmt = 0, ticketDiscAmt = 0) {
   }, [cart, products, discountCampaigns])
 
   const mergedCartItems = useMemo(() => cart.map(cartItem => {
+    // CRÍTICO: buscar SOLO por _key para no confundir variantes del mismo producto.
+    // Antes se usaba || i.productId === cartItem.productId como fallback,
+    // lo que hacía que dos variantes del mismo producto compartieran el mismo
+    // autoItem y mostraran los mismos descuentos/totales.
     const autoItem = autoDiscountResult.itemDiscounts.find(
-      i => i._key === cartItem._key || i.productId === cartItem.productId
+      i => i._key === cartItem._key
     ) || { campaignDiscount: 0, netTotal: cartItem.subtotal, discountDetails: [] }
 
     const manualDiscount = cartItem.discount || 0

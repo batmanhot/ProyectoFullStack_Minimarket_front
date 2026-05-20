@@ -44,7 +44,7 @@ export const productService = {
     if (USE_API) { const { data } = await api.post('/products', payload); return ok(data.data) }
     const product = {
       ...payload,
-      id:        crypto.randomUUID(),
+      id:        payload.id || crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }

@@ -18,6 +18,7 @@ export const SEED_CATEGORIES = [
   { id: 'cat-005', name: 'Snacks',          description: 'Galletas, golosinas y aperitivos' },
   { id: 'cat-006', name: 'Panadería',       description: 'Pan y productos horneados' },
   { id: 'cat-007', name: 'Higiene personal',description: 'Jabón, shampoo y cuidado personal' },
+  { id: 'cat-008', name: 'Ropa y Accesorios', description: 'Prendas de vestir, calzado y accesorios' },
 ]
 
 // ─── PRODUCTOS (con nuevos campos) ────────────────────────────────────────────
@@ -68,6 +69,8 @@ export const SEED_PRODUCTS = [
   p('prd-034','7750282200218','Papas Lays BBQ 42g','Papas fritas BBQ','cat-005','sup-001',1.50,2.50,55,20),
   p('prd-036','7750282210200','Galleta Oreo 36g','Galleta chocolate crema','cat-005','sup-001',1.20,2.00,72,24),
   p('prd-038','7750282210224','Chocolate Sublime 30g','Chocolate con maní','cat-005','sup-001',1.00,1.80,84,30),
+  // ROPA — producto demo con variantes (tallas y colores)
+  p('prd-v01','POLO-CLASICO','Polo Clásico','Polo de algodón 100% — disponible en varias tallas y colores','cat-008','sup-005',15.00,25.00,0,5,'unidad',{ hasVariants: true, stockControl: 'simple', brand: 'Básicos' }),
   // HIGIENE
   p('prd-044','7750195100013','Shampoo H&S 375ml','Shampoo anticaspa','cat-007','sup-004',12.50,18.90,14,5),
   p('prd-045','7750195100020','Shampoo Pantene 400ml','Shampoo reparación','cat-007','sup-004',13.50,20.50,2,5), // stock bajo
@@ -270,4 +273,18 @@ export const SEED_BRANDS = [
   { id: 'brn-013', name: 'San Luis',      description: 'Agua mineral',                       color: '#0ea5e9', isActive: true, createdAt: subtractDays(60)  },
   { id: 'brn-014', name: 'Frugos',        description: 'Jugos y néctares de frutas',         color: '#84cc16', isActive: true, createdAt: subtractDays(55)  },
   { id: 'brn-015', name: 'Lays',          description: 'Snacks y papas fritas',              color: '#fbbf24', isActive: true, createdAt: subtractDays(50)  },
+  { id: 'brn-016', name: 'Básicos',       description: 'Prendas de vestir básicas',            color: '#6366f1', isActive: true, createdAt: subtractDays(45)  },
+]
+
+// ─── VARIANTES DE PRODUCTO (demo) ─────────────────────────────────────────────
+// Variantes del "Polo Clásico" (prd-v01): tallas S/M/L/XL × colores Blanco/Negro
+export const SEED_VARIANTS = [
+  { id: 'var-001', productId: 'prd-v01', barcode: 'POLO-S-BLN',  sku: 'POLO-S-BLN',  attributes: { Talla: 'S',  Color: 'Blanco' }, stock: 8,  stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-002', productId: 'prd-v01', barcode: 'POLO-M-BLN',  sku: 'POLO-M-BLN',  attributes: { Talla: 'M',  Color: 'Blanco' }, stock: 15, stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-003', productId: 'prd-v01', barcode: 'POLO-L-BLN',  sku: 'POLO-L-BLN',  attributes: { Talla: 'L',  Color: 'Blanco' }, stock: 12, stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-004', productId: 'prd-v01', barcode: 'POLO-XL-BLN', sku: 'POLO-XL-BLN', attributes: { Talla: 'XL', Color: 'Blanco' }, stock: 5,  stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-005', productId: 'prd-v01', barcode: 'POLO-S-NEG',  sku: 'POLO-S-NEG',  attributes: { Talla: 'S',  Color: 'Negro'  }, stock: 10, stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-006', productId: 'prd-v01', barcode: 'POLO-M-NEG',  sku: 'POLO-M-NEG',  attributes: { Talla: 'M',  Color: 'Negro'  }, stock: 18, stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-007', productId: 'prd-v01', barcode: 'POLO-L-NEG',  sku: 'POLO-L-NEG',  attributes: { Talla: 'L',  Color: 'Negro'  }, stock: 0,  stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
+  { id: 'var-008', productId: 'prd-v01', barcode: 'POLO-XL-NEG', sku: 'POLO-XL-NEG', attributes: { Talla: 'XL', Color: 'Negro'  }, stock: 3,  stockMin: 2, priceSell: null, createdAt: subtractDays(60) },
 ]

@@ -156,6 +156,274 @@ function ColorDot({ color, size = 'sm' }) {
   return <span className={`${s} rounded-full inline-block flex-shrink-0`} style={{ backgroundColor: color || '#94a3b8' }}/>
 }
 
+// ── Atributos comunes de variantes ────────────────────────────────────────────
+const VARIANT_ATTR_PRESETS = ['Talla', 'Color', 'Tamaño', 'Sabor', 'Modelo', 'Material']
+
+// ══════════════════════════════════════════════════════════════════════════════
+// VARIANT MANAGER — gestión de variantes de un producto existente
+// ══════════════════════════════════════════════════════════════════════════════
+function VariantManager({ productId }) {
+  const { productVariants, addVariant, updateVariant, deleteVariant } = useStore()
+  const variants = productVariants.filter(v => v.productId === productId)
+
+  const blankForm = () => ({ id: null, barcode: '', sku: '', stock: 0, stockMin: 2, priceSell: '', attrs: [{ key: 'Talla', value: '' }] })
+  const [form, setForm] = useState(null)
+  const [lastFocusIdx, setLastFocusIdx] = useState(null)
+  const valueInputsRef = useRef([])
+
+  useEffect(() => {
+    if (lastFocusIdx !== null && valueInputsRef.current[lastFocusIdx]) {
+      valueInputsRef.current[lastFocusIdx].focus()
+      setLastFocusIdx(null)
+    }
+  }, [lastFocusIdx])
+
+  const openEdit = (v) => setForm({
+    id: v.id, barcode: v.barcode, sku: v.sku || '',
+    stock: v.stock, stockMin: v.stockMin ?? 2, priceSell: v.priceSell ?? '',
+    attrs: Object.entries(v.attributes || {}).map(([key, value]) => ({ key, value })),
+  })
+
+  const setField = (field, value) => setForm(f => ({ ...f, [field]: value }))
+  const setAttr  = (idx, field, value) => setForm(f => {
+    const attrs = [...f.attrs]; attrs[idx] = { ...attrs[idx], [field]: value }; return { ...f, attrs }
+  })
+
+  const handleSave = () => {
+    if (!form.barcode.trim()) { toast.error('El código de barras es requerido'); return }
+    // Validar que cada atributo tenga AMBOS campos completados
+    const incomplete = form.attrs.filter(a => a.key.trim() && !a.value.trim())
+    if (incomplete.length > 0) {
+      toast.error(`Completa el valor de: ${incomplete.map(a => a.key).join(', ')}`, { duration: 3500 })
+      // Enfocar el primer campo de valor vacío
+      const idx = form.attrs.findIndex(a => a.key.trim() && !a.value.trim())
+      if (idx >= 0 && valueInputsRef.current[idx]) valueInputsRef.current[idx].focus()
+      return
+    }
+    const attributes = Object.fromEntries(form.attrs.filter(a => a.key.trim() && a.value.trim()).map(a => [a.key.trim(), a.value.trim()]))
+    const payload = {
+      productId, barcode: form.barcode.trim(), sku: form.sku.trim(),
+      stock: parseInt(form.stock) || 0, stockMin: parseInt(form.stockMin) || 2,
+      priceSell: form.priceSell !== '' ? parseFloat(form.priceSell) : null, attributes,
+    }
+    if (form.id) { updateVariant(form.id, payload); toast.success('Variante actualizada') }
+    else         { addVariant({ id: createSafeId(), ...payload, createdAt: new Date().toISOString() }); toast.success('Variante agregada') }
+    setForm(null)
+  }
+
+  const inCls = 'w-full px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-400'
+
+  return (
+    <div className="mt-3 border-2 border-purple-200 dark:border-purple-800 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="bg-purple-50 dark:bg-purple-900/20 px-4 py-3 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold text-purple-800 dark:text-purple-300">Variantes de este producto</p>
+          <p className="text-xs text-purple-600 dark:text-purple-400">
+            {variants.length === 0 ? 'Sin variantes registradas' : `${variants.length} variante${variants.length !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+        {!form && (
+          <button type="button" onClick={() => setForm(blankForm())}
+            className="px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 flex items-center gap-1.5">
+            <span>+</span> Nueva variante
+          </button>
+        )}
+      </div>
+
+      {/* Lista de variantes */}
+      {variants.length > 0 && !form && (
+        <div className="divide-y divide-purple-100 dark:divide-purple-900/40">
+          {variants.map(v => (
+            <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-slate-800 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-colors">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">
+                  {Object.values(v.attributes || {}).join(' · ') || '(sin atributos)'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {v.barcode}{v.sku ? ` · ${v.sku}` : ''} · Stock:{' '}
+                  <span className={v.stock <= 0 ? 'text-red-500 font-semibold' : 'text-gray-500'}>{v.stock}</span>
+                  {v.priceSell ? ` · S/${Number(v.priceSell).toFixed(2)}` : ''}
+                </p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button type="button" onClick={() => openEdit(v)}
+                  className="p-1.5 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" title="Editar">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button type="button" onClick={() => { deleteVariant(v.id); toast.success('Variante eliminada') }}
+                  className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Eliminar">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {variants.length === 0 && !form && (
+        <div className="px-4 py-5 text-center text-xs text-purple-400 bg-white dark:bg-slate-800">
+          Sin variantes — haz clic en "Nueva variante" para agregar tallas, colores, etc.
+        </div>
+      )}
+
+      {/* Formulario inline */}
+      {form && (
+        <div className="bg-white dark:bg-slate-800 p-4 space-y-3 border-t border-purple-100 dark:border-purple-900/40">
+          <p className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
+            {form.id ? 'Editar variante' : 'Nueva variante'}
+          </p>
+
+          {/* Atributos */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 font-medium">
+              Atributos (talla, color…)
+            </p>
+            <p className="text-xs text-purple-500 dark:text-purple-400 mb-2">
+              Haz clic en un tipo y escribe su valor en el campo que aparece →
+            </p>
+
+            {/* Chips de presets */}
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {VARIANT_ATTR_PRESETS.map(key => {
+                const exists = form.attrs.some(a => a.key === key)
+                return (
+                  <button key={key} type="button" disabled={exists}
+                    onClick={() => {
+                      const nextIdx = form.attrs.length
+                      setForm(f => ({ ...f, attrs: [...f.attrs, { key, value: '' }] }))
+                      setLastFocusIdx(nextIdx)
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-xs border font-medium transition-colors ${
+                      exists
+                        ? 'border-purple-400 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 cursor-default'
+                        : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-600'
+                    }`}>
+                    {exists ? '✓ ' : '+ '}{key}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Filas de atributos */}
+            <div className="space-y-2">
+              {form.attrs.map((attr, idx) => {
+                const isPreset   = VARIANT_ATTR_PRESETS.includes(attr.key)
+                const missingVal = attr.key.trim() && !attr.value.trim()
+                const valuePlaceholder = attr.key === 'Talla'   ? 'Ej: XS, S, M, L, XL'
+                                       : attr.key === 'Color'   ? 'Ej: Rojo, Azul, Negro'
+                                       : attr.key === 'Tamaño'  ? 'Ej: Pequeño, Grande'
+                                       : attr.key === 'Sabor'   ? 'Ej: Vainilla, Chocolate'
+                                       : attr.key === 'Modelo'  ? 'Ej: Clásico, Sport'
+                                       : attr.key === 'Material'? 'Ej: Algodón, Poliéster'
+                                       : 'Escribe el valor...'
+                return (
+                  <div key={idx} className="flex items-center gap-2">
+                    {/* Tipo — etiqueta fija para presets, campo editable para custom */}
+                    {isPreset ? (
+                      <span className="inline-flex items-center px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-bold shrink-0 whitespace-nowrap border border-purple-200 dark:border-purple-700">
+                        {attr.key}
+                      </span>
+                    ) : (
+                      <input value={attr.key} onChange={e => setAttr(idx, 'key', e.target.value)}
+                        placeholder="Tipo (ej: Sabor)"
+                        className="w-28 shrink-0 px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-400"/>
+                    )}
+
+                    {/* Flecha visual */}
+                    <span className="text-gray-300 shrink-0 text-sm">→</span>
+
+                    {/* Valor — campo principal */}
+                    <input
+                      ref={el => { valueInputsRef.current[idx] = el }}
+                      value={attr.value}
+                      onChange={e => setAttr(idx, 'value', e.target.value)}
+                      placeholder={valuePlaceholder}
+                      className={`flex-1 min-w-0 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 border ${
+                        missingVal
+                          ? 'border-orange-300 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-600 focus:ring-orange-400 placeholder:text-orange-300'
+                          : 'border-purple-300 bg-purple-50 dark:bg-purple-900/10 dark:border-purple-700 focus:ring-purple-400 dark:text-slate-100'
+                      }`}
+                    />
+
+                    {/* Eliminar */}
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, attrs: f.attrs.filter((_, i) => i !== idx) }))}
+                      className="p-1 text-gray-300 hover:text-red-400 shrink-0 transition-colors">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Agregar atributo personalizado */}
+            <button type="button"
+              onClick={() => {
+                const nextIdx = form.attrs.length
+                setForm(f => ({ ...f, attrs: [...f.attrs, { key: '', value: '' }] }))
+                setLastFocusIdx(nextIdx)
+              }}
+              className="mt-2 text-xs text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center gap-1">
+              + Agregar atributo personalizado
+            </button>
+
+            {/* Advertencia de valor vacío */}
+            {form.attrs.some(a => a.key.trim() && !a.value.trim()) && (
+              <p className="text-xs text-orange-500 mt-2 flex items-center gap-1">
+                ⚠️ Escribe un valor en el campo naranja de cada atributo
+              </p>
+            )}
+          </div>
+
+          {/* Código + SKU */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Código de barras *</label>
+              <input value={form.barcode} onChange={e => setField('barcode', e.target.value)}
+                placeholder="Ej: POLO-M-ROJO" className={inCls}/>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">SKU (opcional)</label>
+              <input value={form.sku} onChange={e => setField('sku', e.target.value)}
+                placeholder="Ej: SKU-001" className={inCls}/>
+            </div>
+          </div>
+
+          {/* Stock + StockMin + Precio */}
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Stock</label>
+              <input type="number" min="0" value={form.stock} onChange={e => setField('stock', e.target.value)} className={inCls}/>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Stock mín.</label>
+              <input type="number" min="0" value={form.stockMin} onChange={e => setField('stockMin', e.target.value)} className={inCls}/>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Precio venta S/ (opcional)</label>
+              <input type="number" step="0.01" min="0" value={form.priceSell} onChange={e => setField('priceSell', e.target.value)}
+                placeholder="Del padre" className={inCls}/>
+            </div>
+          </div>
+
+          {/* Acciones */}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={() => setForm(null)}
+              className="flex-1 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-xs hover:bg-gray-50 dark:hover:bg-slate-700">
+              Cancelar
+            </button>
+            <button type="button" onClick={handleSave}
+              className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700">
+              {form.id ? 'Guardar cambios' : 'Agregar variante'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // FORM — PRODUCTO
 // ══════════════════════════════════════════════════════════════════════════════
@@ -196,9 +464,15 @@ function ProductForm({ product, onClose }) {
     },
   })
 
+  // ID estable del producto — se genera una sola vez al montar el formulario.
+  // Si es edición usa el ID existente; si es creación genera uno nuevo para
+  // que el VariantManager pueda usarlo antes de guardar el producto.
+  const [productId] = useState(() => product?.id ?? createSafeId())
+
   // Preview de imagen en tiempo real
-  const imageUrl   = watch('imageUrl')
+  const imageUrl    = watch('imageUrl')
   const useBatches  = watch('useBatches')
+  const hasVariants = watch('hasVariants') ?? false
   const productType = watch('type') || 'simple'
   const [imgError, setImgError]           = useState(false)
   const [bundleSearch, setBundleSearch]   = useState('')
@@ -234,11 +508,10 @@ function ProductForm({ product, onClose }) {
   }
 
   const onSubmit = async (data) => {
-    // Asegurar que imageUrl vacío quede como string vacío (no undefined)
     const payload = { ...data, imageUrl: data.imageUrl?.trim() || '' }
     const result  = product
       ? await productService.update(product.id, payload)
-      : await productService.create(payload)
+      : await productService.create({ id: productId, ...payload })
     if (result.error) { toast.error(result.error); return }
     toast.success(product ? 'Producto actualizado' : 'Producto creado')
     onClose()
@@ -597,6 +870,25 @@ function ProductForm({ product, onClose }) {
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400">
                   Activa el control de lotes para este producto — permite registrar N° de lote, fecha de vencimiento y costo por lote
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Variantes de producto ─────────────────────────────────────────────── */}
+          <div className="col-span-2">
+            <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl">
+              <button type="button"
+                onClick={() => setValue('hasVariants', !hasVariants)}
+                className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${hasVariants ? 'bg-purple-600' : 'bg-gray-300 dark:bg-slate-600'}`}>
+                <span className={`inline-block h-3 w-3 mt-1 rounded-full bg-white transition-transform ${hasVariants ? 'translate-x-5' : 'translate-x-1'}`}/>
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-purple-800 dark:text-purple-300">Variantes de producto</p>
+                <p className="text-xs text-purple-600 dark:text-purple-400">
+                  {hasVariants
+                    ? 'Activo — guarda el producto y gestiona tallas/colores desde la pestaña 🎨 Variantes'
+                    : 'Activa para gestionar tallas, colores u otros atributos con stock y código de barras propios'}
                 </p>
               </div>
             </div>
@@ -1365,10 +1657,120 @@ function BrandsView({ brands, products }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// COMPONENTE PRINCIPAL — Catalog con 3 pestañas
+// VIEW — GESTIÓN DE VARIANTES
+// ══════════════════════════════════════════════════════════════════════════════
+function VariantesView({ products }) {
+  const { productVariants } = useStore()
+  const [search, setSearch]             = useState('')
+  const [selectedProductId, setSelectedProductId] = useState(null)
+
+  const variantProducts = useMemo(() => {
+    const q = search.toLowerCase()
+    return products.filter(p =>
+      p.isActive && p.hasVariants &&
+      (!q || p.name.toLowerCase().includes(q) || p.barcode.includes(q))
+    )
+  }, [products, search])
+
+  // Auto-seleccionar el primero si no hay selección
+  useEffect(() => {
+    if (!selectedProductId && variantProducts.length > 0) {
+      setSelectedProductId(variantProducts[0].id)
+    }
+  }, [variantProducts, selectedProductId])
+
+  const selectedProduct = products.find(p => p.id === selectedProductId)
+
+  return (
+    <div className="flex gap-4 min-h-[520px]">
+
+      {/* ── Panel izquierdo: lista de productos con variantes ── */}
+      <div className="w-96 shrink-0 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 flex flex-col overflow-hidden">
+        <div className="p-3 border-b border-gray-100 dark:border-slate-700">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar producto..."
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 text-gray-800 dark:text-slate-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {variantProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center text-gray-400 dark:text-slate-500">
+              <span className="text-3xl mb-2">🎨</span>
+              <p className="text-xs">
+                {search
+                  ? 'Sin resultados'
+                  : 'Ningún producto tiene variantes activas. Activa la opción en el formulario del producto.'}
+              </p>
+            </div>
+          ) : (
+            variantProducts.map(p => {
+              const count = productVariants.filter(v => v.productId === p.id).length
+              const isSelected = p.id === selectedProductId
+              return (
+                <button key={p.id}
+                  onClick={() => setSelectedProductId(p.id)}
+                  className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-slate-700/50 transition-colors ${
+                    isSelected
+                      ? 'bg-purple-50 dark:bg-purple-900/30 border-l-2 border-l-purple-500'
+                      : 'hover:bg-gray-50 dark:hover:bg-slate-700/40 border-l-2 border-l-transparent'
+                  }`}>
+                  <p className={`text-sm font-medium truncate ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-800 dark:text-slate-100'}`}>
+                    {p.name}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                    {count > 0
+                      ? <span className="text-purple-500 dark:text-purple-400 font-medium">{count} variante{count !== 1 ? 's' : ''}</span>
+                      : <span>Sin variantes aún</span>
+                    }
+                  </p>
+                </button>
+              )
+            })
+          )}
+        </div>
+
+        <div className="p-2 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
+          <p className="text-xs text-center text-gray-400 dark:text-slate-500">
+            {variantProducts.length} producto{variantProducts.length !== 1 ? 's' : ''} con variantes
+          </p>
+        </div>
+      </div>
+
+      {/* ── Panel derecho: VariantManager del producto seleccionado ── */}
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
+        {selectedProduct ? (
+          <div className="h-full flex flex-col">
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center gap-3">
+              <span className="text-lg">🎨</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{selectedProduct.name}</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">{selectedProduct.barcode}</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <VariantManager productId={selectedProduct.id} />
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 p-8 text-center">
+            <span className="text-5xl mb-4">🎨</span>
+            <p className="text-base font-medium text-gray-600 dark:text-slate-300 mb-1">Gestión de variantes</p>
+            <p className="text-sm">Selecciona un producto de la lista para ver y editar sus variantes</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL — Catalog con pestañas
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Catalog() {
-  const { products, categories, brands, suppliers, businessConfig, addAuditLog } = useStore()
+  const { products, categories, brands, suppliers, businessConfig, addAuditLog, productVariants } = useStore()
   const [tab, setTab] = useState('products')
 
   const tabs = [
@@ -1376,6 +1778,7 @@ export default function Catalog() {
     { key: 'categories', label: 'Categorías',  icon: '🗂️', count: categories.length },
     { key: 'brands',     label: 'Marcas',      icon: '🏷️', count: (brands || []).filter(b => b.isActive).length },
     { key: 'batches',    label: 'Lotes',        icon: '🔢', count: products.filter(p => p.useBatches).length },
+    { key: 'variants',   label: 'Variantes',   icon: '🎨', count: productVariants.length },
   ]
 
   return (
@@ -1424,6 +1827,9 @@ export default function Catalog() {
       )}
       {tab === 'batches' && (
         <BatchesView products={products} suppliers={suppliers}/>
+      )}
+      {tab === 'variants' && (
+        <VariantesView products={products}/>
       )}
     </div>
   )

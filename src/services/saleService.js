@@ -55,12 +55,41 @@ export const saleService = {
       }
     }
 
-    // ── Motor de inventario FEFO/FIFO/Serie/Simple ─────────────────────────────
+    // ── Motor de inventario FEFO/FIFO/Serie/Simple + Variantes ──────────────────
     for (const item of expandedItems) {
       const freshState = useStore.getState()
       const product    = freshState.products.find(p => p.id === item.productId)
       if (!product) continue
 
+      // Ítem vendido como variante con stock propio registrado
+      const hasRegisteredVariants = item.variantId &&
+        freshState.productVariants.some(v => v.productId === item.productId)
+
+      if (hasRegisteredVariants) {
+        const variant = freshState.productVariants.find(v => v.id === item.variantId)
+        if (!variant) {
+          enrichedItems.push({ ...item, batchAllocations: [], stockControlUsed: 'simple' })
+          continue
+        }
+        const prevStock = variant.stock ?? 0
+        const newStock  = Math.max(0, prevStock - item.quantity)
+        freshState.updateVariant(item.variantId, { stock: newStock })
+        freshState.addStockMovement({
+          id: crypto.randomUUID(), productId: item.productId, productName: item.productName,
+          variantId: item.variantId,
+          type: 'salida', quantity: item.quantity,
+          previousStock: prevStock, newStock,
+          reason: `Venta ${invoiceNumber}`,
+          userId: payload.userId, invoiceNumber,
+          unitPrice: item.unitPrice  || 0,
+          totalSale: parseFloat(((item.unitPrice || 0) * item.quantity).toFixed(2)),
+          createdAt: payload.createdAt || new Date().toISOString(),
+        })
+        enrichedItems.push({ ...item, batchAllocations: [], stockControlUsed: 'simple' })
+        continue
+      }
+
+      // Producto normal o con hasVariants=true pero sin variantes registradas aún
       const result = allocateStock({ product, quantity: item.quantity, invoiceNumber, userId: payload.userId })
 
       if (result.error) {
@@ -184,6 +213,27 @@ export const saleService = {
       const freshState = useStore.getState()
       const product    = freshState.products.find(p => p.id === item.productId)
       if (!product) continue
+
+      // Restaurar stock de variante si la venta original fue de una variante registrada
+      const hasRegisteredVariants = item.variantId &&
+        freshState.productVariants.some(v => v.productId === item.productId)
+
+      if (hasRegisteredVariants) {
+        const variant = freshState.productVariants.find(v => v.id === item.variantId)
+        if (!variant) continue
+        const prevStock = variant.stock ?? 0
+        const newStock  = prevStock + item.quantity
+        freshState.updateVariant(item.variantId, { stock: newStock })
+        freshState.addStockMovement({
+          id: crypto.randomUUID(), productId: item.productId, productName: product.name,
+          variantId: item.variantId,
+          type: 'entrada', quantity: item.quantity,
+          previousStock: prevStock, newStock,
+          reason: `Cancelación ${sale.invoiceNumber}`, userId,
+          createdAt: new Date().toISOString(),
+        })
+        continue
+      }
 
       const prevStock = product.stock
       let stockUpdate

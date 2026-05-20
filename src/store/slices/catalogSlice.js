@@ -57,8 +57,32 @@ export const createCatalogSlice = (set, get) => ({
     set((s) => ({ productVariants: [variant, ...s.productVariants] })),
 
   updateVariant: (id, updates) =>
+    set((s) => {
+      const updatedVariants = s.productVariants.map((v) => (v.id === id ? { ...v, ...updates } : v))
+
+      if (!('stock' in updates)) return { productVariants: updatedVariants }
+
+      // Sincronizar stock del producto padre = suma de stocks de todas sus variantes
+      const variant = s.productVariants.find((v) => v.id === id)
+      if (!variant) return { productVariants: updatedVariants }
+
+      const totalStock = updatedVariants
+        .filter((v) => v.productId === variant.productId)
+        .reduce((sum, v) => sum + (v.stock ?? 0), 0)
+
+      return {
+        productVariants: updatedVariants,
+        products: s.products.map((p) =>
+          p.id === variant.productId
+            ? { ...p, stock: totalStock, updatedAt: new Date().toISOString() }
+            : p
+        ),
+      }
+    }),
+
+  deleteVariant: (id) =>
     set((s) => ({
-      productVariants: s.productVariants.map((v) => (v.id === id ? { ...v, ...updates } : v)),
+      productVariants: s.productVariants.filter((v) => v.id !== id),
     })),
 
   // ─── Movimientos de stock ──────────────────────────────────────────────────

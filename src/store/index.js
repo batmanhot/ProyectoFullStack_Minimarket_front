@@ -30,7 +30,7 @@
 
 import { create }                      from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
-import { getInitialDemoState }          from '../data/seedData'
+import { getInitialDemoState, SEED_VARIANTS } from '../data/seedData'
 import { isCampaignActive }             from '../shared/utils/discountEngine'
 import { APP_CONFIG }                   from '../config/app'
 
@@ -132,7 +132,7 @@ export const useStore = create(
             // ── Maestros: siempre inyectar seed para garantizar consistencia
             //    con los productId/clientId referenciados en las ventas demo.
             products:          seed.products,
-            productVariants:   [],
+            productVariants:   SEED_VARIANTS,
             categories:        seed.categories,
             brands:            seed.brands,
             clients:           seed.clients,

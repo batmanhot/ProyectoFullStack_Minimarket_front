@@ -18,12 +18,19 @@ export const createSalesSlice = (set, get) => ({
    * Agrega un producto al carrito.
    * Si el mismo producto (o variante) ya existe, acumula la cantidad.
    * La clave (_key) distingue: mismo producto con distinta variante = líneas separadas.
+   *
+   * IMPORTANTE: la _key siempre usa variantId cuando se proporciona, garantizando
+   * que dos variantes distintas del mismo producto sean líneas independientes.
    */
   addToCart: (product, quantity = 1, variantId = null) => {
-    const key      = variantId ? `${product.id}_${variantId}` : product.id
+    // _key es la identidad única de la línea en el carrito:
+    //   - Con variante : "productId_variantId"  → líneas separadas por variante
+    //   - Sin variante : "productId"             → una sola línea por producto
+    const key      = variantId ? `${product.id}_${variantId}` : `${product.id}`
     const existing = get().cart.find((i) => i._key === key)
 
     if (existing) {
+      // Acumula cantidad en la línea existente
       set((s) => ({
         cart: s.cart.map((i) =>
           i._key === key
@@ -36,6 +43,7 @@ export const createSalesSlice = (set, get) => ({
         ),
       }))
     } else {
+      // Nueva línea en el carrito
       set((s) => ({
         cart: [
           ...s.cart,
@@ -45,7 +53,7 @@ export const createSalesSlice = (set, get) => ({
             productId:   product.id,
             variantId:   variantId || null,
             productName: product.name,
-            barcode:     product.barcode,
+            barcode:     product.barcode || '',
             quantity,
             unitPrice:   product.priceSell,
             discount:    0,
@@ -60,11 +68,13 @@ export const createSalesSlice = (set, get) => ({
   /**
    * Actualiza campos de una línea del carrito (discount, quantity, etc.).
    * Recalcula el subtotal automáticamente: (quantity × unitPrice) - discount.
+   * Busca SOLO por _key (nunca por productId) para evitar ambigüedad entre
+   * variantes del mismo producto.
    */
   updateCartItem: (key, updates) =>
     set((s) => ({
       cart: s.cart.map((i) => {
-        if (i._key !== key && i.productId !== key) return i
+        if (i._key !== key) return i   // ← busca SOLO por _key
         const updated = { ...i, ...updates }
         updated.subtotal = formatNumber(
           (updated.quantity * updated.unitPrice) - (updated.discount || 0)
@@ -73,9 +83,10 @@ export const createSalesSlice = (set, get) => ({
       }),
     })),
 
+  // Elimina una línea del carrito buscando SOLO por _key
   removeFromCart: (key) =>
     set((s) => ({
-      cart: s.cart.filter((i) => i._key !== key && i.productId !== key),
+      cart: s.cart.filter((i) => i._key !== key),
     })),
 
   clearCart: () => set({ cart: [] }),
