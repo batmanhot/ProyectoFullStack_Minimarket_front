@@ -145,13 +145,14 @@ function generateRichSales() {
     return 12
   }
 
+  // Contadores independientes por tipo de comprobante
+  const counters = { T001: 1, B001: 1, F001: 1 }
+
   // Generar entre 15 y 35 ventas por día
-  let invoiceNum = 1200
   for (let daysAgo = 30; daysAgo >= 0; daysAgo--) {
     const salesPerDay = 15 + Math.floor(Math.random() * 20)
 
     for (let s = 0; s < salesPerDay; s++) {
-      invoiceNum++
       const date = new Date()
       date.setDate(date.getDate() - daysAgo)
       date.setHours(pickHour(), Math.floor(Math.random()*60), Math.floor(Math.random()*60))
@@ -172,7 +173,7 @@ function generateRichSales() {
         usedProds.add(prod.id)
 
         const qty = 1 + Math.floor(Math.random() * 5)
-        const hasCampaignDisc = Math.random() < 0.2 // 20% de ítems con descuento campaña
+        const hasCampaignDisc = Math.random() < 0.2
         const campaignDiscount = hasCampaignDisc ? parseFloat((prod.price * qty * 0.05).toFixed(2)) : 0
         const manualDiscount   = Math.random() < 0.05 ? parseFloat((prod.price * 0.10).toFixed(2)) : 0
         const totalDiscount    = campaignDiscount + manualDiscount
@@ -183,7 +184,7 @@ function generateRichSales() {
           id:             crypto.randomUUID(),
           productId:      prod.id,
           productName:    prod.name,
-          barcode:        `775000000${invoiceNum}`,
+          barcode:        prod.id,
           unit:           prod.unit,
           quantity:       qty,
           unitPrice:      prod.price,
@@ -199,18 +200,28 @@ function generateRichSales() {
         })
       }
 
-      const subtotalBruto  = parseFloat(items.reduce((a,i) => a+i.subtotal, 0).toFixed(2))
+      const subtotalBruto   = parseFloat(items.reduce((a,i) => a+i.subtotal, 0).toFixed(2))
       const totalDescuentos = parseFloat(items.reduce((a,i) => a+i.totalDiscount, 0).toFixed(2))
       const total           = parseFloat((subtotalBruto - totalDescuentos).toFixed(2))
       const igv             = parseFloat((total / 1.18 * 0.18).toFixed(2))
       const base            = parseFloat((total - igv).toFixed(2))
 
       const client = clientId ? SEED_CLIENTS.find(c => c.id === clientId) : null
-      const tipoComprobante = client?.documentType === 'RUC' ? 'factura' : 'boleta'
+
+      // Determinar tipo y prefijo según el cliente
+      let tipoComprobante, prefix
+      if (!client) {
+        tipoComprobante = 'ticket'; prefix = 'T001'
+      } else if (client.documentType === 'RUC') {
+        tipoComprobante = 'factura'; prefix = 'F001'
+      } else {
+        tipoComprobante = 'boleta'; prefix = 'B001'
+      }
+      const invoiceNum = counters[prefix]++
 
       sales.push({
         id:             crypto.randomUUID(),
-        invoiceNumber:  formatInvoice(invoiceNum),
+        invoiceNumber:  formatInvoice(invoiceNum, prefix),
         clientId,
         userId,
         userName:       userId === 'usr-001' ? 'Administrador General' : 'María Cajera',
@@ -226,7 +237,7 @@ function generateRichSales() {
         change:         0,
         status:         'completada',
         tipoComprobante,
-        sunatStatus:    'aceptado',
+        sunatStatus:    tipoComprobante === 'ticket' ? 'no_aplica' : 'aceptado',
         note:           '',
         createdAt:      date.toISOString(),
       })
@@ -240,6 +251,13 @@ export const SEED_SALES = generateRichSales()
 
 // ─── ESTADO INICIAL ───────────────────────────────────────────────────────────
 export function getInitialDemoState() {
+  // Calcular el máximo correlativo alcanzado por cada prefijo en las ventas demo
+  const byPrefix = SEED_SALES.reduce((acc, s) => {
+    const [pfx, numStr] = (s.invoiceNumber || '').split('-')
+    if (pfx && numStr) acc[pfx] = Math.max(acc[pfx] || 0, parseInt(numStr, 10) || 0)
+    return acc
+  }, {})
+
   return {
     suppliers:         [...SEED_SUPPLIERS],
     categories:        [...SEED_CATEGORIES],
@@ -257,7 +275,14 @@ export function getInitialDemoState() {
     businessConfig: {
       name: 'Mi Negocio', ruc: '', address: '', phone: '', email: '', logoUrl: '', sector: 'bodega', igvRate: 0.18,
     },
-    nextInvoice: Math.max(...SEED_SALES.map(s => parseInt(s.invoiceNumber.split('-')[1] || '0'))) + 1,
+    // Cada tipo de comprobante arranca en el número siguiente al último emitido en el demo
+    invoiceCounters: {
+      T001:  (byPrefix['T001']  || 0) + 1,
+      B001:  (byPrefix['B001']  || 0) + 1,
+      F001:  (byPrefix['F001']  || 0) + 1,
+      NC001: (byPrefix['NC001'] || 0) + 1,
+    },
+    nextInvoice: Math.max(0, ...Object.values(byPrefix)) + 1,
   }
 }
 

@@ -178,7 +178,6 @@ export const createCatalogSlice = (set, get) => ({
     const n = counters[prefix] != null ? counters[prefix] : (get().nextInvoice || 1)
     set(s => ({
       invoiceCounters: { ...(s.invoiceCounters || {}), [prefix]: n + 1 },
-      nextInvoice: n + 1,
     }))
     return formatInvoice(n, prefix)
   },
