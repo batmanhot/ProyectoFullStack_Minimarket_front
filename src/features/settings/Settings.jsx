@@ -12,12 +12,12 @@ const Section = ({ title, children }) => (
 )
 
 const Field = ({ label, sub, children }) => (
-  <div className="flex items-start justify-between gap-4">
-    <div className="flex-1 min-w-0">
+  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-4">
+    <div className="sm:flex-1 min-w-0">
       <p className="text-sm font-medium text-gray-700 dark:text-slate-200">{label}</p>
       {sub && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{sub}</p>}
     </div>
-    <div className="flex-shrink-0">{children}</div>
+    <div className="w-full sm:w-auto sm:flex-shrink-0">{children}</div>
   </div>
 )
 
@@ -638,24 +638,24 @@ export default function Settings() {
         <Section title="🏪 Datos del negocio">
           <Field label="Nombre del negocio" sub="Aparece en tickets y reportes">
             <input value={biz.name||''} onChange={e => setBiz({...biz, name: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-48 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
           <Field label="RUC" sub="Número de contribuyente">
             <input value={biz.ruc||''} onChange={e => setBiz({...biz, ruc: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-40 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
           <Field label="Dirección" sub="Dirección del local">
             <input value={biz.address||''} onChange={e => setBiz({...biz, address: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-56 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-56 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
           <Field label="Teléfono" sub="Número de contacto">
             <input value={biz.phone||''} onChange={e => setBiz({...biz, phone: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-40 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
           <Field label="Correo del negocio" sub="Se usará para notificaciones y alertas del sistema">
             <input value={biz.email||''} onChange={e => setBiz({...biz, email: e.target.value})}
               type="email" placeholder="contacto@minegocio.com"
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
 
           {/* ── FIX LOGO: preview + guardar inmediato ──────────────────────── */}
@@ -663,7 +663,7 @@ export default function Settings() {
             <Field label="Logo del negocio" sub="URL de imagen para tickets, reportes y encabezados">
               <input value={biz.logoUrl||''} onChange={e => { setBiz({...biz, logoUrl: e.target.value}); setLogoError(false) }}
                 placeholder="https://..."
-                className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 dark:bg-slate-700 dark:text-slate-100"/>
+                className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64 dark:bg-slate-700 dark:text-slate-100"/>
             </Field>
             {biz.logoUrl && !logoError && (
               <div className="mt-3 flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl">
@@ -750,11 +750,11 @@ export default function Settings() {
           </Field>
           <Field label="Prefijo de boleta" sub="Prefijo para el número de comprobante (ej: B001)">
             <input value={sys.invoicePrefix||'B001'} onChange={e => setSys({...sys, invoicePrefix: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-24 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-24 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
           <Field label="Moneda" sub="Símbolo de moneda en pantalla">
             <input value={sys.currencySymbol||'S/'} onChange={e => setSys({...sys, currencySymbol: e.target.value})}
-              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-20 dark:bg-slate-700 dark:text-slate-100"/>
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-20 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
           <Field label="Descuentos habilitados" sub="Permite aplicar descuentos en el POS">
             <Toggle value={sys.allowDiscounts !== false} onChange={v => setSys({...sys, allowDiscounts: v})}/>
@@ -807,7 +807,7 @@ export default function Settings() {
             </Field>
             <Field label="Pie del ticket" sub="Texto que aparece al final de cada boleta">
               <input value={sys.ticketFooter||''} onChange={e => setSys({...sys, ticketFooter: e.target.value})}
-                className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 dark:bg-slate-700 dark:text-slate-100"
+                className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64 dark:bg-slate-700 dark:text-slate-100"
                 placeholder="¡Gracias por su compra!"/>
             </Field>
           </Section>
@@ -874,11 +874,11 @@ export default function Settings() {
               </p>
 
               {/* 2 cards en una fila — cada uno con 2 columnas internas (sección izq | sección der) */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                 {/* ── CARD 1: Principal (col izq) | Operaciones (col der) ── */}
                 <div className="bg-white dark:bg-slate-800 rounded-lg border border-blue-100 dark:border-blue-900/50 overflow-hidden">
-                  <div className="grid grid-cols-2 divide-x divide-blue-100 dark:divide-blue-900/40">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y divide-blue-100 dark:divide-blue-900/40 sm:divide-y-0 sm:divide-x">
 
                     {/* columna izquierda — Principal */}
                     <div>
@@ -928,7 +928,7 @@ export default function Settings() {
 
                 {/* ── CARD 2: Comercial (col izq) | Sistema (col der) ── */}
                 <div className="bg-white dark:bg-slate-800 rounded-lg border border-blue-100 dark:border-blue-900/50 overflow-hidden">
-                  <div className="grid grid-cols-2 divide-x divide-blue-100 dark:divide-blue-900/40">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y divide-blue-100 dark:divide-blue-900/40 sm:divide-y-0 sm:divide-x">
 
                     {/* columna izquierda — Comercial */}
                     <div>
