@@ -524,7 +524,7 @@ function ProductForm({ product, onClose }) {
   return (
     <>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
           {/* Nombre */}
           <div className="col-span-2">
@@ -1191,18 +1191,18 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
   return (
     <div className="space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3">
-          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Valor en almacén</p>
-          <p className="text-lg font-medium text-gray-800 dark:text-slate-100">{formatCurrency(inventoryValue)}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-2 sm:p-3">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mb-1 leading-tight">Valor en almacén</p>
+          <p className="text-xs sm:text-lg font-semibold sm:font-medium text-gray-800 dark:text-slate-100 truncate">{formatCurrency(inventoryValue)}</p>
         </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3">
-          <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Potencial de venta</p>
-          <p className="text-lg font-medium text-blue-700 dark:text-blue-300">{formatCurrency(saleValue)}</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-2 sm:p-3">
+          <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 leading-tight">Potencial de venta</p>
+          <p className="text-xs sm:text-lg font-semibold sm:font-medium text-blue-700 dark:text-blue-300 truncate">{formatCurrency(saleValue)}</p>
         </div>
-        <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-3">
-          <p className="text-xs text-teal-600 dark:text-teal-400 mb-1">Margen potencial</p>
-          <p className="text-lg font-medium text-teal-700 dark:text-teal-300">{formatCurrency(saleValue - inventoryValue)}</p>
+        <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-2 sm:p-3">
+          <p className="text-xs text-teal-600 dark:text-teal-400 mb-1 leading-tight">Margen potencial</p>
+          <p className="text-xs sm:text-lg font-semibold sm:font-medium text-teal-700 dark:text-teal-300 truncate">{formatCurrency(saleValue - inventoryValue)}</p>
         </div>
       </div>
 
@@ -1261,7 +1261,8 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
           action={{ label: 'Nuevo producto', onClick: handleNewProduct }}/>
       ) : (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
                 {['Producto','Código','Categoría','Proveedor','P. Compra','P. Venta','Margen','Stock','Acciones'].map(h => (
@@ -1336,6 +1337,7 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
               })}
             </tbody>
           </table>
+          </div>
           <div className="px-4 py-2 border-t border-gray-50 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50">
             <p className="text-xs text-gray-400 dark:text-slate-500">{filtered.length} producto{filtered.length !== 1 ? 's' : ''} mostrados</p>
           </div>
