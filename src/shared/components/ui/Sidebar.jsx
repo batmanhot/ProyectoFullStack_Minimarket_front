@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore, selectLowStockProducts, selectNearExpiryProducts, selectUnreadNotifications } from '../../../store/index'
-import { ROLES, SECTORS, canAccess } from '../../../config/app'
+import { ROLES, canAccess } from '../../../config/app'
 import { canUsePlan, PLANS } from '../../../config/plans'
 import { useTenantSafe } from '../../../context/TenantContext'
 import { getStoredAlertThresholds } from '../../../services/tenantService'
@@ -66,15 +66,29 @@ const THEME_OPTIONS = [
 ]
 
 export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle, onThemeSet }) {
-  const { currentUser, activeCashSession, resetDemo, logout, businessConfig } = useStore()
+  const { currentUser, activeCashSession, logout, businessConfig } = useStore()
   const lowStockCount   = useStore(s => selectLowStockProducts(s).length)
   const nearExpiryCount = useStore(s => selectNearExpiryProducts(s).length)
   const unreadCount     = useStore(selectUnreadNotifications)
 
-  const [showReset, setShowReset]       = useState(false)
-  const [selectedSector, setSelectedSector] = useState('')
-  const [collapsed, setCollapsed]       = useState(false)
+  const [collapsed, setCollapsed]       = useState(() => window.innerWidth < 768)
+  const [isMobile, setIsMobile]         = useState(() => window.innerWidth < 768)
   const [showThemePicker, setShowThemePicker] = useState(false)
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (mobile) setCollapsed(true)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const handleNavigate = (key) => {
+    onNavigate(key)
+    if (isMobile) setCollapsed(true)
+  }
 
   const role       = ROLES[currentUser?.role]
   const tenantCtx  = useTenantSafe()
@@ -87,14 +101,6 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
 
   // Devuelve true si el módulo está incluido en el plan activo
   const isPlanAllowed = (key) => canUsePlan(plan, key)
-
-  const handleResetConfirm = () => {
-    resetDemo(selectedSector || undefined)
-    const sectorLabel = SECTORS.find(s => s.value===selectedSector)?.label || 'Bodega'
-    toast.success(`Demo reseteado — ${sectorLabel}`, { duration: 3000, icon: '🔄' })
-    onNavigate('dashboard')
-    setShowReset(false); setSelectedSector('')
-  }
 
   const getBadge = (key) => {
     if (key==='inventory') {
@@ -114,11 +120,11 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
         <button onClick={() => setCollapsed(false)} className="p-4 text-gray-400 hover:text-gray-600 border-b border-gray-100 dark:border-gray-800">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <nav className="flex-1 py-2 overflow-y-auto">
+        <nav className="flex-1 py-2 overflow-y-auto sidebar-nav-scroll">
           {allItems.map(item => {
             const badge = getBadge(item.key)
             return (
-              <button key={item.key} onClick={() => onNavigate(item.key)} title={item.label}
+              <button key={item.key} onClick={() => handleNavigate(item.key)} title={item.label}
                 className={`w-full flex items-center justify-center py-2.5 relative ${currentPage===item.key?'text-blue-600':'text-gray-400 hover:text-gray-600'}`}>
                 <span className="text-lg leading-none">{item.icon}</span>
                 {badge && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500"/>}
@@ -142,8 +148,8 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
     )
   }
 
-  return (
-    <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col h-screen sticky top-0">
+  const asideContent = (
+    <aside className={`w-56 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col h-screen ${isMobile ? 'fixed left-0 top-0 z-50' : 'sticky top-0'}`}>
 
       {/* Logo */}
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -179,7 +185,7 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
       )}
 
       {/* Nav agrupado */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-2 sidebar-nav-scroll" style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}>
         {NAV_GROUPS.map(group => {
           // Ítems que el rol permite (visibles) — los bloqueados por plan se muestran con candado
           const visible = group.items.filter(i => canAccess(currentUser?.role, i.key))
@@ -196,7 +202,7 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
                 if (!planOk) return null
 
                 return (
-                  <button key={item.key} onClick={() => onNavigate(item.key)}
+                  <button key={item.key} onClick={() => handleNavigate(item.key)}
                     style={{ width: 'calc(100% - 8px)', marginLeft: '4px' }}
                     className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200'}`}>
                     <div className="flex items-center gap-2.5">
@@ -256,32 +262,24 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
       })()}
 
       {/* Acciones */}
-      <div className="px-2 py-2 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
-        <button onClick={() => setShowReset(true)} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium">
-          <span>🔄</span> Resetear demo
-        </button>
+      <div className="px-2 py-2 border-t border-gray-100 dark:border-gray-800">
         <button onClick={() => { logout(); toast('Sesión cerrada', { icon: '👋' }) }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800">
           <span>🚪</span> Cerrar sesión
         </button>
       </div>
-
-      {/* Modal reset */}
-      {showReset && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-100">Resetear demo</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Selecciona el rubro para cargar datos de ejemplo del sector:</p>
-            <select value={selectedSector} onChange={e => setSelectedSector(e.target.value)} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100">
-              <option value="">Bodega / Abarrotes (por defecto)</option>
-              {SECTORS.map(s => <option key={s.value} value={s.value}>{s.icon} {s.label}</option>)}
-            </select>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowReset(false); setSelectedSector('') }} className="flex-1 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800">Cancelar</button>
-              <button onClick={handleResetConfirm} className="flex-1 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600">Resetear</button>
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   )
+
+  if (isMobile) {
+    return (
+      <>
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setCollapsed(true)}
+        />
+        {asideContent}
+      </>
+    )
+  }
+  return asideContent
 }

@@ -79,13 +79,6 @@ export const useStore = create(
         ...createSessionTrackingSlice(set, get),
         ...createLocationSlice(set, get),
 
-        // ─── Demo reset ──────────────────────────────────────────────────────
-        resetDemo: (sector) => {
-          const initial = getInitialDemoState()
-          if (sector) initial.businessConfig.sector = sector
-          set({ ...initial, currentUser: get().currentUser })
-        },
-
         // ─── Limpiar todos los datos transaccionales (solo modo demo) ─────────
         // Borra toda la data operativa registrada por el usuario dejando el
         // sistema en blanco para que el cliente pueda ingresar su propia data.

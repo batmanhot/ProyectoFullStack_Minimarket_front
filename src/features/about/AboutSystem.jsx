@@ -2,6 +2,7 @@ import { useTenantSafe } from '../../context/TenantContext'
 import { useStore }       from '../../store/index'
 import { PLANS, PLAN_ORDER } from '../../config/plans'
 import { ROLES }          from '../../config/app'
+import { useTheme }       from '../../shared/hooks/useTheme'
 
 // ── Datos descriptivos del sistema ────────────────────────────────────────────
 const BENEFITS = [
@@ -16,35 +17,47 @@ const BENEFITS = [
 ]
 
 const PLAN_COLORS = {
-  trial:      { bg: '#f8fafc', border: '#e2e8f0', header: '#64748b', badge: null },
-  basic:      { bg: '#eff6ff', border: '#bfdbfe', header: '#1d4ed8', badge: null },
-  pro:        { bg: '#f5f3ff', border: '#ddd6fe', header: '#6d28d9', badge: 'Más popular' },
-  enterprise: { bg: '#fdf4ff', border: '#e9d5ff', header: '#7e22ce', badge: null },
+  trial:      { bg: '#f8fafc', bgDark: 'rgba(100,116,139,0.12)', border: '#e2e8f0', header: '#64748b', headerDark: '#94a3b8', badge: null },
+  basic:      { bg: '#eff6ff', bgDark: 'rgba(59,130,246,0.13)',  border: '#bfdbfe', header: '#1d4ed8', headerDark: '#60a5fa', badge: null },
+  pro:        { bg: '#f5f3ff', bgDark: 'rgba(109,40,217,0.18)',  border: '#ddd6fe', header: '#6d28d9', headerDark: '#a78bfa', badge: 'Más popular' },
+  enterprise: { bg: '#fdf4ff', bgDark: 'rgba(126,34,206,0.18)',  border: '#e9d5ff', header: '#7e22ce', headerDark: '#c084fc', badge: null },
 }
 
 const PLAN_ICONS = { trial: '🆓', basic: '⭐', pro: '🚀', enterprise: '🏢' }
 
 const ROLE_INFO = [
   {
-    role: 'admin', icon: '🛡️', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe',
+    role: 'admin', icon: '🛡️',
+    color: '#2563eb', colorDark: '#60a5fa',
+    bg: '#eff6ff',  bgDark: 'rgba(37,99,235,0.15)',
+    border: '#bfdbfe', borderDark: 'rgba(59,130,246,0.28)',
     title: 'Administrador',
     desc: 'Acceso total al sistema. Configura el negocio, gestiona usuarios, revisa auditoría y controla todas las operaciones.',
     caps: ['Todos los módulos', 'Gestión de usuarios', 'Configuración del sistema', 'Auditoría completa'],
   },
   {
-    role: 'gerente', icon: '👔', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe',
+    role: 'gerente', icon: '👔',
+    color: '#7c3aed', colorDark: '#a78bfa',
+    bg: '#f5f3ff',  bgDark: 'rgba(124,58,237,0.15)',
+    border: '#ddd6fe', borderDark: 'rgba(139,92,246,0.28)',
     title: 'Gerente',
     desc: 'Visión gerencial del negocio. Accede a reportes, compras, proveedores y descuentos sin poder modificar configuración ni usuarios.',
     caps: ['Dashboard y reportes', 'Catálogo e inventario', 'Compras y proveedores', 'Descuentos y fidelidad'],
   },
   {
-    role: 'supervisor', icon: '👁️', color: '#d97706', bg: '#fffbeb', border: '#fde68a',
+    role: 'supervisor', icon: '👁️',
+    color: '#d97706', colorDark: '#fbbf24',
+    bg: '#fffbeb',  bgDark: 'rgba(217,119,6,0.15)',
+    border: '#fde68a', borderDark: 'rgba(251,191,36,0.28)',
     title: 'Supervisor',
     desc: 'Control operativo del día a día. Supervisa caja, stock, descuentos y devoluciones sin acceso a compras ni configuración.',
     caps: ['POS y caja', 'Catálogo e inventario', 'Clientes y descuentos', 'Devoluciones'],
   },
   {
-    role: 'cajero', icon: '🖥️', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0',
+    role: 'cajero', icon: '🖥️',
+    color: '#16a34a', colorDark: '#4ade80',
+    bg: '#f0fdf4',  bgDark: 'rgba(22,163,74,0.15)',
+    border: '#bbf7d0', borderDark: 'rgba(34,197,94,0.28)',
     title: 'Cajero',
     desc: 'Enfocado en la venta. Accede solo a lo necesario: POS, caja, devoluciones y cotizaciones.',
     caps: ['Punto de Venta', 'Apertura y cierre de caja', 'Devoluciones', 'Cotizaciones'],
@@ -83,10 +96,15 @@ const MODULE_GROUPS = [
 export default function AboutSystem() {
   const tenantCtx   = useTenantSafe()
   const { currentUser } = useStore()
+  const { theme }   = useTheme()
+  const isDark      = theme !== 'light'
   const plan        = tenantCtx?.plan ?? 'trial'
   const planCfg     = PLANS[plan]
   const userRole    = currentUser?.role ?? 'cajero'
   const availRoles  = planCfg?.availableRoles ?? ['admin']
+
+  const colBg = (pc, isActive) => isActive ? (isDark ? pc.bgDark : pc.bg) : 'transparent'
+  const colHeader = (pc) => isDark ? pc.headerDark : pc.header
 
   const planHas = (planId, key) => {
     const f = PLANS[planId]?.features
@@ -154,10 +172,14 @@ export default function AboutSystem() {
             const isCurrent = userRole === r.role
             return (
               <div key={r.role}
-                style={{ background: available ? r.bg : '#f8fafc', borderColor: available ? r.border : '#e2e8f0', opacity: available ? 1 : 0.55 }}
+                style={{
+                  background:   available ? (isDark ? r.bgDark   : r.bg)     : (isDark ? 'rgba(100,116,139,0.08)' : '#f8fafc'),
+                  borderColor:  available ? (isDark ? r.borderDark : r.border) : (isDark ? 'rgba(100,116,139,0.25)' : '#e2e8f0'),
+                  opacity: available ? 1 : 0.55,
+                }}
                 className="border rounded-xl p-4 transition-all">
                 <div className="flex items-center gap-3 mb-3">
-                  <div style={{ background: available ? r.color : '#94a3b8' }}
+                  <div style={{ background: available ? (isDark ? r.colorDark : r.color) : (isDark ? '#475569' : '#94a3b8') }}
                     className="w-9 h-9 rounded-lg flex items-center justify-center text-lg text-white flex-shrink-0">
                     {r.icon}
                   </div>
@@ -165,10 +187,10 @@ export default function AboutSystem() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-gray-800 dark:text-slate-100">{r.title}</span>
                       {isCurrent && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">Tu perfil</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold">Tu perfil</span>
                       )}
                       {!available && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-semibold">Plan superior</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-400 font-semibold">Plan superior</span>
                       )}
                     </div>
                   </div>
@@ -176,8 +198,12 @@ export default function AboutSystem() {
                 <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-3">{r.desc}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {r.caps.map(c => (
-                    <span key={c} style={{ borderColor: available ? r.border : '#e2e8f0', color: available ? r.color : '#94a3b8' }}
-                      className="text-xs px-2 py-0.5 rounded-full border font-medium bg-white dark:bg-slate-800">
+                    <span key={c}
+                      style={{
+                        borderColor: available ? (isDark ? r.borderDark  : r.border) : (isDark ? 'rgba(100,116,139,0.25)' : '#e2e8f0'),
+                        color:       available ? (isDark ? r.colorDark   : r.color)  : (isDark ? '#64748b' : '#94a3b8'),
+                      }}
+                      className="text-xs px-2 py-0.5 rounded-full border font-medium bg-white/10 dark:bg-slate-800/60">
                       {c}
                     </span>
                   ))}
@@ -205,12 +231,12 @@ export default function AboutSystem() {
                   const isActive = planId === plan
                   return (
                     <th key={planId} className="px-3 py-3 text-center"
-                      style={{ background: isActive ? pc.bg : 'transparent', minWidth: '100px' }}>
+                      style={{ background: colBg(pc, isActive), minWidth: '100px' }}>
                       <div className="flex flex-col items-center gap-1">
                         <span className="text-base">{PLAN_ICONS[planId]}</span>
-                        <span className="font-bold" style={{ color: pc.header }}>{pcfg.label}</span>
+                        <span className="font-bold" style={{ color: colHeader(pc) }}>{pcfg.label}</span>
                         {pc.badge && (
-                          <span className="text-white text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: pc.header }}>
+                          <span className="text-white text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: colHeader(pc) }}>
                             {pc.badge}
                           </span>
                         )}
@@ -251,8 +277,8 @@ export default function AboutSystem() {
                     }
                     return (
                       <td key={planId} className="px-3 py-2.5 text-center"
-                        style={{ background: isActive ? pc.bg : 'transparent' }}>
-                        <span className="text-gray-600 dark:text-slate-400">{value}</span>
+                        style={{ background: colBg(pc, isActive) }}>
+                        <span className="text-gray-600 dark:text-slate-300">{value}</span>
                       </td>
                     )
                   })}
@@ -274,10 +300,10 @@ export default function AboutSystem() {
                         const isActive = planId === plan
                         return (
                           <td key={planId} className="px-3 py-2.5 text-center"
-                            style={{ background: isActive ? pc.bg : 'transparent' }}>
+                            style={{ background: colBg(pc, isActive) }}>
                             {has
                               ? <span className="text-green-500 font-bold text-base">✓</span>
-                              : <span className="text-gray-200 dark:text-slate-700 text-base">—</span>
+                              : <span className="text-gray-300 dark:text-slate-600 text-base">—</span>
                             }
                           </td>
                         )
