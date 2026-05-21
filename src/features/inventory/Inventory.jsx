@@ -43,7 +43,7 @@ function StockAdjustForm({ product, currentUser, onClose }) {
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-2">Tipo de movimiento</label>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {tipos.map(t => (
             <label key={t.value} className="cursor-pointer">
               <input type="radio" {...register('type')} value={t.value} className="sr-only"/>
@@ -374,10 +374,10 @@ export default function Inventory() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3"><p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Valor en almacén (costo)</p><p className="text-lg font-medium text-gray-800 dark:text-slate-100">{formatCurrency(inventoryKPIs.valorCosto)}</p></div>
-        <div className="bg-blue-50 rounded-xl p-3"><p className="text-xs text-blue-600 mb-1">Potencial de venta</p><p className="text-lg font-medium text-blue-700">{formatCurrency(inventoryKPIs.valorVenta)}</p></div>
-        <div className="bg-teal-50 rounded-xl p-3"><p className="text-xs text-teal-600 mb-1">Margen potencial</p><p className="text-lg font-medium text-teal-700">{formatCurrency(inventoryKPIs.valorVenta - inventoryKPIs.valorCosto)}</p></div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-2 sm:p-3"><p className="text-xs text-gray-500 dark:text-slate-400 mb-1 leading-tight">Valor en almacén (costo)</p><p className="text-xs sm:text-lg font-semibold sm:font-medium text-gray-800 dark:text-slate-100 truncate">{formatCurrency(inventoryKPIs.valorCosto)}</p></div>
+        <div className="bg-blue-50 rounded-xl p-2 sm:p-3"><p className="text-xs text-blue-600 mb-1 leading-tight">Potencial de venta</p><p className="text-xs sm:text-lg font-semibold sm:font-medium text-blue-700 truncate">{formatCurrency(inventoryKPIs.valorVenta)}</p></div>
+        <div className="bg-teal-50 rounded-xl p-2 sm:p-3"><p className="text-xs text-teal-600 mb-1 leading-tight">Margen potencial</p><p className="text-xs sm:text-lg font-semibold sm:font-medium text-teal-700 truncate">{formatCurrency(inventoryKPIs.valorVenta - inventoryKPIs.valorCosto)}</p></div>
       </div>
 
       {/* Tabs — FIX: etiqueta correcta "Movimientos" sin "Kardex" */}
@@ -407,7 +407,8 @@ export default function Inventory() {
             <EmptyState icon="📦" title="Sin productos" message="Ajusta los filtros o ve al Catálogo para crear productos."/>
           ) : (
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
-              <table className="w-full">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
                     {['Producto','Código','Categoría','P.Compra','P.Venta','Margen','Stock','Vence','Acciones'].map(h => (
@@ -460,6 +461,7 @@ export default function Inventory() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </>
@@ -468,7 +470,8 @@ export default function Inventory() {
       {/* Tab movimientos generales */}
       {tab === 'movements' && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[580px]">
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
                 {['Fecha','Producto','Tipo','Cantidad','Stock ant.','Stock nuevo','Motivo'].map(h => (
@@ -494,6 +497,7 @@ export default function Inventory() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
