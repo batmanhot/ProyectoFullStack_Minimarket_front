@@ -221,10 +221,10 @@ function RenewModal({ tenant, onClose, onDone }) {
 }
 
 // ─── Modal de Acceso (crear / editar) ────────────────────────────────────────
-function AccessFormModal({ access, tenantOptions, onClose, onDone }) {
+function AccessFormModal({ access, tenantOptions, onClose, onDone, prefillTenantId }) {
   const isEdit = !!access
 
-  const [tenantId,        setTenantId]        = useState(access?.tenantId ?? '')
+  const [tenantId,        setTenantId]        = useState(access?.tenantId ?? prefillTenantId ?? '')
   const [plan,            setPlan]            = useState(access?.plan ?? 'trial')
   const [cycle,           setCycle]           = useState(access?.billingCycle ?? 'monthly')
   const [accessStartDate, setAccessStartDate] = useState(isoToInput(access?.accessStartDate ?? new Date().toISOString()))
@@ -261,7 +261,7 @@ function AccessFormModal({ access, tenantOptions, onClose, onDone }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
         <FieldRow label="Negocio *">
-          <select value={tenantId} onChange={e => setTenantId(e.target.value)} disabled={isEdit} style={inputStyle}>
+          <select value={tenantId} onChange={e => setTenantId(e.target.value)} disabled={isEdit || !!prefillTenantId} style={inputStyle}>
             <option value="">— Selecciona un negocio —</option>
             {tenantOptions.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </select>
@@ -322,209 +322,289 @@ function AccessFormModal({ access, tenantOptions, onClose, onDone }) {
   )
 }
 
-// ─── Tab: Negocios ────────────────────────────────────────────────────────────
+// ─── Tab: Negocios (fusionado con Gestión de Accesos) ────────────────────────
 function TenantsTab({ onRefreshStats }) {
-  const [tenants, setTenants]   = useState([])
-  const [search, setSearch]     = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [renewTarget, setRenewTarget] = useState(null)
+  const [tenants,       setTenants]       = useState([])
+  const [search,        setSearch]        = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [renewTarget,   setRenewTarget]   = useState(null)
+  const [expandedId,    setExpandedId]    = useState(null)   // tenantId con accesos visibles
+  const [accessCache,   setAccessCache]   = useState({})     // { [tenantId]: access[] }
+  const [accessLoading, setAccessLoading] = useState({})     // { [tenantId]: bool }
+  const [formTarget,    setFormTarget]    = useState(null)   // null | access obj (editar)
+  const [newForTenant,  setNewForTenant]  = useState(null)   // tenant para "nuevo acceso"
+  const [deleteMeta,    setDeleteMeta]    = useState(null)   // { id, tenantId }
+  const [tenantOpts,    setTenantOpts]    = useState([])
 
   const load = useCallback(async () => {
     setLoading(true)
-    const r = await tenantService.listAll({ search })
-    if (r.data) setTenants(r.data)
+    const [r1, r2] = await Promise.all([
+      tenantService.listAll({ search }),
+      tenantService.getTenantOptions(),
+    ])
+    if (r1.data) {
+      // Orden alfabético por nombre de negocio
+      setTenants([...r1.data].sort((a, b) =>
+        a.businessName.localeCompare(b.businessName, 'es', { sensitivity: 'base' })
+      ))
+    }
+    if (r2.data) setTenantOpts(r2.data)
     setLoading(false)
   }, [search])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [load])
+
+  const loadAccesses = async (tenantId) => {
+    setAccessLoading(p => ({ ...p, [tenantId]: true }))
+    const r = await tenantService.listAccesses({ tenantId })
+    setAccessCache(p => ({ ...p, [tenantId]: r.data ?? [] }))
+    setAccessLoading(p => ({ ...p, [tenantId]: false }))
+  }
+
+  const toggleExpand = async (tenantId) => {
+    if (expandedId === tenantId) { setExpandedId(null); return }
+    setExpandedId(tenantId)
+    if (!accessCache[tenantId]) await loadAccesses(tenantId)
+  }
 
   const toggleActive = async (t) => {
     await tenantService.setActive(t.id, !t.isActive)
     load(); onRefreshStats()
   }
 
+  const confirmDelete = async () => {
+    await tenantService.deleteAccess(deleteMeta.id)
+    await loadAccesses(deleteMeta.tenantId)
+    setDeleteMeta(null)
+  }
+
   const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
   const tdStyle = { padding: '12px 14px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' }
+  const aTh    = { padding: '8px 12px', textAlign: 'left', fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f8fafc' }
+  const aTd    = { padding: '9px 12px', fontSize: '12px', color: '#475569', borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }
 
   return (
     <>
+      {/* Modal renovar */}
       {renewTarget && (
-        <RenewModal tenant={renewTarget} onClose={() => setRenewTarget(null)} onDone={() => { setRenewTarget(null); load(); onRefreshStats() }} />
+        <RenewModal
+          tenant={renewTarget}
+          onClose={() => setRenewTarget(null)}
+          onDone={() => {
+            setRenewTarget(null)
+            load(); onRefreshStats()
+            if (expandedId === renewTarget.id) loadAccesses(renewTarget.id)
+          }}
+        />
       )}
 
+      {/* Modal editar acceso existente */}
+      {formTarget && (
+        <AccessFormModal
+          access={formTarget}
+          tenantOptions={tenantOpts}
+          onClose={() => setFormTarget(null)}
+          onDone={() => { loadAccesses(formTarget.tenantId); setFormTarget(null) }}
+        />
+      )}
+
+      {/* Modal nuevo acceso para un tenant específico */}
+      {newForTenant && (
+        <AccessFormModal
+          access={null}
+          prefillTenantId={newForTenant.id}
+          tenantOptions={tenantOpts}
+          onClose={() => setNewForTenant(null)}
+          onDone={() => { loadAccesses(newForTenant.id); setNewForTenant(null) }}
+        />
+      )}
+
+      {/* Modal confirmar eliminación */}
+      {deleteMeta && (
+        <Modal title="Confirmar eliminación" onClose={() => setDeleteMeta(null)} width={380}>
+          <p style={{ fontSize: '14px', color: '#475569', marginBottom: '20px' }}>
+            ¿Seguro que deseas eliminar este registro de acceso? Esta acción no se puede deshacer.
+          </p>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button onClick={() => setDeleteMeta(null)}
+              style={{ padding: '9px 18px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+            <button onClick={confirmDelete}
+              style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              Eliminar
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Cabecera */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Negocios registrados</h2>
+        <div>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: '0 0 2px' }}>Negocios registrados</h2>
+          <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>Ordenados alfabéticamente · Expande cada fila para ver y gestionar sus períodos de acceso</p>
+        </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar negocio o slug..."
             style={{ ...inputStyle, width: '220px' }} />
-          <button onClick={load} disabled={loading} style={{ padding: '8px 12px', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }}>
+          <button onClick={load} disabled={loading}
+            style={{ padding: '8px 12px', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }}>
             <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
       </div>
 
+      {/* Tabla principal */}
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '920px' }}>
           <thead>
             <tr style={{ background: '#f8fafc' }}>
-              {['Negocio / Propietario', 'Rubro', 'Plan', 'Inicio acceso', 'Vence', 'Estado', 'Acciones'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
+              {['', 'Negocio / Propietario', 'Rubro', 'Plan', 'Inicio acceso', 'Vence', 'Estado', 'Acciones'].map(h => (
+                <th key={h} style={{ ...thStyle, ...(h === '' ? { width: '32px', padding: '10px 8px' } : {}) }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {!loading && tenants.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay negocios registrados</td></tr>
-            )}
-            {tenants.map(t => (
-              <tr key={t.id} style={{ background: '#fff' }}>
-                <td style={tdStyle}>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{t.businessName}</div>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' }}>{t.slug}</div>
-                  {t.ownerName && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{t.ownerName} · {t.ownerEmail}</div>}
-                </td>
-                <td style={tdStyle}>
-                  <span style={{ fontSize: '12px', color: '#475569' }}>{SECTOR_LABEL(t.sector)}</span>
-                </td>
-                <td style={tdStyle}><PlanBadge plan={t.plan} /></td>
-                <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{fmtDate(t.accessStartDate)}</td>
-                <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{fmtDate(t.accessExpiresAt)}</td>
-                <td style={tdStyle}><StatusBadge accessExpiresAt={t.accessExpiresAt} isActive={t.isActive} /></td>
-                <td style={tdStyle}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button onClick={() => window.open(`/app/${t.slug}`, '_blank')}
-                      style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
-                      Ver
-                    </button>
-                    <button onClick={() => setRenewTarget(t)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#eff6ff', color: '#2563eb', fontSize: '11px', cursor: 'pointer', fontWeight: 700 }}>
-                      <RotateCcw size={11} /> Renovar
-                    </button>
-                    <button onClick={() => toggleActive(t)}
-                      style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: t.isActive ? '#fef2f2' : '#f0fdf4', color: t.isActive ? '#dc2626' : '#16a34a', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
-                      {t.isActive ? 'Suspender' : 'Activar'}
-                    </button>
-                  </div>
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>
+                  No hay negocios registrados
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )
-}
-
-// ─── Tab: Gestión de Accesos (CRUD) ──────────────────────────────────────────
-function AccessTab() {
-  const [accesses, setAccesses]   = useState([])
-  const [tenantOpts, setTOpts]    = useState([])
-  const [search, setSearch]       = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [formTarget, setForm]     = useState(null)   // null | 'new' | access object
-  const [deleteId, setDeleteId]   = useState(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const [r1, r2] = await Promise.all([
-      tenantService.listAccesses({ search }),
-      tenantService.getTenantOptions(),
-    ])
-    if (r1.data) setAccesses(r1.data)
-    if (r2.data) setTOpts(r2.data)
-    setLoading(false)
-  }, [search])
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { load() }, [load])
-
-  const confirmDelete = async () => {
-    await tenantService.deleteAccess(deleteId)
-    setDeleteId(null); load()
-  }
-
-  const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0' }
-  const tdStyle = { padding: '11px 14px', borderBottom: '1px solid #f1f5f9', fontSize: '13px', color: '#374151', verticalAlign: 'middle' }
-
-  return (
-    <>
-      {formTarget !== null && (
-        <AccessFormModal
-          access={formTarget === 'new' ? null : formTarget}
-          tenantOptions={tenantOpts}
-          onClose={() => setForm(null)}
-          onDone={() => { setForm(null); load() }}
-        />
-      )}
-      {deleteId && (
-        <Modal title="Confirmar eliminación" onClose={() => setDeleteId(null)} width={380}>
-          <p style={{ fontSize: '14px', color: '#475569', marginBottom: '20px' }}>¿Seguro que deseas eliminar este registro de acceso? Esta acción no se puede deshacer.</p>
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button onClick={() => setDeleteId(null)} style={{ padding: '9px 18px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
-            <button onClick={confirmDelete} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Eliminar</button>
-          </div>
-        </Modal>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Gestión de accesos</h2>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar negocio..."
-            style={{ ...inputStyle, width: '200px' }} />
-          <button onClick={load} style={{ padding: '8px 12px', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }}>
-            <RefreshCw size={14} />
-          </button>
-          <button onClick={() => setForm('new')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '7px', border: 'none', background: '#2563eb', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-            <Plus size={14} /> Nuevo acceso
-          </button>
-        </div>
-      </div>
-
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-          <thead>
-            <tr style={{ background: '#f8fafc' }}>
-              {['Negocio', 'Plan', 'Inicio', 'Vencimiento', 'Bonus', 'Estado', 'Notas', 'Acciones'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {!loading && accesses.length === 0 && (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', fontSize: '13px' }}>No hay registros de acceso</td></tr>
             )}
-            {accesses.map(a => {
-              const status = getAccessStatus(a.accessExpiresAt, true)
-              const scfg   = ACCESS_STATUS_CONFIG[status]
+
+            {tenants.map(t => {
+              const isExpanded = expandedId === t.id
+              const accesses   = accessCache[t.id] ?? []
+              const aLoading   = accessLoading[t.id]
+
               return (
-                <tr key={a.id}>
-                  <td style={tdStyle}>
-                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{a.businessName}</div>
-                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: 'monospace' }}>{a.tenantSlug}</div>
-                  </td>
-                  <td style={tdStyle}><PlanBadge plan={a.plan} /></td>
-                  <td style={{ ...tdStyle, color: '#64748b' }}>{fmtDate(a.accessStartDate)}</td>
-                  <td style={{ ...tdStyle, color: '#64748b' }}>{fmtDate(a.accessExpiresAt)}</td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', fontSize: '11px', fontWeight: 700, color: '#475569' }}>+{a.bonusDays}d</span>
-                  </td>
-                  <td style={tdStyle}>
-                    <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: scfg.bg, color: scfg.color }}>{scfg.label}</span>
-                  </td>
-                  <td style={{ ...tdStyle, maxWidth: '160px', color: '#94a3b8', fontSize: '12px' }}>{a.notes || '—'}</td>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => setForm(a)} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }} title="Editar">
-                        <Edit2 size={13} color="#374151" />
+                <>
+                  {/* ── Fila principal del negocio ── */}
+                  <tr key={t.id} style={{ background: isExpanded ? '#f0f9ff' : '#fff', transition: 'background .15s' }}>
+                    {/* Toggle expand */}
+                    <td style={{ ...tdStyle, padding: '12px 8px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => toggleExpand(t.id)}
+                        title={isExpanded ? 'Ocultar accesos' : 'Ver accesos'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '2px', display: 'flex', alignItems: 'center' }}
+                      >
+                        <ChevronRight size={16} style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform .2s', color: isExpanded ? '#2563eb' : '#94a3b8' }} />
                       </button>
-                      <button onClick={() => setDeleteId(a.id)} style={{ padding: '5px 9px', borderRadius: '6px', border: 'none', background: '#fef2f2', cursor: 'pointer' }} title="Eliminar">
-                        <Trash2 size={13} color="#dc2626" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{t.businessName}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' }}>{t.slug}</div>
+                      {t.ownerName && (
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                          {t.ownerName} · {t.ownerEmail}
+                        </div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ fontSize: '12px', color: '#475569' }}>{SECTOR_LABEL(t.sector)}</span>
+                    </td>
+                    <td style={tdStyle}><PlanBadge plan={t.plan} /></td>
+                    <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{fmtDate(t.accessStartDate)}</td>
+                    <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{fmtDate(t.accessExpiresAt)}</td>
+                    <td style={tdStyle}>
+                      <StatusBadge accessExpiresAt={t.accessExpiresAt} isActive={t.isActive} />
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button onClick={() => window.open(`/app/${t.slug}`, '_blank')}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                          Ver
+                        </button>
+                        <button onClick={() => setRenewTarget(t)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#eff6ff', color: '#2563eb', fontSize: '11px', cursor: 'pointer', fontWeight: 700 }}>
+                          <RotateCcw size={11} /> Renovar
+                        </button>
+                        <button onClick={() => toggleActive(t)}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: t.isActive ? '#fef2f2' : '#f0fdf4', color: t.isActive ? '#dc2626' : '#16a34a', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                          {t.isActive ? 'Suspender' : 'Activar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* ── Panel de accesos expandible ── */}
+                  {isExpanded && (
+                    <tr key={`${t.id}-accesses`}>
+                      <td colSpan={8} style={{ padding: 0, background: '#f0f9ff', borderBottom: '2px solid #bfdbfe' }}>
+                        <div style={{ padding: '12px 20px 16px 40px' }}>
+
+                          {/* Cabecera del panel */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#2563eb' }}>
+                              Períodos de acceso — {t.businessName}
+                            </span>
+                            <button
+                              onClick={() => setNewForTenant(t)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#2563eb', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                              <Plus size={12} /> Nuevo acceso
+                            </button>
+                          </div>
+
+                          {/* Tabla de accesos */}
+                          {aLoading ? (
+                            <div style={{ padding: '16px', textAlign: 'center', fontSize: '12px', color: '#94a3b8' }}>Cargando...</div>
+                          ) : accesses.length === 0 ? (
+                            <div style={{ padding: '14px 0', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                              Sin registros de acceso — usa "Renovar" o "Nuevo acceso" para agregar uno.
+                            </div>
+                          ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #bfdbfe' }}>
+                              <thead>
+                                <tr>
+                                  {['Plan', 'Ciclo', 'Inicio', 'Vencimiento', 'Bonus', 'Estado', 'Notas', ''].map(h => (
+                                    <th key={h} style={aTh}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {accesses.map(a => {
+                                  const st   = getAccessStatus(a.accessExpiresAt, true)
+                                  const scfg = ACCESS_STATUS_CONFIG[st]
+                                  return (
+                                    <tr key={a.id}>
+                                      <td style={aTd}><PlanBadge plan={a.plan} /></td>
+                                      <td style={{ ...aTd, fontFamily: 'monospace', fontSize: '11px' }}>{a.billingCycle ?? '—'}</td>
+                                      <td style={aTd}>{fmtDate(a.accessStartDate)}</td>
+                                      <td style={aTd}>{fmtDate(a.accessExpiresAt)}</td>
+                                      <td style={{ ...aTd, textAlign: 'center' }}>
+                                        <span style={{ padding: '2px 7px', borderRadius: '10px', background: '#f1f5f9', fontSize: '10px', fontWeight: 700, color: '#475569' }}>+{a.bonusDays}d</span>
+                                      </td>
+                                      <td style={aTd}>
+                                        <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: 700, background: scfg.bg, color: scfg.color }}>
+                                          {scfg.label}
+                                        </span>
+                                      </td>
+                                      <td style={{ ...aTd, maxWidth: '160px', color: '#94a3b8' }}>{a.notes || '—'}</td>
+                                      <td style={{ ...aTd, textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'flex-end' }}>
+                                          <button onClick={() => setFormTarget(a)}
+                                            style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }} title="Editar">
+                                            <Edit2 size={12} color="#374151" />
+                                          </button>
+                                          <button onClick={() => setDeleteMeta({ id: a.id, tenantId: t.id })}
+                                            style={{ padding: '4px 8px', borderRadius: '5px', border: 'none', background: '#fef2f2', cursor: 'pointer' }} title="Eliminar">
+                                            <Trash2 size={12} color="#dc2626" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               )
             })}
           </tbody>
@@ -1126,6 +1206,174 @@ function SiteTab() {
   )
 }
 
+// ─── Tab: Sesiones de usuarios (monitoreo) ───────────────────────────────────
+function SessionsTab() {
+  const [sessions,      setSessions]      = useState([])
+  const [tenants,       setTenants]       = useState([])
+  const [filterTenant,  setFilterTenant]  = useState('')
+  const [filterRole,    setFilterRole]    = useState('')
+  const [filterDate,    setFilterDate]    = useState('')
+  const [loading,       setLoading]       = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const r = await tenantService.listAll()
+    if (!r.data) { setLoading(false); return }
+
+    const allTenants = r.data
+    setTenants(allTenants)
+
+    // Agrega sessionHistory y activeSessions de cada store Zustand en localStorage
+    const aggregated = []
+    for (const t of allTenants) {
+      try {
+        const raw = localStorage.getItem(`mm_store_v5_${t.slug}`)
+        if (!raw) continue
+        const parsed = JSON.parse(raw)
+        const history = parsed?.state?.sessionHistory ?? []
+        const active  = parsed?.state?.activeSessions  ?? []
+
+        for (const s of active) {
+          aggregated.push({ ...s, tenantSlug: t.slug, businessName: t.businessName, status: 'active', logoutTime: null, durationFormatted: 'En línea' })
+        }
+        for (const s of history) {
+          aggregated.push({ ...s, tenantSlug: t.slug, businessName: t.businessName, status: 'ended' })
+        }
+      } catch { /* store corrupto o vacío — se omite */ }
+    }
+
+    aggregated.sort((a, b) => new Date(b.loginTime) - new Date(a.loginTime))
+    setSessions(aggregated)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() /* eslint-disable-line react-hooks/set-state-in-effect */ }, [load])
+
+  const today    = new Date().toISOString().slice(0, 10)
+  const filtered = sessions.filter(s => {
+    if (filterTenant && s.tenantSlug !== filterTenant)       return false
+    if (filterRole   && s.role       !== filterRole)         return false
+    if (filterDate   && !s.loginTime?.startsWith(filterDate)) return false
+    return true
+  })
+
+  const activeCount = sessions.filter(s => s.status === 'active').length
+  const todayCount  = sessions.filter(s => s.loginTime?.startsWith(today)).length
+  const uniqueUsers = [...new Set(sessions.map(s => s.username))].length
+
+  const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }
+  const tdStyle = { padding: '12px 14px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' }
+
+  const ROLE_STYLE = {
+    admin:      { bg: '#eff6ff', color: '#2563eb' },
+    gerente:    { bg: '#f3e8ff', color: '#7c3aed' },
+    supervisor: { bg: '#fef3c7', color: '#d97706' },
+    cajero:     { bg: '#f0fdf4', color: '#16a34a' },
+  }
+
+  return (
+    <>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: '12px', marginBottom: '20px' }}>
+        {[
+          { label: 'En línea ahora',    value: activeCount,     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+          { label: 'Accesos hoy',       value: todayCount,      color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+          { label: 'Usuarios únicos',   value: uniqueUsers,     color: '#7c3aed', bg: '#f3e8ff', border: '#ddd6fe' },
+          { label: 'Registros totales', value: sessions.length, color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
+        ].map(({ label, value, color, bg, border }) => (
+          <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: '10px', padding: '14px 16px' }}>
+            <div style={{ fontSize: '24px', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros + título */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0, flex: 1 }}>
+          Historial de accesos
+          {filtered.length !== sessions.length && (
+            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 400, marginLeft: '8px' }}>
+              {filtered.length} de {sessions.length}
+            </span>
+          )}
+        </h2>
+        <select value={filterTenant} onChange={e => setFilterTenant(e.target.value)} style={{ ...inputStyle, width: '180px' }}>
+          <option value="">Todos los negocios</option>
+          {tenants.map(t => <option key={t.slug} value={t.slug}>{t.businessName}</option>)}
+        </select>
+        <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...inputStyle, width: '140px' }}>
+          <option value="">Todos los roles</option>
+          {['admin','gerente','supervisor','cajero'].map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} style={{ ...inputStyle, width: '150px' }} />
+        <button onClick={load} disabled={loading} style={{ padding: '8px 12px', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' }}>
+          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+        </button>
+      </div>
+
+      {/* Aviso explicativo */}
+      <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '11px', color: '#0369a1' }}>
+        Los registros provienen del historial de sesiones de cada negocio almacenado en este navegador.
+        Los accesos desde otros dispositivos o navegadores no aparecen aquí hasta integrar el backend.
+      </div>
+
+      {/* Tabla */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '820px' }}>
+          <thead>
+            <tr style={{ background: '#f8fafc' }}>
+              {['Negocio', 'Usuario', 'Rol', 'Ingreso', 'Salida', 'Duración', 'Estado'].map(h => (
+                <th key={h} style={thStyle}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8', fontSize: '13px' }}>
+                  {sessions.length === 0
+                    ? 'Sin registros — los accesos se registran cuando los usuarios ingresan a la app'
+                    : 'No hay registros que coincidan con los filtros seleccionados'}
+                </td>
+              </tr>
+            )}
+            {filtered.map((s, i) => {
+              const rs = ROLE_STYLE[s.role] ?? { bg: '#f1f5f9', color: '#475569' }
+              return (
+                <tr key={`${s.id ?? i}`} style={{ background: s.status === 'active' ? '#f0fdf4' : '#fff' }}>
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#0f172a' }}>{s.businessName}</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: 'monospace' }}>{s.tenantSlug}</div>
+                  </td>
+                  <td style={tdStyle}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>{s.fullName || s.username}</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', fontFamily: 'monospace' }}>{s.username}</div>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: rs.bg, color: rs.color }}>
+                      {s.role}
+                    </span>
+                  </td>
+                  <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{fmtTime(s.loginTime)}</td>
+                  <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{s.logoutTime ? fmtTime(s.logoutTime) : '—'}</td>
+                  <td style={{ ...tdStyle, fontSize: '12px', color: '#475569' }}>{s.durationFormatted ?? '—'}</td>
+                  <td style={tdStyle}>
+                    {s.status === 'active'
+                      ? <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#16a34a' }}>● En línea</span>
+                      : <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#f8fafc', color: '#94a3b8' }}>Finalizada</span>
+                    }
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
 // ─── LoginForm ────────────────────────────────────────────────────────────────
 function LoginForm({ onLogin }) {
   const [pass, setPass]   = useState('')
@@ -1158,13 +1406,13 @@ function LoginForm({ onLogin }) {
 
 // ─── SuperAdmin principal ─────────────────────────────────────────────────────
 const TABS = [
-  { id: 'tenants', label: 'Negocios',            icon: Users        },
-  { id: 'access',  label: 'Gestión de Accesos',  icon: Package      },
-  { id: 'history', label: 'Historial',           icon: History      },
-  { id: 'prices',  label: 'Precios',             icon: DollarSign   },
-  { id: 'limits',  label: 'Límites de plan',     icon: Sliders      },
-  { id: 'alerts',  label: 'Alertas',             icon: Bell         },
-  { id: 'site',    label: 'Sitio web',           icon: Globe        },
+  { id: 'tenants',  label: 'Negocios',            icon: Users        },
+  { id: 'sessions', label: 'Accesos de usuarios', icon: Clock        },
+  { id: 'history',  label: 'Historial',           icon: History      },
+  { id: 'prices',   label: 'Precios',             icon: DollarSign   },
+  { id: 'limits',   label: 'Límites de plan',     icon: Sliders      },
+  { id: 'alerts',   label: 'Alertas',             icon: Bell         },
+  { id: 'site',     label: 'Sitio web',           icon: Globe        },
 ]
 
 export default function SuperAdmin() {
@@ -1248,13 +1496,13 @@ export default function SuperAdmin() {
             ))}
           </div>
           <div style={{ padding: '20px' }}>
-            {tab === 'tenants' && <TenantsTab onRefreshStats={loadStats} />}
-            {tab === 'access'  && <AccessTab />}
-            {tab === 'history' && <HistoryTab />}
-            {tab === 'prices'  && <PricesTab />}
-            {tab === 'limits'  && <LimitsTab />}
-            {tab === 'alerts'  && <AlertsTab />}
-            {tab === 'site'    && <SiteTab />}
+            {tab === 'tenants'  && <TenantsTab onRefreshStats={loadStats} />}
+            {tab === 'sessions' && <SessionsTab />}
+            {tab === 'history'  && <HistoryTab />}
+            {tab === 'prices'   && <PricesTab />}
+            {tab === 'limits'   && <LimitsTab />}
+            {tab === 'alerts'   && <AlertsTab />}
+            {tab === 'site'     && <SiteTab />}
           </div>
         </div>
 

@@ -42,7 +42,7 @@ function buildA4HTML(nc, businessConfig) {
       <td style="padding:8px;border-bottom:1px solid #e5e7eb">${item.productName}</td>
       <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${item.quantity} ${item.unit||'u'}</td>
       <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">S/ ${Number(item.netUnitPrice||item.unitPrice).toFixed(2)}</td>
-      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#7c3aed">S/ ${Number(item.totalRefund).toFixed(2)}</td>
+      <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#1d4ed8">S/ ${Number(item.totalRefund).toFixed(2)}</td>
     </tr>`).join('')
 
   const createdDate = new Date(nc.createdAt).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})
@@ -62,14 +62,14 @@ function buildA4HTML(nc, businessConfig) {
   .biz-sub  { font-size:10px; color:#6b7280; margin-top:2px; }
 
   /* Caja del documento */
-  .doc-box { border:2px solid #7c3aed; border-radius:6px; padding:12px 16px; text-align:center; min-width:160px; }
-  .doc-type { font-size:11px; font-weight:700; color:#7c3aed; text-transform:uppercase; letter-spacing:.05em; }
+  .doc-box { border:2px solid #1d4ed8; border-radius:6px; padding:12px 16px; text-align:center; min-width:160px; }
+  .doc-type { font-size:11px; font-weight:700; color:#1d4ed8; text-transform:uppercase; letter-spacing:.05em; }
   .doc-name { font-size:14px; font-weight:800; color:#111; margin:3px 0; }
-  .doc-num  { font-size:16px; font-weight:900; color:#7c3aed; font-family:'Courier New',monospace; }
+  .doc-num  { font-size:16px; font-weight:900; color:#1d4ed8; font-family:'Courier New',monospace; }
 
   /* Separador */
   .divider { border:none; border-top:1px solid #e5e7eb; margin:14px 0; }
-  .divider-bold { border-top:2px solid #7c3aed; margin:14px 0; }
+  .divider-bold { border-top:2px solid #1d4ed8; margin:14px 0; }
 
   /* Grid de datos */
   .meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
@@ -79,21 +79,22 @@ function buildA4HTML(nc, businessConfig) {
   .meta-sub { font-size:10px; color:#6b7280; margin-top:1px; }
 
   /* Motivo */
-  .reason-box { background:#fdf4ff; border:1px solid #e9d5ff; border-radius:6px; padding:10px 14px; margin-bottom:14px; }
-  .reason-label { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:#7c3aed; font-weight:700; margin-bottom:3px; }
+  .reason-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px 14px; margin-bottom:14px; }
+  .reason-label { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:#1d4ed8; font-weight:700; margin-bottom:3px; }
 
   /* Tabla */
   table { width:100%; border-collapse:collapse; margin-bottom:14px; }
-  thead tr { background:#7c3aed; color:#fff; }
+  thead tr { background:#dbeafe; color:#1d4ed8; }
   thead th { padding:8px; font-size:10px; font-weight:700; text-align:left; }
   thead th:not(:first-child) { text-align:right; }
   thead th:nth-child(2) { text-align:center; }
-  tbody tr:nth-child(even) { background:#fdf4ff; }
+  tbody tr:nth-child(even) { background:#eff6ff; }
 
   /* Totales */
-  .totals { width:240px; margin-left:auto; margin-bottom:14px; }
-  .total-row { display:flex; justify-content:space-between; padding:4px 0; font-size:11px; }
-  .total-final { background:#7c3aed; color:#fff; border-radius:6px; padding:10px 14px; display:flex; justify-content:space-between; font-size:14px; font-weight:800; margin-top:4px; }
+  .totals { width:100%; margin-bottom:14px; }
+  .subtotals { display:flex; flex-direction:column; align-items:flex-end; margin-bottom:4px; }
+  .total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:11px; min-width:210px; }
+  .total-final { background:#dbeafe; color:#1d4ed8; border-radius:6px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; font-size:14px; font-weight:800; margin-top:4px; border:1px solid #bfdbfe; white-space:nowrap; }
 
   /* Firma */
   .signature { display:flex; justify-content:space-between; margin-top:30px; }
@@ -106,7 +107,7 @@ function buildA4HTML(nc, businessConfig) {
   /* Acciones (solo pantalla) */
   .actions-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
   .btn { padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-size:12px; font-weight:700; }
-  .btn-print { background:#7c3aed; color:#fff; }
+  .btn-print { background:#1d4ed8; color:#fff; }
   .btn-pdf   { background:#dc2626; color:#fff; }
   .btn-wa    { background:#16a34a; color:#fff; }
 
@@ -159,8 +160,8 @@ function buildA4HTML(nc, businessConfig) {
     </div>
     <div class="meta-box">
       <span class="meta-label">Documento de referencia</span>
-      <div class="meta-val">${nc.invoiceNumber}</div>
-      <div class="meta-sub">Boleta / Comprobante original</div>
+      <div class="meta-val">${nc._refInvoice || nc.invoiceNumber}</div>
+      <div class="meta-sub">Comprobante original</div>
     </div>
     <div class="meta-box">
       <span class="meta-label">Atendido por</span>
@@ -192,13 +193,15 @@ function buildA4HTML(nc, businessConfig) {
 
   <!-- TOTALES -->
   <div class="totals">
-    <div class="total-row">
-      <span style="color:#6b7280">Op. Gravada:</span>
-      <span>S/ ${Number(baseImponible).toFixed(2)}</span>
-    </div>
-    <div class="total-row">
-      <span style="color:#6b7280">I.G.V. (${Math.round(igvRate*100)}%):</span>
-      <span>S/ ${Number(igv).toFixed(2)}</span>
+    <div class="subtotals">
+      <div class="total-row">
+        <span style="color:#6b7280">Op. Gravada:</span>
+        <span>S/ ${Number(baseImponible).toFixed(2)}</span>
+      </div>
+      <div class="total-row">
+        <span style="color:#6b7280">I.G.V. (${Math.round(igvRate*100)}%):</span>
+        <span>S/ ${Number(igv).toFixed(2)}</span>
+      </div>
     </div>
     <div class="total-final">
       <span>TOTAL A REEMBOLSAR</span>
@@ -227,7 +230,7 @@ function buildA4HTML(nc, businessConfig) {
 </div>
 
 <script>
-var NC = ${JSON.stringify({ ncNumber: nc.ncNumber, invoiceNumber: nc.invoiceNumber, clientName: nc.clientName, totalRefund: nc.totalRefund, items: nc.items, reasonNote: nc.reasonNote })};
+var NC = ${JSON.stringify({ ncNumber: nc.ncNumber, refInvoice: nc._refInvoice || nc.invoiceNumber, clientName: nc.clientName, totalRefund: nc.totalRefund, items: nc.items, reasonNote: nc.reasonNote })};
 var BIZ = ${JSON.stringify({ name: biz.name, ruc: biz.ruc })};
 var REASON = "${reasonLabel.replace(/"/g, '\\"')}";
 
@@ -238,7 +241,7 @@ function sendWA() {
     '─────────────────',
     '*NOTA DE CRÉDITO ELECTRÓNICA*',
     'N°: ' + NC.ncNumber,
-    'Doc. referencia: ' + NC.invoiceNumber,
+    'Doc. referencia: ' + NC.refInvoice,
     NC.clientName ? 'Cliente: ' + NC.clientName : null,
     '─────────────────',
     'Motivo: ' + REASON,
@@ -284,7 +287,7 @@ function buildTicketHTML(nc, businessConfig) {
   .row{ display:flex; justify-content:space-between; }
   .center{ text-align:center; }
   .bold{ font-weight:bold; }
-  .fab{ position:fixed; bottom:12px; right:12px; background:#7c3aed; color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; }
+  .fab{ position:fixed; bottom:12px; right:12px; background:#1d4ed8; color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; }
   @page{ size:80mm auto; margin:0; }
   @media print{ html,body{ width:80mm; } .fab{display:none} }
 </style></head>
@@ -298,7 +301,7 @@ function buildTicketHTML(nc, businessConfig) {
   <div class="center bold" style="font-size:12px;color:#000">${nc.ncNumber}</div>
   <hr class="hr">
   <div style="color:#000"><strong>Fecha:</strong> ${formatDateTime(nc.createdAt)}</div>
-  <div style="color:#000"><strong>Doc. ref.:</strong> ${nc.invoiceNumber}</div>
+  <div style="color:#000"><strong>Doc. ref.:</strong> ${nc._refInvoice || nc.invoiceNumber}</div>
   ${nc.clientName ? `<div style="color:#000"><strong>Cliente:</strong> ${nc.clientName}</div>` : ''}
   <hr class="hr">
   <div class="bold" style="font-size:9px;color:#000">MOTIVO:</div>
@@ -366,7 +369,7 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
       `─────────────────────`,
       `*NOTA DE CRÉDITO ELECTRÓNICA*`,
       `N°: ${nc.ncNumber}`,
-      `Doc. referencia: ${nc.invoiceNumber}`,
+      `Doc. referencia: ${nc._refInvoice || nc.invoiceNumber}`,
       nc.clientName ? `Cliente: ${nc.clientName}` : null,
       `─────────────────────`,
       `Motivo: ${reasonLabel}`,
@@ -395,10 +398,10 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-purple-500 text-lg">📋</span>
+              <span className="text-blue-600 text-lg">📋</span>
               <h2 className="font-bold text-gray-800 dark:text-slate-100">Nota de Crédito</h2>
             </div>
-            <p className="text-xs text-purple-500 font-mono mt-0.5">{nc.ncNumber} · Ref: {nc.invoiceNumber}</p>
+            <p className="text-xs text-blue-600 font-mono mt-0.5">{nc.ncNumber} · Ref: {nc._refInvoice || nc.invoiceNumber}</p>
           </div>
           <button onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
@@ -436,21 +439,21 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
                 {businessConfig?.address && <div style={{ fontSize:'10px', color:'#555' }}>{businessConfig.address}</div>}
                 {businessConfig?.phone   && <div style={{ fontSize:'10px', color:'#555' }}>Tel: {businessConfig.phone}</div>}
               </div>
-              <div style={{ border:'2px solid #7c3aed', borderRadius:'6px', padding:'8px 12px', textAlign:'center', minWidth:'130px' }}>
-                <div style={{ fontSize:'9px', fontWeight:'700', color:'#7c3aed', textTransform:'uppercase', letterSpacing:'.04em' }}>Nota de Crédito</div>
+              <div style={{ border:'2px solid #1d4ed8', borderRadius:'6px', padding:'8px 12px', textAlign:'center', minWidth:'130px' }}>
+                <div style={{ fontSize:'9px', fontWeight:'700', color:'#1d4ed8', textTransform:'uppercase', letterSpacing:'.04em' }}>Nota de Crédito</div>
                 <div style={{ fontSize:'10px', fontWeight:'700', color:'#111', margin:'2px 0' }}>ELECTRÓNICA</div>
-                <div style={{ fontSize:'14px', fontWeight:'900', color:'#7c3aed', fontFamily:'monospace' }}>{nc.ncNumber}</div>
+                <div style={{ fontSize:'14px', fontWeight:'900', color:'#1d4ed8', fontFamily:'monospace' }}>{nc.ncNumber}</div>
               </div>
             </div>
 
-            <hr style={{ border:'none', borderTop:'2px solid #7c3aed', margin:'10px 0' }}/>
+            <hr style={{ border:'none', borderTop:'2px solid #1d4ed8', margin:'10px 0' }}/>
 
             {/* Datos del documento */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'12px' }}>
               {[
                 { label:'Cliente / Receptor', val: nc.clientName || 'Consumidor Final' },
                 { label:'Fecha de emisión',   val: new Date(nc.createdAt).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + new Date(nc.createdAt).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) },
-                { label:'Doc. de referencia', val: nc.invoiceNumber, sub:'Comprobante original' },
+                { label:'Doc. de referencia', val: nc._refInvoice || nc.invoiceNumber, sub:'Comprobante original' },
                 { label:'Atendido por',        val: nc.userName || '—' },
               ].map(m => (
                 <div key={m.label} style={{ background:'#f9fafb', border:'1px solid #e5e7eb', borderRadius:'5px', padding:'8px' }}>
@@ -462,8 +465,8 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
             </div>
 
             {/* Motivo */}
-            <div style={{ background:'#fdf4ff', border:'1px solid #e9d5ff', borderRadius:'5px', padding:'8px 10px', marginBottom:'12px' }}>
-              <div style={{ fontSize:'8px', textTransform:'uppercase', letterSpacing:'.06em', color:'#7c3aed', fontWeight:'700', marginBottom:'3px' }}>Motivo de la Nota de Crédito</div>
+            <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'5px', padding:'8px 10px', marginBottom:'12px' }}>
+              <div style={{ fontSize:'8px', textTransform:'uppercase', letterSpacing:'.06em', color:'#1d4ed8', fontWeight:'700', marginBottom:'3px' }}>Motivo de la Nota de Crédito</div>
               <div style={{ fontSize:'12px', fontWeight:'600', color:'#374151' }}>{reasonLabel}</div>
               {nc.reasonNote && <div style={{ fontSize:'10px', color:'#6b7280', marginTop:'2px' }}>{nc.reasonNote}</div>}
             </div>
@@ -471,7 +474,7 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
             {/* Tabla de productos */}
             <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:'12px' }}>
               <thead>
-                <tr style={{ background:'#7c3aed', color:'#fff' }}>
+                <tr style={{ background:'#dbeafe', color:'#1d4ed8' }}>
                   {['DESCRIPCIÓN','CANT.','P. UNIT.','REEMBOLSO'].map((h,i) => (
                     <th key={h} style={{ padding:'6px 8px', fontSize:'9px', fontWeight:'700', textAlign: i===0?'left':i===1?'center':'right' }}>{h}</th>
                   ))}
@@ -479,26 +482,31 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
               </thead>
               <tbody>
                 {nc.items?.map((item, idx) => (
-                  <tr key={idx} style={{ background: idx%2===1 ? '#fdf4ff' : '#fff' }}>
+                  <tr key={idx} style={{ background: idx%2===1 ? '#eff6ff' : '#fff' }}>
                     <td style={{ padding:'6px 8px', fontSize:'10px', color:'#111', borderBottom:'1px solid #e5e7eb' }}>{item.productName}</td>
                     <td style={{ padding:'6px 8px', fontSize:'10px', color:'#111', textAlign:'center', borderBottom:'1px solid #e5e7eb' }}>{item.quantity} {item.unit||'u'}</td>
                     <td style={{ padding:'6px 8px', fontSize:'10px', color:'#111', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>S/ {Number(item.netUnitPrice||item.unitPrice).toFixed(2)}</td>
-                    <td style={{ padding:'6px 8px', fontSize:'10px', fontWeight:'600', color:'#7c3aed', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>S/ {Number(item.totalRefund).toFixed(2)}</td>
+                    <td style={{ padding:'6px 8px', fontSize:'10px', fontWeight:'600', color:'#1d4ed8', textAlign:'right', borderBottom:'1px solid #e5e7eb' }}>S/ {Number(item.totalRefund).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {/* Totales */}
-            <div style={{ marginLeft:'auto', width:'220px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#555', padding:'2px 0' }}>
-                <span>Op. Gravada:</span><span>S/ {Number(baseImponible).toFixed(2)}</span>
+            <div style={{ width:'100%', marginBottom:'12px' }}>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', marginBottom:'4px' }}>
+                {[
+                  { label:'Op. Gravada:', val: `S/ ${Number(baseImponible).toFixed(2)}` },
+                  { label:`I.G.V. (${Math.round(igvRate*100)}%):`, val: `S/ ${Number(igv).toFixed(2)}` },
+                ].map(row => (
+                  <div key={row.label} style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#555', padding:'2px 0', minWidth:'210px' }}>
+                    <span>{row.label}</span><span>{row.val}</span>
+                  </div>
+                ))}
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', color:'#555', padding:'2px 0' }}>
-                <span>I.G.V. ({Math.round(igvRate*100)}%):</span><span>S/ {Number(igv).toFixed(2)}</span>
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', fontWeight:'800', background:'#7c3aed', color:'#fff', padding:'8px 10px', borderRadius:'5px', marginTop:'4px' }}>
-                <span>TOTAL REEMBOLSO</span><span>S/ {Number(nc.totalRefund).toFixed(2)}</span>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'13px', fontWeight:'800', background:'#dbeafe', color:'#1d4ed8', padding:'8px 10px', borderRadius:'5px', border:'1px solid #bfdbfe', whiteSpace:'nowrap' }}>
+                <span>TOTAL REEMBOLSO</span>
+                <span style={{ fontSize:'14px', marginLeft:'16px' }}>S/ {Number(nc.totalRefund).toFixed(2)}</span>
               </div>
             </div>
 
@@ -545,7 +553,7 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
               <span className="text-lg">📱</span><span>WhatsApp</span>
             </button>
             <button onClick={handlePrintA4}
-              className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-semibold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-100 border border-purple-200 dark:border-purple-800 transition-all">
+              className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 border border-blue-200 dark:border-blue-800 transition-all">
               <span className="text-lg">📄</span>
               <span>PDF A4</span>
               <span className="text-[10px] font-normal opacity-60">Formal</span>

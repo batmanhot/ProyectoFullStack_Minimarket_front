@@ -205,6 +205,9 @@ function generateRichSales() {
       const igv             = parseFloat((total / 1.18 * 0.18).toFixed(2))
       const base            = parseFloat((total - igv).toFixed(2))
 
+      const client = clientId ? SEED_CLIENTS.find(c => c.id === clientId) : null
+      const tipoComprobante = client?.documentType === 'RUC' ? 'factura' : 'boleta'
+
       sales.push({
         id:             crypto.randomUUID(),
         invoiceNumber:  formatInvoice(invoiceNum),
@@ -222,6 +225,8 @@ function generateRichSales() {
         payments:       [{ method, amount: total, reference: '' }],
         change:         0,
         status:         'completada',
+        tipoComprobante,
+        sunatStatus:    'aceptado',
         note:           '',
         createdAt:      date.toISOString(),
       })
@@ -250,7 +255,7 @@ export function getInitialDemoState() {
     stockMovements:    [],
     purchases:         [],
     businessConfig: {
-      name: 'Mi Negocio', ruc: '', address: '', phone: '', logoUrl: '', sector: 'bodega', igvRate: 0.18,
+      name: 'Mi Negocio', ruc: '', address: '', phone: '', email: '', logoUrl: '', sector: 'bodega', igvRate: 0.18,
     },
     nextInvoice: Math.max(...SEED_SALES.map(s => parseInt(s.invoiceNumber.split('-')[1] || '0'))) + 1,
   }

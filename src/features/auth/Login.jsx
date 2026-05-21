@@ -45,6 +45,9 @@ export default function Login() {
 
   const DEMO_ROLES = ALL_DEMO_ROLES.filter(r => availableRoles.includes(r.role))
 
+  const isDemo     = tenantSlug === 'demo'
+  const isRealTenant = !isDemo
+
   const [loading, setLoading]       = useState(false)
   const [username, setUsername]     = useState('')
   const [password, setPassword]     = useState('')
@@ -52,6 +55,7 @@ export default function Login() {
   const [activeRole, setActiveRole] = useState(null)
   const [tick, setTick]             = useState(0)
   const [hovered, setHovered]       = useState(null)
+  const [showHelp, setShowHelp]     = useState(false)
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => (t + 1) % FEATURES.length), 2800)
@@ -430,6 +434,47 @@ export default function Login() {
 
         .spin { animation: spin .9s linear infinite; }
 
+        /* ── Banner contextual ── */
+        .ctx-banner {
+          border-radius: 11px;
+          padding: 11px 14px;
+          margin-bottom: 13px;
+          font-size: 11px;
+          line-height: 1.6;
+        }
+        .ctx-banner.demo-banner {
+          background: rgba(56,189,248,0.08);
+          border: 1px solid rgba(56,189,248,0.22);
+          color: rgba(56,189,248,0.90);
+        }
+        .ctx-banner.real-banner {
+          background: rgba(99,102,241,0.08);
+          border: 1px solid rgba(99,102,241,0.22);
+          color: rgba(167,139,250,0.90);
+        }
+        .help-toggle {
+          background: none; border: none; cursor: pointer;
+          font-size: 10px; font-weight: 600; letter-spacing: .04em;
+          color: rgba(255,255,255,0.30); text-decoration: underline;
+          text-underline-offset: 3px; padding: 0; margin-top: 4px;
+          display: block; width: 100%; text-align: center;
+          transition: color .15s;
+        }
+        .help-toggle:hover { color: rgba(255,255,255,0.55); }
+        .help-panel {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 10px;
+          padding: 12px 14px;
+          margin-top: 8px;
+          font-size: 11px;
+          color: rgba(255,255,255,0.50);
+          line-height: 1.7;
+          animation: fadeUp .2s ease both;
+        }
+        .help-panel ol { margin: 6px 0 0; padding-left: 16px; }
+        .help-panel li { margin-bottom: 3px; }
+
         /* ── Responsive: tablet/móvil — ocultar panel izquierdo ── */
         @media (max-width: 900px) {
           .login-left { display: none; }
@@ -538,6 +583,28 @@ export default function Login() {
 
             <div className="section-sep"/>
 
+            {/* ── BANNER CONTEXTUAL — demo vs negocio real ─────────────── */}
+            {isDemo ? (
+              <div className="ctx-banner demo-banner">
+                <span style={{ fontWeight: 700, fontSize: '12px', display: 'block', marginBottom: '3px' }}>
+                  🎯 Estás en el Demo gratuito
+                </span>
+                Elige un rol abajo y explora todas las funciones sin registrarte. Los datos son simulados y se reinician periódicamente.
+              </div>
+            ) : (
+              <div className="ctx-banner real-banner">
+                <span style={{ fontWeight: 700, fontSize: '12px', display: 'block', marginBottom: '3px' }}>
+                  🏪 Accede a tu negocio — {businessName || tenantSlug}
+                </span>
+                Ingresa con el usuario y contraseña que configuraste al registrarte.
+                {demoMode && (
+                  <span style={{ display: 'block', marginTop: '4px', color: 'rgba(196,181,253,0.70)' }}>
+                    ¿Explorando? Los botones de acceso rápido también están disponibles abajo.
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* ── ACCESO RÁPIDO — sección demo (solo en modo demo) ─────── */}
             {demoMode && (
               <div className="demo-section">
@@ -590,7 +657,9 @@ export default function Login() {
               {demoMode && (
                 <div className="divider">
                   <div className="divider-line"/>
-                  <span className="divider-text">o ingresa tus credenciales</span>
+                  <span className="divider-text">
+                    {isDemo ? 'o ingresa con credenciales' : 'ingresa tus credenciales'}
+                  </span>
                   <div className="divider-line"/>
                 </div>
               )}
@@ -652,19 +721,53 @@ export default function Login() {
                 </button>
               </form>
 
-              {demoMode && (
+              {/* Hint de credenciales — solo demo */}
+              {demoMode && isDemo && (
                 <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.22)', textAlign:'center', marginTop:'8px', lineHeight:1.5 }}>
                   Demo: <span style={{ color:'rgba(56,189,248,0.60)' }}>admin / admin123 · cajero1 / cajero123</span>
                 </p>
+              )}
+
+              {/* Acordeón de ayuda — solo negocios reales */}
+              {isRealTenant && (
+                <>
+                  <button className="help-toggle" onClick={() => setShowHelp(h => !h)}>
+                    {showHelp ? '▲ Ocultar ayuda' : '¿Cómo ingresar a mi cuenta? ▼'}
+                  </button>
+                  {showHelp && (
+                    <div className="help-panel">
+                      <strong style={{ color: 'rgba(255,255,255,0.65)', display: 'block', marginBottom: '4px' }}>
+                        Pasos para acceder:
+                      </strong>
+                      <ol>
+                        <li>En <strong style={{ color: 'rgba(255,255,255,0.60)' }}>Usuario</strong> escribe <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '4px' }}>admin</code></li>
+                        <li>En <strong style={{ color: 'rgba(255,255,255,0.60)' }}>Contraseña</strong> escribe la que elegiste al registrarte</li>
+                        <li>Haz clic en <strong style={{ color: 'rgba(255,255,255,0.60)' }}>Ingresar al sistema</strong></li>
+                      </ol>
+                      <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.30)', fontSize: '10px' }}>
+                        ¿Olvidaste tu contraseña? Contáctanos para restablecerla.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* ── FOOTER ───────────────────────────────────────────────── */}
             <div className="card-footer">
-              {demoMode
-                ? <p className="footer-note">Aplicación demo para presentaciones comerciales<br/><span style={{ color: 'rgba(56,189,248,0.50)' }}>Datos simulados · Sin conexión a servidor</span></p>
-                : <p className="footer-note">Sistema POS · Ingresa con las credenciales asignadas<br/><span style={{ color: 'rgba(56,189,248,0.50)' }}>Acceso seguro con usuario y contraseña</span></p>
-              }</div>
+              {isDemo
+                ? <p className="footer-note">
+                    Demo gratuito · Explora sin compromisos<br/>
+                    <span style={{ color: 'rgba(56,189,248,0.50)' }}>Datos simulados · Sin conexión a servidor</span>
+                  </p>
+                : <p className="footer-note">
+                    {businessName || tenantSlug} · Acceso seguro<br/>
+                    <span style={{ color: 'rgba(99,102,241,0.60)' }}>
+                      ¿Primera vez? Usuario: <strong>admin</strong> · Contraseña: la que configuraste al registrarte
+                    </span>
+                  </p>
+              }
+            </div>
 
           </div>
         </div>

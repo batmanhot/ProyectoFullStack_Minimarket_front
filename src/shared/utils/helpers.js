@@ -57,7 +57,7 @@ export const daysUntil = (iso) => {
 }
 
 // ─── INVOICE ──────────────────────────────────────────────────────────────────
-export const formatInvoice = (n) => `B001-${String(n).padStart(6, '0')}`
+export const formatInvoice = (n, prefix = 'B001') => `${prefix}-${String(n).padStart(6, '0')}`
 
 // ─── CÁLCULOS POS ─────────────────────────────────────────────────────────────
 export const calcCartTotals = (items) => {

@@ -43,6 +43,7 @@ const LoyaltyConsulta = lazy(() => import('./features/loyalty/LoyaltyConsulta'))
 const Quotations      = lazy(() => import('./features/quotations/Quotations'))
 const Merma           = lazy(() => import('./features/merma/Merma'))
 const Trazabilidad    = lazy(() => import('./features/trazabilidad/Trazabilidad'))
+const Comprobantes    = lazy(() => import('./features/comprobantes/Comprobantes'))
 const CustomerDisplay = lazy(() => import('./features/pos/CustomerDisplay'))
 const AboutSystem     = lazy(() => import('./features/about/AboutSystem'))
 
@@ -55,6 +56,7 @@ const PAGES = {
   discounts: Discounts, tickets: Tickets, returns: Returns,
   settings: Settings, loyalty: LoyaltyConsulta, quotations: Quotations,
   merma: Merma, trazabilidad: Trazabilidad, 'customer-display': CustomerDisplay,
+  comprobantes: Comprobantes,
   about: AboutSystem,
 }
 

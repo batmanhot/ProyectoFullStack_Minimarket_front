@@ -76,54 +76,73 @@ function ProductKardex({ product, movements, onClose, systemConfig }) {
   const refCost = getUnitCost(product, product.priceSell || 0, costMethod)
   const productMovements = movements
     .filter(m => m.productId === product.id)
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) // cronológico para saldo
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
 
-  // Calcular saldo de stock y valor acumulado por movimiento (de más antiguo a más nuevo)
   let saldoStock = 0
   let saldoValor = 0
   const movimientosValorizados = productMovements.map(m => {
     const esEntrada  = m.type === 'entrada'
     const unitCost   = m.unitCost ?? product.priceBuy ?? 0
     const totalValue = m.totalValue ?? parseFloat((unitCost * m.quantity).toFixed(2))
-
     saldoStock += esEntrada ? m.quantity : -m.quantity
     saldoValor += esEntrada ? totalValue : -totalValue
-
     return {
-      ...m,
-      unitCost,
-      totalValue,
+      ...m, unitCost, totalValue,
       saldoStock: parseFloat(saldoStock.toFixed(2)),
       saldoValor: parseFloat(saldoValor.toFixed(2)),
       esEntrada,
     }
-  }).reverse() // mostrar más recientes arriba en la tabla
+  }).reverse()
 
   const totales = productMovements.reduce((acc, m) => {
-    if (m.type === 'entrada') {
-      acc.entradas += m.quantity
-      acc.valorEntradas += m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
-    } else if (m.type === 'salida') {
-      acc.salidas += m.quantity
-      acc.valorSalidas += m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
-    } else if (m.type === 'merma') {
-      acc.merma += m.quantity
-      acc.valorMerma += m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
-    }
+    const v = m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
+    if      (m.type === 'entrada') { acc.entradas += m.quantity; acc.valorEntradas += v }
+    else if (m.type === 'salida')  { acc.salidas  += m.quantity; acc.valorSalidas  += v }
+    else if (m.type === 'merma')   { acc.merma    += m.quantity; acc.valorMerma    += v }
     return acc
   }, { entradas: 0, salidas: 0, merma: 0, valorEntradas: 0, valorSalidas: 0, valorMerma: 0 })
 
   const valorInventario = parseFloat((product.stock * refCost).toFixed(2))
   const hasCost = (m) => m.unitCost != null && m.unitCost > 0
 
+  // Formato de fecha compacto: línea 1 = DD/MM/AA, línea 2 = HH:MM
+  const fmtFechaCorta = (iso) => {
+    const d = new Date(iso)
+    const fecha = d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    const hora  = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+    return { fecha, hora }
+  }
+
+  // Formato de cantidad: sin decimales si es entero
+  const fmtQty = (n) => Number.isInteger(n) ? String(n) : n.toFixed(2)
+
+  const TYPE_STYLE = {
+    entrada: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    salida:  'bg-red-100   text-red-600   dark:bg-red-900/30   dark:text-red-400',
+    merma:   'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+    ajuste:  'bg-blue-100  text-blue-600  dark:bg-blue-900/30  dark:text-blue-400',
+  }
+
+  // Anchos mínimos garantizados por columna (en px)
+  const COL = {
+    fecha:      { minWidth: 88  },
+    tipo:       { minWidth: 72  },
+    cantidad:   { minWidth: 80  },
+    costoUnit:  { minWidth: 96  },
+    valorMov:   { minWidth: 96  },
+    stock:      { minWidth: 100 },
+    saldoValor: { minWidth: 100 },
+    motivo:     { minWidth: 160 },
+  }
+
   return (
     <div className="space-y-4">
 
-      {/* KPIs de stock y valor */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 text-center">
           <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Stock actual</p>
-          <p className="text-xl font-bold text-gray-800 dark:text-slate-100">{product.stock}</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{fmtQty(product.stock)}</p>
           <p className="text-xs text-gray-400 dark:text-slate-500">{product.unit}</p>
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
@@ -133,119 +152,136 @@ function ProductKardex({ product, movements, onClose, systemConfig }) {
         </div>
         <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
           <p className="text-xs text-green-500 mb-1">Entradas valorizadas</p>
-          <p className="text-lg font-bold text-green-700 dark:text-green-400">+{totales.entradas.toFixed(2)}</p>
+          <p className="text-xl font-bold text-green-700 dark:text-green-400">+{fmtQty(totales.entradas)}</p>
           <p className="text-xs text-green-500">{formatCurrency(totales.valorEntradas)}</p>
         </div>
         <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 text-center">
           <p className="text-xs text-red-500 mb-1">Salidas valorizadas</p>
-          <p className="text-lg font-bold text-red-600 dark:text-red-400">-{totales.salidas.toFixed(2)}</p>
+          <p className="text-xl font-bold text-red-600 dark:text-red-400">−{fmtQty(totales.salidas)}</p>
           <p className="text-xs text-red-400">{formatCurrency(totales.valorSalidas)}</p>
         </div>
       </div>
 
-      {/* Aviso de movimientos sin costo histórico */}
+      {/* Aviso sin costo histórico */}
       {movimientosValorizados.some(m => !hasCost(m)) && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-700 dark:text-amber-400">
           <span>⚠️</span>
-          <span>
-            Algunos movimientos anteriores a la Opción B no tienen costo registrado.
-            Se muestra el costo actual del producto como referencia.
-          </span>
+          <span>Algunos movimientos anteriores no tienen costo registrado. Se usa el costo actual como referencia.</span>
         </div>
       )}
 
       {productMovements.length === 0 ? (
         <EmptyState icon="📋" title="Sin movimientos" message="Este producto no tiene movimientos registrados."/>
       ) : (
-        <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
-          <table className="w-full">
+        /* overflow-x-auto → scroll horizontal en pantallas pequeñas */
+        <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden overflow-x-auto">
+          <table className="w-full" style={{ minWidth: '820px' }}>
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-700">
-                {[
-                  { label: 'Fecha',        align: 'left'  },
-                  { label: 'Tipo',         align: 'left'  },
-                  { label: 'Cantidad',     align: 'right' },
-                  { label: 'Costo unit.',  align: 'right' },
-                  { label: 'Valor mov.',   align: 'right' },
-                  { label: 'Stock ant.',   align: 'right' },
-                  { label: 'Stock nuevo',  align: 'right' },
-                  { label: 'Saldo valor',  align: 'right' },
-                  { label: 'Motivo',       align: 'left'  },
-                ].map(h => (
-                  <th key={h.label}
-                    className={`text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-${h.align}`}>
-                    {h.label}
-                  </th>
-                ))}
+                <th style={COL.fecha}     className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-left">Fecha</th>
+                <th style={COL.tipo}      className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-left">Tipo</th>
+                <th style={COL.cantidad}  className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-right">Cantidad</th>
+                <th style={COL.costoUnit} className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-right">Costo unit.</th>
+                <th style={COL.valorMov}  className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-right">Valor mov.</th>
+                <th style={COL.stock}     className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-center">Stock ant. → nvo.</th>
+                <th style={COL.saldoValor}className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-right">Saldo valor</th>
+                <th style={COL.motivo}    className="text-xs font-semibold text-gray-500 dark:text-slate-400 px-3 py-2.5 uppercase tracking-wide text-left">Motivo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
-              {movimientosValorizados.map(m => (
-                <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
-                  <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap">
-                    {formatDateTime(m.createdAt)}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      m.type === 'entrada' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      m.type === 'salida'  ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                      m.type === 'merma'   ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
-                      'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                    }`}>
-                      {m.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right font-medium">
-                    <span className={m.esEntrada ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
-                      {m.esEntrada ? '+' : '-'}{m.quantity}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right text-gray-600 dark:text-slate-300">
-                    {m.unitCost > 0
-                      ? formatCurrency(m.unitCost)
-                      : <span className="text-gray-300 dark:text-slate-600 text-xs">—</span>
-                    }
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right font-semibold">
-                    <span className={m.esEntrada ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
-                      {m.esEntrada ? '+' : '-'}{formatCurrency(m.totalValue)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right text-gray-400 dark:text-slate-500">
-                    {m.previousStock}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right font-medium text-gray-800 dark:text-slate-100">
-                    {m.newStock}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right">
-                    <span className={m.saldoValor >= 0 ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-red-500 dark:text-red-400 font-semibold'}>
-                      {formatCurrency(m.saldoValor)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400 max-w-[180px] truncate">
-                    {m.reason}
-                    {m.invoiceNumber && (
-                      <span className="ml-1 font-mono text-gray-400 dark:text-slate-500">· {m.invoiceNumber}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {movimientosValorizados.map(m => {
+                const { fecha, hora } = fmtFechaCorta(m.createdAt)
+                return (
+                  <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
+
+                    {/* Fecha compacta en 2 líneas */}
+                    <td className="px-3 py-2.5 whitespace-nowrap" style={COL.fecha}>
+                      <span className="text-xs text-gray-700 dark:text-slate-300 font-medium">{fecha}</span>
+                      <br/>
+                      <span className="text-[10px] text-gray-400 dark:text-slate-500">{hora}</span>
+                    </td>
+
+                    {/* Tipo */}
+                    <td className="px-3 py-2.5" style={COL.tipo}>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${TYPE_STYLE[m.type] || TYPE_STYLE.ajuste}`}>
+                        {m.type}
+                      </span>
+                    </td>
+
+                    {/* Cantidad */}
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap" style={COL.cantidad}>
+                      <span className={`text-sm font-semibold ${m.esEntrada ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {m.esEntrada ? '+' : '−'}{fmtQty(m.quantity)}
+                      </span>
+                    </td>
+
+                    {/* Costo unit. */}
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap" style={COL.costoUnit}>
+                      {m.unitCost > 0
+                        ? <span className="text-sm text-gray-700 dark:text-slate-300">{formatCurrency(m.unitCost)}</span>
+                        : <span className="text-gray-300 dark:text-slate-600 text-xs">—</span>
+                      }
+                    </td>
+
+                    {/* Valor mov. */}
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap" style={COL.valorMov}>
+                      <span className={`text-sm font-semibold ${m.esEntrada ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {m.esEntrada ? '+' : '−'}{formatCurrency(m.totalValue)}
+                      </span>
+                    </td>
+
+                    {/* Stock ant. → nvo. (columna fusionada) */}
+                    <td className="px-3 py-2.5 text-center whitespace-nowrap" style={COL.stock}>
+                      <span className="text-sm text-gray-400 dark:text-slate-500">{fmtQty(m.previousStock ?? 0)}</span>
+                      <span className="text-xs text-gray-300 dark:text-slate-600 mx-1.5">→</span>
+                      <span className={`text-sm font-semibold ${m.esEntrada ? 'text-green-700 dark:text-green-400' : 'text-gray-800 dark:text-slate-100'}`}>
+                        {fmtQty(m.newStock ?? 0)}
+                      </span>
+                    </td>
+
+                    {/* Saldo valor */}
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap" style={COL.saldoValor}>
+                      <span className={`text-sm font-semibold ${m.saldoValor >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {formatCurrency(m.saldoValor)}
+                      </span>
+                    </td>
+
+                    {/* Motivo */}
+                    <td className="px-3 py-2.5 text-xs text-gray-500 dark:text-slate-400" style={{ ...COL.motivo, maxWidth: '240px' }}>
+                      <span className="block truncate">{m.reason}</span>
+                      {m.invoiceNumber && (
+                        <span className="font-mono text-gray-400 dark:text-slate-500 text-[10px]">{m.invoiceNumber}</span>
+                      )}
+                    </td>
+
+                  </tr>
+                )
+              })}
             </tbody>
-            {/* Fila de totales */}
+
+            {/* Totales */}
             <tfoot>
-              <tr className="bg-gray-50 dark:bg-slate-800/50 border-t border-gray-200 dark:border-slate-700">
-                <td colSpan={3} className="px-3 py-2.5 text-xs font-semibold text-gray-600 dark:text-slate-300 uppercase tracking-wide">
+              <tr className="bg-gray-50 dark:bg-slate-800/50 border-t-2 border-gray-200 dark:border-slate-700">
+                <td colSpan={2} className="px-3 py-3 text-xs font-bold text-gray-600 dark:text-slate-300 uppercase tracking-wide">
                   TOTALES
                 </td>
-                <td className="px-3 py-2.5"/>
-                <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-800 dark:text-slate-100">
-                  {formatCurrency(totales.valorEntradas - totales.valorSalidas - totales.valorMerma)}
+                <td className="px-3 py-3 text-right whitespace-nowrap">
+                  <div className="text-xs text-green-600 dark:text-green-400 font-semibold">+{fmtQty(totales.entradas)}</div>
+                  <div className="text-xs text-red-500 dark:text-red-400 font-semibold">−{fmtQty(totales.salidas)}</div>
                 </td>
-                <td colSpan={2} className="px-3 py-2.5"/>
-                <td className="px-3 py-2.5 text-right text-sm font-bold text-blue-600 dark:text-blue-400">
-                  {formatCurrency(valorInventario)}
+                <td className="px-3 py-3"/>
+                <td className="px-3 py-3 text-right whitespace-nowrap">
+                  <span className="text-sm font-bold text-gray-800 dark:text-slate-100">
+                    {formatCurrency(totales.valorEntradas - totales.valorSalidas - totales.valorMerma)}
+                  </span>
                 </td>
-                <td className="px-3 py-2.5 text-xs text-gray-400 dark:text-slate-500">
+                <td className="px-3 py-3"/>
+                <td className="px-3 py-3 text-right whitespace-nowrap">
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {formatCurrency(valorInventario)}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-xs text-gray-400 dark:text-slate-500">
                   Valor inventario actual
                 </td>
               </tr>
@@ -259,7 +295,7 @@ function ProductKardex({ product, movements, onClose, systemConfig }) {
 
 // ── Página principal ───────────────────────────────────────────────────────────
 export default function Inventory() {
-  const { products, categories, suppliers, stockMovements, currentUser, businessConfig, systemConfig, addAuditLog } = useStore()
+  const { products, categories, suppliers, stockMovements, currentUser, businessConfig, systemConfig, addAuditLog, locations } = useStore()
   const [search, setSearch]       = useState('')
   const [categoryFilter, setCatF] = useState('')
   const [tab, setTab]             = useState('products')
@@ -389,7 +425,18 @@ export default function Inventory() {
                         <td className="px-3 py-3">
                           <div className="text-sm font-medium text-gray-800 dark:text-slate-100 max-w-[180px] truncate">{p.name}</div>
                           {p.brand && <div className="text-xs text-gray-400 dark:text-slate-500">{p.brand}</div>}
-                          {p.location && <div className="text-xs text-blue-400">📍 {p.location}</div>}
+                          {p.location && (() => {
+                            const isMaster = locations?.some((l) => l.name === p.location)
+                            return (
+                              <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full mt-0.5 ${
+                                isMaster
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400'
+                                  : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'
+                              }`}>
+                                📍 {p.location}
+                              </span>
+                            )
+                          })()}
                         </td>
                         <td className="px-3 py-3 text-xs font-mono text-gray-500 dark:text-slate-400">{p.barcode}</td>
                         <td className="px-3 py-3"><span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-full">{cat?.name || '—'}</span></td>
@@ -459,7 +506,7 @@ export default function Inventory() {
 
       {/* Modal Kardex por producto — punto 3 */}
       {modal?.type === 'kardex' && (
-        <Modal title={`Movimientos — ${modal.data.name}`} subtitle={`${modal.data.barcode} · Stock actual: ${modal.data.stock} ${modal.data.unit}`} size="lg" onClose={() => setModal(null)}>
+        <Modal title={`Movimientos — ${modal.data.name}`} subtitle={`${modal.data.barcode} · Stock actual: ${modal.data.stock} ${modal.data.unit}`} size="xl" onClose={() => setModal(null)}>
           <ProductKardex product={modal.data} movements={stockMovements} onClose={() => setModal(null)} systemConfig={systemConfig}/>
         </Modal>
       )}

@@ -42,7 +42,8 @@ const NAV_GROUPS = [
     { key:'reports',    label:'Reportes',             icon:'📈' },
     { key:'discounts',  label:'Gestion Descuentos',  icon:'🏷️' },
     { key:'tickets',    label:'Descuentos por Vales', icon:'🎟️' },
-    { key:'returns',    label:'Devoluciones',         icon:'↩️' },
+    { key:'returns',       label:'Devoluciones',          icon:'↩️' },
+    { key:'comprobantes',  label:'Comprobantes SUNAT',    icon:'🧾' },
   ]},
   { label:'Sistema',     items:[
     { key:'alerts',     label:'Alertas',              icon:'🔔' },

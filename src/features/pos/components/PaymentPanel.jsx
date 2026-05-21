@@ -47,6 +47,7 @@ export default function PaymentPanel({
   const [loyaltyDiscount,   setLoyaltyDiscount]   = useState(0)
   const [redeemedPoints,    setRedeemedPoints]    = useState(0)
   const [showMoreMethods,   setShowMoreMethods]   = useState(false)
+  const [tipoComprobante,   setTipoComprobante]   = useState('ticket')
   const amountRef = useRef(null)
 
   // ─── Derivados ──────────────────────────────────────────────────────────────
@@ -108,6 +109,8 @@ export default function PaymentPanel({
     setDniError('')
     setShowClientDrop(false)
     onClientChange?.(c.id)
+    // Auto-cambiar a factura si el cliente tiene RUC
+    if (c.documentType === 'RUC') setTipoComprobante('factura')
   }
 
   const handleClearClient = () => {
@@ -118,6 +121,7 @@ export default function PaymentPanel({
     setLoyaltyDiscount(0)
     setRedeemedPoints(0)
     onClientChange?.(null)
+    if (tipoComprobante === 'factura') setTipoComprobante('boleta')
   }
 
   const addPayment = () => {
@@ -142,6 +146,11 @@ export default function PaymentPanel({
 
   const handleConfirm = () => {
     if (!isComplete) { toast.error(`Falta ${formatCurrency(remaining)} por cobrar`); return }
+    // Factura requiere cliente con RUC
+    if (tipoComprobante === 'factura') {
+      if (!selectedClient) { toast.error('Para emitir Factura selecciona un cliente con RUC'); return }
+      if (selectedClient.documentType !== 'RUC') { toast.error(`El cliente tiene ${selectedClient.documentType}, no RUC. Cambia a Boleta o selecciona otro cliente`); return }
+    }
     if (isZeroTotal) {
       onConfirm({
         payments: payments.length > 0 ? payments
@@ -150,10 +159,11 @@ export default function PaymentPanel({
         change: 0,
         loyaltyDiscount,
         redeemedPoints,
+        tipoComprobante,
       })
       return
     }
-    onConfirm({ payments, clientId, change, loyaltyDiscount, redeemedPoints })
+    onConfirm({ payments, clientId, change, loyaltyDiscount, redeemedPoints, tipoComprobante })
   }
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') addPayment() }
@@ -302,6 +312,40 @@ export default function PaymentPanel({
               )}
             </div>
           </div>
+        )}
+      </div>
+
+      {/* ══ 1b. TIPO DE COMPROBANTE ═════════════════════════════════════════ */}
+      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
+        <p className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">
+          Comprobante
+        </p>
+        <div className="flex gap-1.5">
+          {[
+            { value: 'ticket',  label: 'Ticket',  icon: '🎫',
+              on:  'bg-gray-100 dark:bg-slate-600 border-gray-400 dark:border-slate-400 text-gray-700 dark:text-slate-100' },
+            { value: 'boleta',  label: 'Boleta',  icon: '📄',
+              on:  'bg-sky-50 dark:bg-sky-900/30 border-sky-400 text-sky-700 dark:text-sky-300' },
+            { value: 'factura', label: 'Factura', icon: '🧾',
+              on:  'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-400 text-indigo-700 dark:text-indigo-300' },
+          ].map(({ value, label, icon, on }) => (
+            <button
+              key={value}
+              onClick={() => setTipoComprobante(value)}
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                tipoComprobante === value
+                  ? on
+                  : 'border-gray-200 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+              }`}>
+              {icon} {label}
+            </button>
+          ))}
+        </div>
+        {tipoComprobante === 'factura' && !selectedClient && (
+          <p className="text-[10px] text-amber-500 dark:text-amber-400 mt-1">⚠ Factura requiere cliente con RUC</p>
+        )}
+        {tipoComprobante === 'ticket' && (
+          <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">No va a SUNAT · Sin desglose de IGV</p>
         )}
       </div>
 

@@ -5,14 +5,16 @@
 
 ---
 
-## Estado actual del frontend (resumen sesión)
-
-Antes de entrar a los pendientes, en esta sesión se completaron:
+## Estado actual del frontend (resumen sesiones)
 
 - ✅ `ProductKardex` aplica `costMethod` (PEPS/CPP) usando `getUnitCost` de helpers
 - ✅ `getUnitCost` extraída a `src/shared/utils/helpers.js` — fuente única de verdad
 - ✅ Kardex y Reporte "Inventario Valorizado" usan la misma función → valores coinciden
-- ✅ `systemConfig` agregado al destructuring de `useStore()` en `Inventory.jsx`
+- ✅ Variantes de producto — 100% frontend (tab en Catálogo, selector en POS, stock por variante)
+- ✅ Módulo SUNAT/Comprobantes — 100% UI lista para conectar backend
+- ✅ Boleta/Factura en panel de cobro y en ticket de venta
+- ✅ Devoluciones con soporte de variantes
+- ✅ Maestro de Ubicaciones — `locationSlice`, pestaña en Settings, dropdown en Catálogo, badge en Inventario
 
 ---
 
@@ -22,21 +24,32 @@ Antes de entrar a los pendientes, en esta sesión se completaron:
 
 | | |
 |---|---|
-| **Frontend hoy** | 0% — solo existe campo `location` en schema (sin UI) |
-| **Backend** | 0% — sin modelos ni endpoints |
+| **Frontend hoy** | ✅ 70% — maestro de ubicaciones completo; `location` como dropdown en Catálogo; badge en Inventario |
+| **Backend** | ⏳ Pendiente — modelos, endpoints y stock dividido por ubicación |
 | **Riesgo** | Crítico para negocios con depósito físico separado |
 
-**Backend necesita:**
-- Modelo `Location` (almacén central, góndola 1, góndola 2…)
-- Modelo `StockTransfer` con origen, destino, productos, cantidades, estado
-- `POST /inventory/transfers`
-- Stock del producto pasa a tener **stock por ubicación**
+**✅ Frontend completado (2026-05-20):**
+- `locationSlice.js` — CRUD de ubicaciones (addLocation, updateLocation, deleteLocation) con audit log
+- Settings → pestaña **Ubicaciones** — alta/baja/edición/activación de ubicaciones físicas
+- Catálogo → campo `location` pasa de texto libre a **dropdown** del maestro; fallback a texto si el maestro está vacío
+- Inventario → badge de ubicación con estilo diferenciado: azul = maestro / gris = texto legado
+- Renombrar una ubicación propaga automáticamente el cambio a todos los productos asignados
+- Eliminar una ubicación valida que no tenga productos asignados antes de borrar
 
-**Frontend puede adelantar (SIN backend):**
-- Ajustes → gestionar ubicaciones con store local
-- Inventario → mostrar stock desglosado por ubicación
-- Módulo Transferencias → formulario + historial con Zustand/localStorage
-- Kardex → campo `locationFrom / locationTo` en movimientos
+**⏳ Backend necesita implementar (Django):**
+- Modelo `Location` con FK `tenant` — campos: `id`, `name`, `description`, `isActive`
+- Cambiar `product.location` (string) → `product.locationId` (FK a Location)
+- Modelo `StockTransfer`: origen, destino, producto, cantidad, estado (`pendiente/confirmada/anulada`), usuario, fecha
+- `GET  /locations` — listar ubicaciones del tenant
+- `POST /locations` — crear ubicación
+- `PATCH /locations/{id}` — editar / desactivar
+- `DELETE /locations/{id}` — eliminar (validar que no tenga products ni transfers pendientes)
+- `POST /inventory/transfers` — registrar transferencia entre ubicaciones
+- `GET  /inventory/transfers` — historial con filtros por ubicación/producto/fecha
+- `PATCH /inventory/transfers/{id}/confirm` — confirmar transferencia (descuenta origen, suma destino atómicamente)
+- `PATCH /inventory/transfers/{id}/cancel` — anular
+- Stock del producto pasa a `ProductLocation (productId, locationId, quantity, batches)` — stock total = suma de todas las ubicaciones
+- Cuando esté listo: el frontend conecta `locationSlice` a los endpoints REST en vez de localStorage
 
 ---
 
@@ -83,22 +96,29 @@ Antes de entrar a los pendientes, en esta sesión se completaron:
 
 | | |
 |---|---|
-| **Frontend hoy** | 0% operativo — solo template visual del ticket |
-| **Backend** | 0% |
+| **Frontend hoy** | ✅ 100% UI lista — módulo Comprobantes implementado (2026-05-20) |
+| **Backend** | 0% — pendiente de implementar |
 | **Riesgo** | CRÍTICO LEGAL — sin esto el sistema no es válido ante SUNAT |
 
-**Backend necesita:**
-- Credenciales SUNAT (RUC, clave SOL, certificado digital)
-- Generación + firma de XML en formato UBL 2.1
-- Cola asíncrona (Celery + Redis) para reintentos
-- `POST /sunat/cpe/emit`, `GET /sunat/cpe/status/{id}`
-- Almacenamiento de CDR (Constancia de Recepción)
+**✅ Frontend completado (2026-05-20):**
+- Campo `sunatStatus` en ventas: `pendiente / enviado / aceptado / rechazado / error_sunat`
+- Campo `tipoComprobante`: `boleta` (cliente DNI o sin cliente) / `factura` (cliente con RUC)
+- Módulo "Comprobantes" en menú → ruta `comprobantes`
+- KPIs: conteo por estado con colores
+- Tabla con filtros por estado, tipo, fecha y búsqueda
+- Botón "Reintentar" visible para rechazados (desactivado hasta backend)
+- Acceso al ticket de venta desde la lista
 
-**Frontend puede adelantar (SIN backend):**
-- Estados del comprobante: `pendiente / enviado / aceptado / rechazado / error_sunat`
-- Cola visual en módulo "Comprobantes" con estado por boleta/factura
-- Acción "Reintentar emisión" para rechazados
-- Generación del XML UBL 2.1 en frontend (formateo de datos — ya existen todos los campos)
+**⏳ Backend necesita implementar (Django):**
+- Credenciales SUNAT por tenant: RUC, clave SOL, certificado digital `.pfx`
+- Generación y firma del XML UBL 2.1 (Boleta: `01`, Factura: `03`)
+- `POST /sunat/cpe/emit` — enviar comprobante, devuelve `{ sunatStatus, cdrUrl, sunatCode, sunatMessage }`
+- `GET /sunat/cpe/status/{saleId}` — consultar estado actual en SUNAT
+- Cola asíncrona Celery + Redis para reintentos automáticos (hasta 3 intentos con backoff)
+- Almacenamiento del CDR (Constancia de Recepción) y hash SHA-256 del XML
+- Webhook o polling para actualizar `sunatStatus` en el frontend
+- Cuando el backend esté listo: conectar el botón "Reintentar" de `Comprobantes.jsx` al endpoint `POST /sunat/cpe/emit`
+- Generar código QR oficial SUNAT (URL de consulta con hash) e inyectarlo en `SaleTicket.jsx`
 
 ---
 
@@ -141,6 +161,24 @@ Antes de entrar a los pendientes, en esta sesión se completaron:
 - **Cola de ventas pendientes**: guardar venta en cola local cuando está offline
 - **Banner de sincronización**: "3 ventas pendientes de sincronizar" al volver online
 - Llenar `syncPendingSales()` con lógica IndexedDB → listo para conectar endpoint
+
+---
+
+---
+
+## Alertas por correo electrónico — Pendiente de backend
+
+| | |
+|---|---|
+| **Frontend hoy** | ✅ Campo `businessConfig.email` implementado en Settings → Negocio (2026-05-20) |
+| **Backend** | ❌ Pendiente — el envío real requiere servidor |
+
+**⏳ Backend necesita implementar (Django):**
+- Endpoint `POST /notifications/email` que reciba `{ to, subject, body }` y envíe vía SMTP / SendGrid / AWS SES
+- Configuración de credenciales SMTP por tenant (host, port, user, password)
+- Al detectar alertas críticas (`sin_stock`, `producto_vencido`, `caja_diferencia`) → disparar email automático al `businessConfig.email` del tenant
+- Resumen diario programado (Celery beat): enviar consolidado de alertas activas a las 8am
+- Cuando esté listo: en `src/features/alerts/Alerts.jsx` función `detectAlerts()`, reemplazar el toast actual por una llamada al endpoint de email para alertas de severidad `alta`
 
 ---
 

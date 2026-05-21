@@ -436,6 +436,7 @@ function ProductForm({ product, onClose }) {
   const {
     categories, brands, suppliers, products: allProducts,
     addCategory, addBrand, addSupplier,
+    locations,
   } = useStore()
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(productSchema),
@@ -634,7 +635,21 @@ function ProductForm({ product, onClose }) {
           {/* Ubicación */}
           <div>
             <label className={labelCls}>Ubicación en almacén</label>
-            <input {...register('location')} placeholder="Ej: Pasillo A, Estante 3" className={inputCls}/>
+            {locations.filter((l) => l.isActive).length > 0 ? (
+              <select {...register('location')} className={inputCls}>
+                <option value="">— Sin ubicación —</option>
+                {locations.filter((l) => l.isActive).map((l) => (
+                  <option key={l.id} value={l.name}>{l.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex gap-2 items-center">
+                <input {...register('location')} placeholder="Ej: Almacén, Góndola A" className={inputCls}/>
+                <span className="text-xs text-amber-500 whitespace-nowrap">
+                  Configura ubicaciones en Ajustes → Ubicaciones
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Fecha vencimiento */}

@@ -55,8 +55,8 @@ function MermaForm({ onClose }) {
     if (!dq.trim()) return []
     const q = dq.toLowerCase()
     return products
-      .filter(p => p.isActive && (p.name.toLowerCase().includes(q) || p.barcode.includes(dq)))
-      .slice(0, 6)
+      .filter(p => p.isActive !== false && (p.name.toLowerCase().includes(q) || (p.barcode || '').includes(dq)))
+      .slice(0, 8)
   }, [dq, products])
 
   const selectedProduct = products.find(p => p.id === productId)
@@ -121,15 +121,20 @@ function MermaForm({ onClose }) {
       <div>
         <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Producto *</label>
         {!selectedProduct ? (
-          <div className="relative">
+          <div>
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nombre o código de barras..."
               className={cls}/>
+            {dq.trim() && searchResults.length === 0 && (
+              <p className="mt-2 text-xs text-gray-400 dark:text-slate-500 text-center py-2">
+                Sin resultados para <strong>"{dq}"</strong>
+              </p>
+            )}
             {searchResults.length > 0 && (
-              <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl z-20 overflow-hidden">
+              <div className="mt-1 border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden overflow-y-auto max-h-52">
                 {searchResults.map(p => (
-                  <button key={p.id} onMouseDown={() => { setProductId(p.id); setSearch('') }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-between border-b border-gray-50 dark:border-slate-700/50 last:border-0">
+                  <button key={p.id} onClick={() => { setProductId(p.id); setSearch('') }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-between border-b border-gray-100 dark:border-slate-700 last:border-0 transition-colors">
                     <div>
                       <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{p.name}</p>
                       <p className="text-xs text-gray-400 dark:text-slate-500">
@@ -178,7 +183,7 @@ function MermaForm({ onClose }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Cantidad *</label>
-          <input type="number" min="0.01" step="0.01" value={quantity}
+          <input type="number" min="0.01" step="1" value={quantity}
             onChange={e => setQuantity(e.target.value)}
             className={cls}/>
         </div>

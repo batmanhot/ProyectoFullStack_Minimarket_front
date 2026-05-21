@@ -38,6 +38,7 @@ export const PLANS = {
     features: [
       'dashboard', 'pos', 'catalog', 'inventory',
       'clients', 'cash', 'reports', 'quotations', 'returns',
+      'comprobantes',
       'users', 'settings', 'about',
     ],
     limits:    { products: 100, users: 1, exportData: false, multiCash: false },
@@ -51,6 +52,7 @@ export const PLANS = {
     features: [
       'dashboard', 'pos', 'catalog', 'inventory',
       'clients', 'cash', 'reports', 'suppliers', 'purchases', 'returns', 'quotations',
+      'comprobantes',
       'users', 'settings', 'about',
     ],
     limits:    { products: 500, users: 3, exportData: true, multiCash: false },
@@ -65,6 +67,7 @@ export const PLANS = {
       'dashboard', 'pos', 'catalog', 'inventory',
       'clients', 'cash', 'reports', 'suppliers', 'purchases', 'returns', 'quotations',
       'discounts', 'tickets', 'loyalty', 'merma', 'trazabilidad', 'audit', 'alerts',
+      'comprobantes',
       'users', 'settings', 'about',
     ],
     limits:    { products: 2000, users: 10, exportData: true, multiCash: true },

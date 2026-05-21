@@ -157,6 +157,15 @@ export const tenantService = {
     }
     // Busca por slug exacto; si no existe devuelve demo como fallback
     const tenant = _tenants[slug] ?? _tenants.demo
+
+    // La Bodega Demo siempre está activa con fecha 30 días desde hoy.
+    // Se devuelve una copia inmutable — el registro en localStorage no cambia.
+    if (tenant?.slug === 'demo') {
+      const refreshedExpiry = new Date()
+      refreshedExpiry.setDate(refreshedExpiry.getDate() + 30)
+      return ok({ ...tenant, isActive: true, accessExpiresAt: refreshedExpiry.toISOString() })
+    }
+
     return ok(tenant)
   },
 

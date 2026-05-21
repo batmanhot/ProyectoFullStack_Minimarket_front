@@ -55,7 +55,13 @@ function getReturnableQty(item, existingReturns, saleId) {
   const already = (existingReturns || [])
     .filter(r => r.status !== 'anulada' && r.saleId === saleId)
     .flatMap(r => r.items)
-    .filter(ri => ri.saleItemId === item.id || ri.productId === item.productId)
+    .filter(ri => {
+      // Variante: identificar por variantId para no contaminar otras variantes del mismo producto
+      if (item.variantId && ri.variantId) return ri.variantId === item.variantId
+      if (item.variantId || ri.variantId)  return false  // uno tiene variante y el otro no → son distintos
+      // Sin variante: identificar por id de línea o por productId
+      return ri.saleItemId === item.id || ri.productId === item.productId
+    })
     .reduce((acc, ri) => acc + ri.quantity, 0)
   return Math.max(0, item.quantity - already)
 }
@@ -289,11 +295,12 @@ export default function Returns() {
     const ncItems = selectedItems
       .filter(i => (selected[i.id] || 0) > 0)
       .map(i => {
-        const saleItem    = foundSale.items?.find(si => si.id === i.id || si.productId === i.productId)
-        const firstBatch  = saleItem?.batchAllocations?.[0] ?? null
+        const saleItem   = foundSale.items?.find(si => si.id === i.id)
+        const firstBatch = saleItem?.batchAllocations?.[0] ?? null
         return {
           saleItemId:   i.id,
           productId:    i.productId,
+          variantId:    i.variantId || null,
           productName:  i.productName,
           barcode:      i.barcode,
           quantity:     selected[i.id],
@@ -311,12 +318,16 @@ export default function Returns() {
     const igvRate       = parseFloat(systemConfig?.igvRate ?? businessConfig?.igvRate ?? 0.18)
     const baseImponible = HALF_UP(totalRefund / (1 + igvRate))
     const igv           = HALF_UP(totalRefund - baseImponible)
-    const ncCount       = (existingReturns || []).length + 1
-    const ncNumber      = `NC001-${String(ncCount).padStart(6, '0')}`
+    const ncNumber      = useStore.getState().getNextInvoice('NC001')
+
+    // NC va a SUNAT solo si el comprobante origen era boleta o factura (no ticket)
+    const originalTipo  = foundSale.tipoComprobante || 'boleta'
+    const ncSunatStatus = originalTipo === 'ticket' ? null : 'pendiente'
 
     const nc = {
       id: crypto.randomUUID(), ncNumber,
       saleId: foundSale.id, invoiceNumber: foundSale.invoiceNumber,
+      tipoComprobante: 'nc',
       clientId: foundSale.clientId,
       clientName: clients.find(c => c.id === foundSale.clientId)?.name || null,
       userId: currentUser?.id,
@@ -324,7 +335,7 @@ export default function Returns() {
       reason, reasonLabel: RETURN_REASONS.find(r => r.value === reason)?.label || reason,
       reasonNote: reasonNote.trim(),
       items: ncItems, totalRefund, baseImponible, igv, igvRate,
-      status: 'completada', createdAt: now,
+      status: 'completada', sunatStatus: ncSunatStatus, createdAt: now,
     }
 
     addReturn(nc)
@@ -336,9 +347,7 @@ export default function Returns() {
       const isBundle = product.type === 'bundle'
 
       if (isBundle) {
-        // Bundle/Kit → al vender se descontó el stock de los COMPONENTES, no del bundle.
-        // Los ítems de componentes en foundSale.items tienen sus propios batchAllocations
-        // registrados durante la venta — los usamos para restaurar lotes exactos.
+        // Bundle/Kit → restaurar stock de los COMPONENTES usando sus batchAllocations
         ;(product.components || []).forEach(comp => {
           const { products: freshProducts } = useStore.getState()
           const cp = freshProducts.find(p => p.id === comp.productId)
@@ -352,9 +361,7 @@ export default function Returns() {
           _restoreProductStock(cp, restoreQty, compBatchId, compBatchNum, updateProduct)
         })
 
-        // Recalcular stock del bundle como mínimo de sus componentes ya restaurados.
-        // Mismo criterio que saleService.cancel: calcStockDisponible excluye lotes
-        // vencidos (FEFO) y lotes en merma para obtener el stock real disponible.
+        // Recalcular stock del bundle como mínimo de sus componentes ya restaurados
         const { products: freshProds } = useStore.getState()
         const freshBundle = freshProds.find(p => p.id === ncItem.productId)
         if (freshBundle?.components?.length) {
@@ -367,6 +374,29 @@ export default function Returns() {
             }))
           )
           updateProduct(freshBundle.id, { stock: newBundleStock })
+        }
+
+      } else if (ncItem.variantId) {
+        // Producto con variante → restaurar stock en la variante (updateVariant sincroniza el padre)
+        const freshState = useStore.getState()
+        const variant    = freshState.productVariants?.find(v => v.id === ncItem.variantId)
+        if (variant) {
+          const prevStock = variant.stock ?? 0
+          const newStock  = prevStock + ncItem.quantity
+          freshState.updateVariant(ncItem.variantId, { stock: newStock })
+          freshState.addStockMovement({
+            id: crypto.randomUUID(),
+            productId:    ncItem.productId,
+            productName:  ncItem.productName,
+            variantId:    ncItem.variantId,
+            type:         'entrada',
+            quantity:     ncItem.quantity,
+            previousStock: prevStock,
+            newStock,
+            reason:       `Devolución NC ${nc.ncNumber}`,
+            userId:       currentUser?.id,
+            createdAt:    now,
+          })
         }
 
       } else {

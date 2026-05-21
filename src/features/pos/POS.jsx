@@ -359,29 +359,32 @@ export default function POS({ onNavigate }) {
 
   const handleRemoveTicket = () => { setAppliedTicket(null); setTicketCode(''); setTicketError('') }
 
-  const handleCompleteSale = useCallback(async ({ payments, clientId, change, loyaltyDiscount = 0, redeemedPoints = 0 }) => {
+  const handleCompleteSale = useCallback(async ({ payments, clientId, change, loyaltyDiscount = 0, redeemedPoints = 0, tipoComprobante = 'boleta' }) => {
     setProcessing(true)
     const { getNextInvoice } = useStore.getState()
+    const invoicePrefix = tipoComprobante === 'ticket' ? 'T001' : tipoComprobante === 'factura' ? 'F001' : 'B001'
     const salePayload = {
-        invoiceNumber: getNextInvoice(),
-        clientId:      clientId || null,
-        userId:        currentUser?.id,
-        userName:      currentUser?.fullName,
-        items:         mergedCartItems,   // ← FIX: contiene campaignDiscount, totalDiscount, netTotal
+        invoiceNumber:   getNextInvoice(invoicePrefix),
+        clientId:        clientId || null,
+        userId:          currentUser?.id,
+        userName:        currentUser?.fullName,
+        items:           mergedCartItems,
         subtotalBruto,
         totalDescuentos,
-        total:          totalAPagar,
+        total:           totalAPagar,
         baseImponible,
-        igv:            igvCalculado,
+        igv:             igvCalculado,
         igvRate,
-        discount:       totalDescuentos,
-        ticketCode:     appliedTicket?.ticket?.code || null,
-        ticketDiscount: appliedTicket?.discountAmt  || 0,
+        discount:        totalDescuentos,
+        ticketCode:      appliedTicket?.ticket?.code || null,
+        ticketDiscount:  appliedTicket?.discountAmt  || 0,
         payments,
-        change: change || 0,
+        change:          change || 0,
         loyaltyDiscount,
         redeemedPoints,
-        note: saleNote.trim() || null,   // ← nota de venta opcional
+        note:            saleNote.trim() || null,
+        tipoComprobante,
+        sunatStatus: tipoComprobante === 'ticket' ? null : 'pendiente',
       }
     const result = await saleService.create(salePayload)
     setProcessing(false)

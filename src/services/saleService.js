@@ -142,7 +142,18 @@ export const saleService = {
       }
     }
 
-    const sale = { ...payload, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
+    // Enriquecer con datos del cliente para el comprobante
+    const saleClientEnrich = (() => {
+      if (!payload.clientId) return {}
+      const c = useStore.getState().clients.find(cl => cl.id === payload.clientId)
+      if (!c) return {}
+      return {
+        clientName:     c.name,
+        clientDocument: `${c.documentType} ${c.documentNumber}`,
+      }
+    })()
+
+    const sale = { ...payload, ...saleClientEnrich, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
 
     // ── Programa de Puntos — delegado a LoyaltyEngine ─────────────────────────
     if (payload.clientId) {
@@ -300,6 +311,74 @@ export const saleService = {
           })
         }
       }
+    }
+
+    // ── Generar NC de anulación para boletas y facturas (no tickets) ──────────
+    const tipo = sale.tipoComprobante
+    if (tipo !== 'ticket') {
+      const freshState  = useStore.getState()
+      const ncNumber    = freshState.getNextInvoice('NC001')
+      const now         = new Date().toISOString()
+      const igvRate     = parseFloat(sale.igvRate ?? 0.18)
+      const totalRefund = sale.total
+      const HALF_UP     = n => Math.floor(Number(n) * 100 + 0.5) / 100
+      const baseImponible = HALF_UP(totalRefund / (1 + igvRate))
+      const igv           = HALF_UP(totalRefund - baseImponible)
+
+      // Solo ítems facturables (excluir componentes internos de bundles)
+      const billableItems = sale.items.filter(i => !i._fromBundle)
+      const ncItems = billableItems.map(item => {
+        const netUnit = item.netTotal != null && item.quantity > 0
+          ? HALF_UP(item.netTotal / item.quantity)
+          : (() => {
+              const gross    = item.quantity * (item.unitPrice || 0)
+              const discount = item.totalDiscount != null
+                ? item.totalDiscount
+                : (item.discount || 0) + (item.campaignDiscount || 0)
+              return HALF_UP(Math.max(0, gross - discount) / item.quantity)
+            })()
+        const firstBatch = item.batchAllocations?.[0] ?? null
+        return {
+          saleItemId:   item.id,
+          productId:    item.productId,
+          variantId:    item.variantId    || null,
+          productName:  item.productName,
+          barcode:      item.barcode      || '',
+          quantity:     item.quantity,
+          unitPrice:    item.unitPrice    || 0,
+          netUnitPrice: netUnit,
+          discount:     item.discount     || 0,
+          totalRefund:  HALF_UP(netUnit * item.quantity),
+          unit:         item.unit         || 'unidad',
+          batchId:      firstBatch?.batchId     ?? null,
+          batchNumber:  firstBatch?.batchNumber ?? null,
+          expiryDate:   firstBatch?.expiryDate  ?? null,
+        }
+      })
+
+      const currentUser = freshState.currentUser
+      freshState.addReturn({
+        id:              crypto.randomUUID(),
+        ncNumber,
+        saleId:          sale.id,
+        invoiceNumber:   sale.invoiceNumber,
+        tipoComprobante: 'nc',
+        clientId:        sale.clientId    || null,
+        clientName:      sale.clientName  || null,
+        userId:          userId,
+        userName:        currentUser?.fullName || currentUser?.username || null,
+        reason:          'anulacion',
+        reasonLabel:     'Anulación de comprobante',
+        reasonNote:      reason,
+        items:           ncItems,
+        totalRefund,
+        baseImponible,
+        igv,
+        igvRate,
+        status:          'completada',
+        sunatStatus:     'pendiente',
+        createdAt:       now,
+      })
     }
 
     useStore.getState().updateSale(id, { status: 'cancelada', cancelReason: reason, cancelledAt: new Date().toISOString() })

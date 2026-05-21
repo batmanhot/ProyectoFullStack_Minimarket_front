@@ -53,6 +53,7 @@ import { createCashSlice }          from './slices/cashSlice'
 import { createStakeholdersSlice }  from './slices/stakeholdersSlice'
 import { createDiscountsSlice }     from './slices/discountsSlice'
 import { createSessionTrackingSlice } from './slices/sessionTrackingSlice'
+import { createLocationSlice }        from './slices/locationSlice'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE PRINCIPAL
@@ -76,6 +77,7 @@ export const useStore = create(
         ...createStakeholdersSlice(set, get),
         ...createDiscountsSlice(set, get),
         ...createSessionTrackingSlice(set, get),
+        ...createLocationSlice(set, get),
 
         // ─── Demo reset ──────────────────────────────────────────────────────
         resetDemo: (sector) => {
@@ -102,6 +104,7 @@ export const useStore = create(
             debtPayments:      [],
             cart:              [],
             nextInvoice:       1,
+            invoiceCounters:   { T001: 1, B001: 1, F001: 1, NC001: 1 },
             auditLog:          [],
             notifications:     [],
             discountCampaigns: [],
@@ -152,9 +155,24 @@ export const useStore = create(
             auditLog:          [],
             notifications:     [],
             cart:              [],
-            nextInvoice:       Math.max(...adjustedSales.map(s =>
-              parseInt(s.invoiceNumber?.split('-')[1] || '0')
-            )) + 1,
+            nextInvoice: (() => {
+              const nums = adjustedSales.map(s => parseInt(s.invoiceNumber?.split('-')[1] || '0'))
+              return (nums.length ? Math.max(...nums) : 0) + 1
+            })(),
+            invoiceCounters: (() => {
+              const byPrefix = adjustedSales.reduce((acc, s) => {
+                if (!s.invoiceNumber) return acc
+                const [pfx, numStr] = s.invoiceNumber.split('-')
+                if (pfx && numStr) acc[pfx] = Math.max(acc[pfx] || 0, parseInt(numStr, 10) || 0)
+                return acc
+              }, {})
+              return {
+                T001:  (byPrefix['T001']  || 0) + 1,
+                B001:  (byPrefix['B001']  || 0) + 1,
+                F001:  (byPrefix['F001']  || 0) + 1,
+                NC001: (byPrefix['NC001'] || 0) + 1,
+              }
+            })(),
             // ── Preservar configuración y sesión del tenant
             businessConfig:    businessConfig ?? seed.businessConfig,
             systemConfig:      systemConfig,
@@ -188,6 +206,7 @@ export const useStore = create(
           debtPayments:      s.debtPayments,
           cart:              s.cart,
           nextInvoice:       s.nextInvoice,
+          invoiceCounters:   s.invoiceCounters,
           // Configuración
           businessConfig:    s.businessConfig,
           systemConfig:      s.systemConfig,
@@ -206,6 +225,8 @@ export const useStore = create(
           // Sesiones de usuarios
           activeSessions:    s.activeSessions,
           sessionHistory:    s.sessionHistory,
+          // Maestro de ubicaciones
+          locations:         s.locations,
         }),
       }
     )

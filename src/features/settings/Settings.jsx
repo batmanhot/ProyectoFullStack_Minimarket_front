@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useState, useRef } from 'react'
 import { useStore } from '../../store/index'
 import { useTenantSafe } from '../../context/TenantContext'
 import { SECTORS } from '../../config/app'
@@ -134,6 +134,343 @@ function CostMethodSection({ sys, setSys, sector }) {
           El método UEPS (LIFO) está <strong>prohibido en Perú</strong> desde 1994 y no está disponible.
           Una vez declarado el método ante SUNAT, debe aplicarse consistentemente en el ejercicio.
         </span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Gestión de Ubicaciones ──────────────────────────────────────────────────
+function LocationsPanel() {
+  const { locations, addLocation, updateLocation, deleteLocation } = useStore()
+  const [newName, setNewName]       = useState('')
+  const [newDesc, setNewDesc]       = useState('')
+  const [editId, setEditId]         = useState(null)
+  const [editName, setEditName]     = useState('')
+  const [editDesc, setEditDesc]     = useState('')
+  const [error, setError]           = useState('')
+  const inputRef                    = useRef(null)
+
+  const handleAdd = () => {
+    setError('')
+    const result = addLocation({ name: newName, description: newDesc })
+    if (result.error) { setError(result.error); return }
+    setNewName('')
+    setNewDesc('')
+    toast.success(`Ubicación "${result.location.name}" creada`)
+  }
+
+  const handleUpdate = () => {
+    setError('')
+    const result = updateLocation(editId, { name: editName, description: editDesc })
+    if (result.error) { setError(result.error); return }
+    setEditId(null)
+    toast.success('Ubicación actualizada')
+  }
+
+  const handleDelete = (loc) => {
+    setError('')
+    const result = deleteLocation(loc.id)
+    if (result.error) { setError(result.error); return }
+    toast.success(`Ubicación "${loc.name}" eliminada`)
+  }
+
+  const startEdit = (loc) => {
+    setEditId(loc.id)
+    setEditName(loc.name)
+    setEditDesc(loc.description || '')
+    setError('')
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  const active   = locations.filter((l) => l.isActive)
+  const inactive = locations.filter((l) => !l.isActive)
+
+  const inputCls = 'px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100'
+
+  return (
+    <div className="space-y-5">
+
+      {/* Info */}
+      <div className="flex items-start gap-2.5 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+        <span className="text-base flex-shrink-0">🏗️</span>
+        <span>
+          Define las <strong>ubicaciones físicas</strong> de tu negocio: almacenes, góndolas, mostradores, bodegas, salas de exhibición, etc.
+          Luego asigna cada producto a una ubicación desde el <strong>Catálogo</strong>.
+          <br className="my-1"/>
+          <span className="text-blue-500 dark:text-blue-400">
+            Las transferencias de stock entre ubicaciones estarán disponibles cuando se integre el backend.
+          </span>
+        </span>
+      </div>
+
+      {/* Formulario alta */}
+      <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-5 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 pb-3">
+          Nueva ubicación
+        </h3>
+        <div className="flex gap-3 flex-wrap">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            placeholder="Nombre (ej: Almacén, Góndola A, Mostrador)"
+            className={`${inputCls} flex-1 min-w-40`}
+          />
+          <input
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            placeholder="Descripción opcional"
+            className={`${inputCls} flex-1 min-w-40`}
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!newName.trim()}
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            Agregar
+          </button>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+
+      {/* Lista de ubicaciones activas */}
+      {active.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200">
+              Ubicaciones activas
+              <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                {active.length}
+              </span>
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-50 dark:divide-slate-700">
+            {active.map((loc) => (
+              <div key={loc.id} className="px-5 py-3">
+                {editId === loc.id ? (
+                  <div className="flex gap-3 flex-wrap items-center">
+                    <input
+                      ref={inputRef}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleUpdate()}
+                      className={`${inputCls} flex-1 min-w-32`}
+                    />
+                    <input
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      placeholder="Descripción"
+                      className={`${inputCls} flex-1 min-w-32`}
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={handleUpdate}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                        Guardar
+                      </button>
+                      <button onClick={() => { setEditId(null); setError('') }}
+                        className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 text-xs rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 transition-colors">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📍</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{loc.name}</p>
+                      {loc.description && (
+                        <p className="text-xs text-gray-400 dark:text-slate-500">{loc.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => updateLocation(loc.id, { isActive: false })}
+                        title="Desactivar"
+                        className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                        Desactivar
+                      </button>
+                      <button onClick={() => startEdit(loc)}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                        Editar
+                      </button>
+                      <button onClick={() => handleDelete(loc)}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ubicaciones inactivas */}
+      {inactive.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden opacity-60">
+          <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-700">
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-slate-400">
+              Inactivas
+              <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400">
+                {inactive.length}
+              </span>
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-50 dark:divide-slate-700">
+            {inactive.map((loc) => (
+              <div key={loc.id} className="px-5 py-3 flex items-center gap-3">
+                <span className="text-lg opacity-40">📍</span>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-400 dark:text-slate-500 line-through">{loc.name}</p>
+                </div>
+                <button onClick={() => updateLocation(loc.id, { isActive: true })}
+                  className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                  Reactivar
+                </button>
+                <button onClick={() => handleDelete(loc)}
+                  className="text-xs px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 transition-colors">
+                  Eliminar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Estado vacío */}
+      {locations.length === 0 && (
+        <div className="text-center py-12 text-gray-400 dark:text-slate-500">
+          <div className="text-4xl mb-3">🏗️</div>
+          <p className="text-sm font-medium">Sin ubicaciones configuradas</p>
+          <p className="text-xs mt-1">Agrega la primera para organizar tu inventario</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Panel de Correlativos ────────────────────────────────────────────────────
+const SERIES = [
+  { prefix: 'T001',  label: 'Ticket',             icon: '🎫', color: 'gray'   },
+  { prefix: 'B001',  label: 'Boleta Electrónica',  icon: '📄', color: 'sky'    },
+  { prefix: 'F001',  label: 'Factura Electrónica', icon: '🧾', color: 'indigo' },
+  { prefix: 'NC001', label: 'Nota de Crédito',     icon: '↩️', color: 'violet' },
+]
+
+function Correlativos() {
+  const { invoiceCounters = {}, nextInvoice = 1, setInvoiceCounter } = useStore()
+  const [drafts, setDrafts] = useState({})
+  const [saved,  setSaved]  = useState({})
+
+  const currentFor = (prefix) =>
+    invoiceCounters[prefix] != null ? invoiceCounters[prefix] : nextInvoice
+
+  const handleApply = (prefix) => {
+    const raw = drafts[prefix]
+    if (!raw) return
+    const val = parseInt(raw, 10)
+    if (isNaN(val) || val < 1) { toast.error('El número debe ser mayor a 0'); return }
+    if (val < currentFor(prefix)) {
+      toast.error(`No puedes retroceder el correlativo — el mínimo permitido es ${currentFor(prefix)}`)
+      return
+    }
+    setInvoiceCounter(prefix, val)
+    setDrafts(d => ({ ...d, [prefix]: '' }))
+    setSaved(s => ({ ...s, [prefix]: true }))
+    toast.success(`Correlativo ${prefix} actualizado — próximo: ${prefix}-${String(val).padStart(6, '0')}`)
+    setTimeout(() => setSaved(s => ({ ...s, [prefix]: false })), 2500)
+  }
+
+  const clsBadge = {
+    gray:   'bg-gray-100   dark:bg-gray-700     text-gray-600   dark:text-gray-300',
+    sky:    'bg-sky-100    dark:bg-sky-900/30    text-sky-700    dark:text-sky-300',
+    indigo: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300',
+    violet: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Aviso SUNAT */}
+      <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-700 dark:text-amber-300">
+        <span className="text-base shrink-0">⚠️</span>
+        <div>
+          <p className="font-semibold mb-0.5">El correlativo solo puede avanzar, nunca retroceder</p>
+          <p className="text-xs">SUNAT no permite reutilizar números ya emitidos. Si ingresas un número menor al actual, el sistema lo rechazará.</p>
+        </div>
+      </div>
+
+      {/* Cards por serie */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {SERIES.map(({ prefix, label, icon, color }) => {
+          const current = currentFor(prefix)
+          const preview = prefix + '-' + String(current).padStart(6, '0')
+          const draft   = drafts[prefix] || ''
+          const isSaved = saved[prefix]
+
+          return (
+            <div key={prefix}
+              className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-5 space-y-4">
+              {/* Encabezado */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{label}</p>
+                    <span className={`text-xs font-mono px-2 py-0.5 rounded-full font-semibold ${clsBadge[color]}`}>{prefix}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Próximo número */}
+              <div className="px-4 py-3 bg-gray-50 dark:bg-slate-700/50 rounded-xl">
+                <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Próximo comprobante</p>
+                <p className="text-base font-mono font-bold text-gray-800 dark:text-slate-100">{preview}</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Correlativo interno: {current}</p>
+              </div>
+
+              {/* Configurar inicio */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Establecer nuevo inicio desde:</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={current}
+                    step="1"
+                    value={draft}
+                    onChange={e => setDrafts(d => ({ ...d, [prefix]: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && handleApply(prefix)}
+                    placeholder={String(current)}
+                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
+                  />
+                  <button
+                    onClick={() => handleApply(prefix)}
+                    disabled={!draft}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 ${
+                      isSaved
+                        ? 'bg-green-500 text-white'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}>
+                    {isSaved ? '✓ Aplicado' : 'Aplicar'}
+                  </button>
+                </div>
+                {draft && parseInt(draft) > 0 && parseInt(draft) >= current && (
+                  <p className="text-xs text-blue-500 dark:text-blue-400 mt-1.5 font-mono">
+                    Vista previa: {prefix}-{String(parseInt(draft)).padStart(6, '0')}
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Nota informativa */}
+      <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+        <span className="shrink-0">ℹ️</span>
+        <p>
+          Usa esta configuración al <strong>migrar desde otro sistema</strong> o para continuar una serie existente.
+          Por ejemplo, si tu última boleta emitida fue <strong>B001-000250</strong>, establece el inicio en <strong>251</strong>.
+        </p>
       </div>
     </div>
   )
@@ -275,12 +612,14 @@ export default function Settings() {
       <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-2 overflow-x-auto">
         <div className="flex items-center gap-2 min-w-max">
           {[
-            { key: 'business',  label: '🏪 Negocio'     },
-            { key: 'fiscal',    label: '💰 Fiscal'       },
-            { key: 'inventory', label: '📦 Inventario'   },
-            { key: 'pos',       label: '🖥️ POS / Caja'  },
-            { key: 'audit',     label: '🔍 Auditoría'    },
-            { key: 'backup',    label: '💾 Backup'       },
+            { key: 'business',      label: '🏪 Negocio'         },
+            { key: 'fiscal',        label: '💰 Fiscal'           },
+            { key: 'correlativos',  label: '🧾 Correlativos'     },
+            { key: 'inventory',     label: '📦 Inventario'       },
+            { key: 'locations',     label: '📍 Ubicaciones'      },
+            { key: 'pos',           label: '🖥️ POS / Caja'      },
+            { key: 'audit',         label: '🔍 Auditoría'        },
+            { key: 'backup',        label: '💾 Backup'           },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
@@ -312,6 +651,11 @@ export default function Settings() {
           <Field label="Teléfono" sub="Número de contacto">
             <input value={biz.phone||''} onChange={e => setBiz({...biz, phone: e.target.value})}
               className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 dark:bg-slate-700 dark:text-slate-100"/>
+          </Field>
+          <Field label="Correo del negocio" sub="Se usará para notificaciones y alertas del sistema">
+            <input value={biz.email||''} onChange={e => setBiz({...biz, email: e.target.value})}
+              type="email" placeholder="contacto@minegocio.com"
+              className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 dark:bg-slate-700 dark:text-slate-100"/>
           </Field>
 
           {/* ── FIX LOGO: preview + guardar inmediato ──────────────────────── */}
@@ -423,6 +767,9 @@ export default function Settings() {
         </Section>
       )}
 
+      {/* ── TAB CORRELATIVOS ────────────────────────────────────────────────── */}
+      {activeTab === 'correlativos' && <Correlativos />}
+
       {/* ── TAB INVENTARIO ─────────────────────────────────────────────────── */}
       {activeTab === 'inventory' && (
         <div className="space-y-4">
@@ -444,6 +791,9 @@ export default function Settings() {
           <CostMethodSection sys={sys} setSys={setSys} sector={biz.sector} />
         </div>
       )}
+
+      {/* ── TAB UBICACIONES ────────────────────────────────────────────────── */}
+      {activeTab === 'locations' && <LocationsPanel />}
 
       {/* ── TAB POS ─────────────────────────────────────────────────────────── */}
       {activeTab === 'pos' && (

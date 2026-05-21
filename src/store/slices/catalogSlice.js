@@ -170,10 +170,24 @@ export const createCatalogSlice = (set, get) => ({
     }))
   },
 
-  // ─── Contador de facturas ──────────────────────────────────────────────────
-  getNextInvoice: () => {
-    const n = get().nextInvoice
-    set({ nextInvoice: n + 1 })
-    return formatInvoice(n)
+  // ─── Contador de facturas por prefijo ─────────────────────────────────────
+  // invoiceCounters = { T001: n, B001: n, F001: n, NC001: n }
+  // Migración: si invoiceCounters[prefix] no existe, cae al legacy nextInvoice.
+  getNextInvoice: (prefix = 'B001') => {
+    const counters = get().invoiceCounters || {}
+    const n = counters[prefix] != null ? counters[prefix] : (get().nextInvoice || 1)
+    set(s => ({
+      invoiceCounters: { ...(s.invoiceCounters || {}), [prefix]: n + 1 },
+      nextInvoice: n + 1,
+    }))
+    return formatInvoice(n, prefix)
+  },
+
+  // Permite configurar el número de inicio de un correlativo desde Ajustes
+  setInvoiceCounter: (prefix, value) => {
+    const n = Math.max(1, parseInt(value) || 1)
+    set(s => ({
+      invoiceCounters: { ...(s.invoiceCounters || {}), [prefix]: n },
+    }))
   },
 })
