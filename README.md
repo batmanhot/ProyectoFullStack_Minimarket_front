@@ -1,190 +1,144 @@
-# 🛒 Sistema POS Minimarket
+# 🛒 Minimarket POS Frontend
 
-![Minimarket Banner](https://img.shields.io/badge/Status-In%20Development-yellow?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-
-Aplicación web de Punto de Venta (POS) orientada a la operación diaria de minimarkets y tiendas de retail de proximidad.  
-El sistema permite administrar ventas, inventario, caja, clientes, compras y reportes desde una interfaz moderna, rápida y preparada para uso intensivo en mostrador.
+Aplicación web de **Punto de Venta (POS)** para minimarkets y comercios retail de proximidad. Este frontend centraliza operaciones clave como ventas en caja, inventario, caja/arqueo, compras, clientes, reportes y descuentos, con una interfaz moderna construida para velocidad operativa y escalabilidad modular.
 
 ---
 
-## 📌 Descripción del proyecto
+## 🧰 Stack Tecnológico
 
-Este proyecto implementa un **sistema POS frontend** para centralizar procesos comerciales y operativos en negocios de venta minorista.  
-Incluye módulos integrados para:
+### Frontend
+- **React 19** (`react`, `react-dom`)
+- **Vite 7** (bundler y entorno de desarrollo)
+- **React Router DOM 7** (enrutamiento)
+- **Tailwind CSS 3** + **PostCSS** + **Autoprefixer** (estilos)
 
-- Venta en caja con cálculo de totales, descuentos e impuestos.
-- Gestión de catálogo e inventario con control de stock.
-- Control de caja (apertura, movimientos, cierre y arqueo).
-- Clientes, proveedores, compras, devoluciones y cotizaciones.
-- Reportes operativos y trazabilidad de movimientos.
-- Capacidades PWA para experiencia de uso mejorada.
+### Estado, formularios y validación
+- **Zustand** (estado global)
+- **React Hook Form**
+- **Zod** + `@hookform/resolvers`
 
-> Nota: este repositorio corresponde al **frontend** del sistema.
+### Servicios y utilidades
+- **Axios** (HTTP client)
+- **decimal.js** (precisión en cálculos)
+- **react-hot-toast** (notificaciones)
 
----
+### Reportería y documentos
+- **Recharts** (gráficos)
+- **xlsx** (importación/exportación Excel)
+- **jsPDF** + **html2canvas** (generación de PDF)
 
-## 🏪 Tipo de negocios objetivo
-
-El sistema está orientado principalmente a:
-
-- Minimarkets y bodegas.
-- Tiendas de conveniencia.
-- Autoservicios de barrio.
-- Pequeños supermercados.
-- Comercios minoristas con alto flujo de tickets.
-
-También puede adaptarse a otros negocios retail que requieran control de inventario y venta rápida por caja.
-
----
-
-## 🚀 Stack tecnológico
-
-### Frontend y arquitectura
-- **React 19** (UI basada en componentes).
-- **Vite** (desarrollo y build).
-- **Tailwind CSS** (estilos utilitarios).
-- **Zustand** + `persist` + `subscribeWithSelector` (estado global y persistencia local).
-- **React Router DOM 7** (navegación).
-
-### Formularios, validaciones y utilidades
-- **React Hook Form** + **Zod** (`@hookform/resolvers`) para formularios y validación.
-- **Axios** para consumo de servicios HTTP.
-- **decimal.js** para cálculos numéricos precisos.
-- **react-hot-toast** para notificaciones.
-
-### Reportes, documentos y exportación
-- **Recharts** para visualización de métricas.
-- **xlsx** para exportación/importación en Excel.
-- **jsPDF** + **html2canvas** para generación de PDF.
-
-### PWA
-- Service Worker y recursos offline (`public/sw.js`, `public/offline.html`).
-- Componente de instalación de app (`InstallPWA`).
-- Indicadores de estado online/offline en la interfaz.
+### Tooling de desarrollo
+- **ESLint 9**
+- **@vitejs/plugin-react**
+- **Playwright** (testing/e2e tooling instalado en el proyecto)
 
 ---
 
-## 🔄 Procesos principales del negocio
+## ✨ Características Principales (Features)
 
-1. **Proceso de venta en POS**
-   - Búsqueda de productos por nombre/código/SKU.
-   - Agregado al carrito y ajuste de cantidades.
-   - Aplicación de descuentos (manuales, campañas y tickets).
-   - Cálculo de subtotal bruto, descuentos, base imponible e IGV.
-   - Registro de pagos y emisión de ticket.
-   - Gestión de ventas en espera (hold/recover) para atención simultánea.
-
-2. **Proceso de caja**
-   - Apertura de caja por turno.
-   - Registro y control de movimientos.
-   - Seguimiento de ventas del turno.
-   - Cierre y arqueo de caja con control de diferencias.
-
-3. **Proceso de inventario**
-   - Administración de productos y categorías.
-   - Control de stock mínimo y alertas.
-   - Movimientos de inventario y kardex.
-   - Toma de inventario (stocktaking) y ajustes.
-
-4. **Proceso comercial y soporte**
-   - Gestión de clientes y proveedores.
-   - Registro de compras.
-   - Gestión de devoluciones y notas relacionadas.
-   - Cotizaciones y seguimiento.
-
-5. **Proceso de control y análisis**
-   - Dashboard con indicadores clave.
-   - Reportes operativos/exportables.
-   - Auditoría de acciones y trazabilidad.
+- Módulo de **POS** con flujo de venta, carrito y emisión de ticket.
+- **Gestión de caja**: apertura/cierre, arqueo y reportes de turno.
+- **Catálogo e inventario**: productos, stock, toma de inventario y mermas.
+- **Compras, proveedores y clientes** para operación comercial integral.
+- **Descuentos y campañas** (tickets promocionales y reglas de aplicación).
+- **Devoluciones**, **cotizaciones** y **trazabilidad/auditoría**.
+- **Dashboard y reportes** con métricas operativas.
+- Soporte de capacidades **PWA** (Service Worker, offline fallback, instalación).
 
 ---
 
-## ✨ Funcionalidades por módulo
+## ✅ Requisitos Previos
 
-- **Dashboard:** indicadores operativos y resumen general.
-- **POS:** venta rápida, descuentos, ticketing, pagos y pantalla cliente.
-- **Catálogo:** gestión de productos, categorías y datos comerciales.
-- **Inventario:** stock, movimientos, kardex y toma de inventario.
-- **Caja:** apertura/cierre, arqueo y control diario de efectivo.
-- **Clientes:** gestión de cartera y apoyo a fidelización.
-- **Proveedores:** administración de terceros de compra.
-- **Compras:** registro y control de abastecimiento.
-- **Descuentos y Tickets:** campañas, cupones/tickets y reglas de aplicación.
-- **Devoluciones:** control de devoluciones y documentos asociados.
-- **Cotizaciones:** emisión y gestión de propuestas comerciales.
-- **Reportes:** análisis de ventas e inventario con exportación.
-- **Usuarios y roles:** control de accesos por perfil.
-- **Auditoría:** historial de eventos y acciones.
-- **Merma y Trazabilidad:** control operativo para pérdidas y seguimiento.
+Instala lo siguiente en tu entorno local:
+
+- **Node.js** (recomendado: **v20 LTS** o superior)
+- **npm** (incluido con Node.js, recomendado npm 10+)
+- **Git** (para clonar el repositorio)
+
+> Este repositorio corresponde al **frontend**. No incluye motor de base de datos ni servicio backend embebido.
 
 ---
 
-## 🛠️ Instalación y ejecución local
+## 🏗️ Arquitectura del Proyecto
 
-1. **Clonar el repositorio**
-   ```bash
-   git clone [url-del-repositorio]
-   cd minimarket
-   ```
+Estructura principal (resumen):
 
-2. **Instalar dependencias**
-   ```bash
-   npm install
-   ```
+- `src/main.jsx`: punto de entrada de la app.
+- `src/App.jsx`: composición principal de vistas/rutas.
+- `src/features/`: módulos funcionales por dominio (POS, inventario, reportes, etc.).
+- `src/services/`: capa de acceso a API y servicios HTTP.
+- `src/store/`: estado global y slices de dominio.
+- `src/shared/`: componentes, hooks, utilidades y esquemas reutilizables.
+- `src/config/`: configuración de app y parámetros de entorno.
+- `public/`: assets estáticos, `sw.js`, `offline.html`, íconos PWA.
 
-3. **Configurar variables de entorno**
-   Crear/ajustar archivo `.env` según tu entorno:
-   ```env
-   VITE_API_URL=http://localhost:3000
-   ```
-
-4. **Ejecutar en desarrollo**
-   ```bash
-   npm run dev
-   ```
-
-5. **Build de producción**
-   ```bash
-   npm run build
-   ```
-
-6. **Preview de build**
-   ```bash
-   npm run preview
-   ```
-
-7. **Build con flujo PWA**
-   ```bash
-   npm run build:pwa
-   ```
+Patrón general:
+- **Arquitectura modular por features**, con separación de UI, lógica compartida y capa de servicios.
+- Preparado para alternar entre modo mock/local y consumo de API vía variables de entorno.
 
 ---
 
-## 📁 Estructura general del proyecto
+## ⚙️ Configuración e Instalación
 
-```text
-src/
-  features/        # módulos funcionales del negocio
-  shared/          # componentes, hooks y utilidades compartidas
-  store/           # estado global (Zustand + slices)
-  services/        # capa de servicios
-  data/            # datos semilla/demo
-  config/          # configuración de app y permisos
-public/
-  sw.js            # service worker
-  offline.html     # fallback offline
+### 1) Clonar el repositorio
+
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd minimarket
 ```
 
+### 2) Instalar dependencias
+
+```bash
+npm install
+```
+
+### 3) Configurar variables de entorno (`.env`)
+
+Crea un archivo `.env` en la raíz del proyecto con valores base:
+
+```env
+VITE_COMPANY_NAME=Mi Negocio
+VITE_COMPANY_RUC=20000000000
+VITE_COMPANY_ADDRESS=Av. Principal 123
+VITE_COMPANY_PHONE=01-000-0000
+VITE_USE_API=false
+VITE_API_URL=http://localhost:3000/api
+```
+
+### 4) Ejecutar migraciones (si aplica)
+
+```bash
+# No aplica en este repositorio (frontend).
+# Las migraciones se ejecutan en el proyecto backend correspondiente.
+```
+
+### 5) Iniciar servidor en modo desarrollo
+
+```bash
+npm run dev
+```
+
+La app corre con Vite en:
+
+- **http://localhost:3000**
+
 ---
 
-## 📄 Licencia
+## 📜 Scripts Disponibles
 
-MIT
+| Script | Comando | Descripción |
+|---|---|---|
+| `dev` | `npm run dev` | Inicia el servidor de desarrollo con Vite (HMR). |
+| `build` | `npm run build` | Genera el build de producción. |
+| `preview` | `npm run preview` | Levanta una vista previa del build generado. |
+| `lint` | `npm run lint` | Ejecuta análisis estático con ESLint. |
+| `build:pwa` | `npm run build:pwa` | Build de producción + post-proceso PWA (`scripts/post-build.js`). |
 
 ---
 
-Desarrollado para digitalizar y optimizar operaciones del sector retail de proximidad.
+## 📌 Notas Operativas
+
+- El proyecto está enfocado en frontend SPA para operación POS retail.
+- La integración con backend se controla por `VITE_USE_API` y `VITE_API_URL`.
+- Los recursos PWA y offline están en `public/sw.js` y `public/offline.html`.
