@@ -2,22 +2,23 @@ import { api, USE_API, ok, fail, delay } from './_base'
 import { getAccessExpiry, BONUS_DAYS, BILLING_CYCLES } from '../config/plans'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const isoNow   = ()          => new Date().toISOString()
-const makeSlug = (name)      => name.toLowerCase()
+const isoNow   = ()     => new Date().toISOString()
+const toIsoDate = (date) => {
+  if (!date) return null
+  return date.includes('T') ? date : new Date(`${date}T00:00:00`).toISOString()
+}
+const makeSlug = (name) => name.toLowerCase()
   .normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
 
 // ─── Persistencia mock en localStorage ───────────────────────────────────────
-// El mock debe sobrevivir a page-reloads para que el registro self-service
-// aparezca en el SuperAdmin aunque el usuario cambie de URL.
-
 const KEYS = {
   tenants:         'mm_mock_tenants_v1',
   accesses:        'mm_mock_accesses_v1',
   renewals:        'mm_mock_renewals_v1',
   prices:          'mm_mock_prices_v1',
-  site:            'mm_mock_site_v1',
-  limits:          'mm_saas_plan_limits_v1',
+  site:            'mm_mock_site_v2',    // v2 — campos expandidos de landing
+  limits:          'mm_saas_plan_limits_v2', // v2 — campos expandidos por plan
   alertThresholds: 'mm_alert_thresholds_v1',
 }
 
@@ -28,31 +29,45 @@ const _save = (key, data) => {
   try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
 }
 
-// ─── Datos default (solo cuando localStorage está vacío) ──────────────────────
+// ─── Fechas demo ──────────────────────────────────────────────────────────────
 const START_DEMO   = '2025-04-12T00:00:00Z'
 const START_TIENDA = '2025-03-14T00:00:00Z'
 
+// ─── Tenants por defecto ──────────────────────────────────────────────────────
 const DEFAULT_TENANTS = {
   demo: {
     id: 'tenant_demo', slug: 'demo',
     businessName: 'Bodega Demo', sector: 'bodega',
-    ownerName: 'Administrador Demo', ownerEmail: 'demo@minimarket.app', phone: '999000001',
+    ruc: '20000000001',
+    ownerName: 'Administrador Demo', ownerEmail: 'demo@minimarket.app',
+    phone: '999 000 001', ownerPassword: 'demo1234',
     plan: 'pro', billingCycle: 'monthly',
     accessStartDate: START_DEMO,
     accessExpiresAt: getAccessExpiry(START_DEMO, 'monthly'),
-    isActive: true, createdAt: '2025-01-01T00:00:00Z',
+    isActive: true,
+    registrationSource: 'superadmin',
+    internalNotes: 'Negocio demo del sistema. Acceso siempre renovado automáticamente.',
+    systemVersion: 'MiniMarket POS v1.0',
+    createdAt: '2025-01-01T00:00:00Z',
   },
   'mi-tienda': {
     id: 'tenant_001', slug: 'mi-tienda',
     businessName: 'Mi Tienda', sector: 'bodega',
-    ownerName: 'Juan Pérez', ownerEmail: 'juan@mitienda.com', phone: '987654321',
+    ruc: '20111222333',
+    ownerName: 'Juan Pérez', ownerEmail: 'juan@mitienda.com',
+    phone: '987 654 321', ownerPassword: 'tienda123',
     plan: 'trial', billingCycle: 'monthly',
     accessStartDate: START_TIENDA,
     accessExpiresAt: getAccessExpiry(START_TIENDA, 'monthly'),
-    isActive: true, createdAt: '2025-03-14T00:00:00Z',
+    isActive: true,
+    registrationSource: 'self-service',
+    internalNotes: 'Cliente Demo — Plan Prueba Gratuita activo 30 días por defecto.',
+    systemVersion: 'MiniMarket POS v1.0',
+    createdAt: '2025-03-14T00:00:00Z',
   },
 }
 
+// ─── Accesos por defecto ──────────────────────────────────────────────────────
 const DEFAULT_ACCESSES = [
   {
     id: 'access_001', tenantId: 'tenant_demo', tenantSlug: 'demo',
@@ -70,6 +85,7 @@ const DEFAULT_ACCESSES = [
   },
 ]
 
+// ─── Renovaciones por defecto ─────────────────────────────────────────────────
 const DEFAULT_RENEWALS = [
   {
     id: 'renew_001', tenantId: 'tenant_demo', businessName: 'Bodega Demo',
@@ -85,41 +101,75 @@ const DEFAULT_RENEWALS = [
   },
 ]
 
-// ─── Precios configurables (editables desde SuperAdmin) ──────────────────────
+// ─── Precios configurables ────────────────────────────────────────────────────
 const DEFAULT_PRICES = { basic: 49, pro: 99, enterprise: 199 }
 
-// ─── Límites por plan (editables desde SuperAdmin) ───────────────────────────
+// ─── Límites por plan (v2 — campos expandidos) ────────────────────────────────
+// null = ilimitado | -1 también es interpretado como ilimitado en algunos contextos
 export const DEFAULT_PLAN_LIMITS = {
-  trial:      { products: 100,  users: 1  },
-  basic:      { products: 500,  users: 3  },
-  pro:        { products: 2000, users: 10 },
-  enterprise: { products: null, users: null },
+  trial: {
+    products: 100,  users: 1,   warehouses: 1,  suppliers: 0,
+    customers: 50,  ordersPerMonth: 100, storageGB: 1,
+    supportType: 'email',
+    apiAccess: false, multiCompany: false, advancedExport: false, advancedReports: false,
+  },
+  basic: {
+    products: 500,  users: 3,   warehouses: 2,  suppliers: 50,
+    customers: 100, ordersPerMonth: 300, storageGB: 5,
+    supportType: 'email',
+    apiAccess: false, multiCompany: false, advancedExport: true, advancedReports: false,
+  },
+  pro: {
+    products: 2000, users: 10,  warehouses: 5,  suppliers: 200,
+    customers: 500, ordersPerMonth: 1000, storageGB: 20,
+    supportType: 'chat',
+    apiAccess: true, multiCompany: false, advancedExport: true, advancedReports: true,
+  },
+  enterprise: {
+    products: null, users: null, warehouses: null, suppliers: null,
+    customers: null, ordersPerMonth: null, storageGB: null,
+    supportType: 'phone',
+    apiAccess: true, multiCompany: true, advancedExport: true, advancedReports: true,
+  },
 }
 
-// ─── Umbrales de alerta de vencimiento (editables desde SuperAdmin) ───────────
-// Días antes del vencimiento en que se activa cada nivel de alerta.
-// Invariante: critical < urgent < warning, todos >= 1.
+// ─── Umbrales de alerta ────────────────────────────────────────────────────────
 export const DEFAULT_ALERT_THRESHOLDS = {
-  warning:  7,   // aviso suave — amarillo
-  urgent:   3,   // urgente    — naranja
-  critical: 1,   // crítico    — rojo
+  warning:  7,
+  urgent:   3,
+  critical: 1,
 }
 
-// ─── Configuración del sitio/landing (editable desde SuperAdmin) ──────────────
+// ─── Configuración del sitio / landing (v2 — campos expandidos) ───────────────
 export const DEFAULT_SITE_SETTINGS = {
-  brandName:   'MiniMarket POS',
-  tagline:     'Sistema POS para retail minorista en Perú',
-  phone:       '',
-  whatsapp:    '',
-  email:       '',
-  address:     '',
-  facebook:    '',
-  instagram:   '',
-  tiktok:      '',
+  // Marca
+  brandName:    'MiniMarket POS',
+  tagline:      'Sistema POS para retail minorista en Perú',
+  description:  'Sistema de punto de venta diseñado para bodegas y minimarkets del Perú. Gestiona ventas, inventario y clientes desde un solo lugar.',
+  primaryColor: '#00c896',
+  logoUrl:      '',
+  systemVersion: 'v1.0',
+  // Contacto
+  phone:        '',
+  whatsapp:     '',
+  email:        '',
+  address:      '',
+  // Redes sociales
+  facebook:     '',
+  instagram:    '',
+  tiktok:       '',
+  // Sección Hero
+  heroTitle:    'Gestiona tu tienda con inteligencia',
+  heroSubtitle: 'POS moderno para bodegas y minimarkets del Perú',
+  heroCta:      'Empezar gratis',
+  heroImage:    '',
+  // SEO & Footer
+  metaTitle:    'MiniMarket POS — Sistema de Punto de Venta',
+  metaDesc:     'Sistema POS para retail minorista en Perú.',
+  footerText:   '© 2025 MiniMarket POS. Todos los derechos reservados.',
 }
 
 // ─── Estado mutable persistido ────────────────────────────────────────────────
-// Se lee de localStorage al cargar el módulo; los default solo aplican la primera vez.
 let _tenants         = _load(KEYS.tenants)         ?? { ...DEFAULT_TENANTS }
 let _accesses        = _load(KEYS.accesses)        ?? [...DEFAULT_ACCESSES]
 let _renewals        = _load(KEYS.renewals)        ?? [...DEFAULT_RENEWALS]
@@ -128,7 +178,17 @@ let _site            = _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS
 let _limits          = _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
 let _alertThresholds = _load(KEYS.alertThresholds) ?? { ...DEFAULT_ALERT_THRESHOLDS }
 
-// Contadores derivados de los datos existentes para evitar IDs duplicados
+// Migrar registros existentes con campos faltantes (retrocompat)
+Object.values(_tenants).forEach(t => {
+  if (!t.ruc)           t.ruc           = ''
+  if (!t.ownerPassword) t.ownerPassword = ''
+  if (!t.internalNotes) t.internalNotes = ''
+  if (!t.systemVersion) t.systemVersion = 'MiniMarket POS v1.0'
+  if (!t.phone)         t.phone         = ''
+  if (!t.createdAt)     t.createdAt     = t.accessStartDate ?? isoNow()
+  if (!t.accessExpiresAt) t.accessExpiresAt = getAccessExpiry(t.accessStartDate ?? t.createdAt, t.billingCycle ?? 'monthly')
+})
+
 let _accessIdx  = Math.max(0, ..._accesses.map(a => parseInt(a.id.split('_')[1]) || 0)) + 1
 let _renewalIdx = Math.max(0, ..._renewals.map(r => parseInt(r.id.split('_')[1]) || 0)) + 1
 
@@ -138,7 +198,7 @@ const _flush = () => {
   _save(KEYS.renewals, _renewals)
 }
 
-// Lectura sincrónica para componentes que no pueden usar async (Sidebar, Landing, hooks)
+// Lectura sincrónica para componentes que no pueden usar async
 export const getStoredPrices           = () => _load(KEYS.prices)          ?? { ...DEFAULT_PRICES }
 export const getStoredSiteSettings     = () => _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS }
 export const getStoredPlanLimits       = () => _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
@@ -155,17 +215,13 @@ export const tenantService = {
       const { data } = await api.get(`/tenants/${slug}`)
       return ok(data)
     }
-    // Busca por slug exacto; si no existe devuelve demo como fallback
     const tenant = _tenants[slug] ?? _tenants.demo
-
-    // La Bodega Demo siempre está activa con fecha 30 días desde hoy.
-    // Se devuelve una copia inmutable — el registro en localStorage no cambia.
+    // La Bodega Demo siempre activa con 30 días desde hoy
     if (tenant?.slug === 'demo') {
-      const refreshedExpiry = new Date()
-      refreshedExpiry.setDate(refreshedExpiry.getDate() + 30)
-      return ok({ ...tenant, isActive: true, accessExpiresAt: refreshedExpiry.toISOString() })
+      const exp = new Date()
+      exp.setDate(exp.getDate() + 30)
+      return ok({ ...tenant, isActive: true, accessExpiresAt: exp.toISOString() })
     }
-
     return ok(tenant)
   },
 
@@ -174,8 +230,6 @@ export const tenantService = {
   async register({ businessName, sector, ownerName, ownerEmail, phone = '', password, plan = 'trial', billingCycle = 'monthly' }) {
     await delay(900)
     if (USE_API) {
-      // El backend recibe la contraseña en texto plano y la hashea (bcrypt/argon2).
-      // NUNCA enviar hash desde el frontend — el servidor controla el hashing.
       const { data } = await api.post('/tenants/register', { businessName, sector, ownerName, ownerEmail, phone, password, plan, billingCycle })
       return ok(data)
     }
@@ -184,31 +238,29 @@ export const tenantService = {
     const tenantId        = `tenant_${Date.now()}`
     const accessStartDate = isoNow()
     const accessExpiresAt = getAccessExpiry(accessStartDate, billingCycle)
-    // En el mock la contraseña se guarda en texto plano únicamente para pruebas locales.
-    // En producción el backend la reemplaza por su hash antes de persistir.
     const ownerPassword   = password
 
-    // ── Tabla de negocios (tenants) ─────────────────────────────────────────────
-    // Todos los campos que el backend necesitará al integrarse.
     _tenants[slug] = {
       id:               tenantId,
       slug,
       businessName,
       sector,
+      ruc:              '',
       ownerName,
       ownerEmail,
       phone,
-      ownerPassword,        // backend hashea antes de guardar en DB
+      ownerPassword,
       plan,
       billingCycle,
       accessStartDate,
       accessExpiresAt,
       isActive:         true,
-      registrationSource: 'self-service',  // distinguir de los creados por superadmin
+      registrationSource: 'self-service',
+      internalNotes:    '',
+      systemVersion:    'MiniMarket POS v1.0',
       createdAt:        accessStartDate,
     }
 
-    // ── Tabla de accesos (historial de períodos activos) ────────────────────────
     const accessId = `access_${_accessIdx++}`
     _accesses.push({
       id: accessId, tenantId, tenantSlug: slug,
@@ -220,10 +272,8 @@ export const tenantService = {
       createdBy: 'self-register', createdAt: accessStartDate,
     })
 
-    // ── Tabla de renovaciones (historial de cambios de plan) ────────────────────
-    const renewalId = `renew_${_renewalIdx++}`
     _renewals.unshift({
-      id: renewalId, tenantId, businessName,
+      id: `renew_${_renewalIdx++}`, tenantId, businessName,
       previousPlan: null, newPlan: plan,
       billingCycle,
       accessStartDate, accessExpiresAt,
@@ -232,19 +282,7 @@ export const tenantService = {
     })
 
     _flush()
-
-    // Retorna todos los campos que el frontend necesita para la pantalla de éxito
-    // y que el backend deberá incluir en su respuesta JWT / objeto de sesión.
-    return ok({
-      slug,
-      tenantId,
-      businessName,
-      ownerEmail,
-      plan,
-      billingCycle,
-      accessStartDate,
-      accessExpiresAt,
-    })
+    return ok({ slug, tenantId, businessName, ownerEmail, plan, billingCycle, accessStartDate, accessExpiresAt })
   },
 
   async checkSlugAvailable(slug) {
@@ -267,7 +305,7 @@ export const tenantService = {
     return ok({ ...config, updatedAt: isoNow() })
   },
 
-  // ── SuperAdmin — Negocios ───────────────────────────────────────────────────
+  // ── SuperAdmin — CRUD de Negocios ───────────────────────────────────────────
 
   async listAll({ search = '' } = {}) {
     await delay(200)
@@ -279,10 +317,117 @@ export const tenantService = {
     const filtered = search
       ? all.filter(t =>
           t.businessName.toLowerCase().includes(search.toLowerCase()) ||
-          t.slug.includes(search.toLowerCase())
+          t.slug.includes(search.toLowerCase()) ||
+          (t.ruc ?? '').includes(search) ||
+          (t.ownerEmail ?? '').toLowerCase().includes(search.toLowerCase())
         )
       : all
     return ok(filtered, filtered.length)
+  },
+
+  async superadminCreateTenant({
+    businessName, sector = 'bodega', ownerName = '', ownerEmail = '',
+    phone = '', ownerPassword = '', ruc = '',
+    plan = 'trial', billingCycle = 'monthly', accessStartDate = null,
+    accessExpiresAt = null, createdAt = null,
+    internalNotes = '', systemVersion = 'MiniMarket POS v1.0', isActive = true,
+  }) {
+    await delay(400)
+    if (USE_API) {
+      const { data } = await api.post('/admin/tenants', {
+        businessName, sector, ownerName, ownerEmail, phone, ownerPassword, ruc,
+        plan, billingCycle, accessStartDate, accessExpiresAt, createdAt,
+        internalNotes, systemVersion, isActive,
+      })
+      return ok(data)
+    }
+
+    const slug = makeSlug(businessName)
+    if (_tenants[slug]) return fail(`El slug "${slug}" ya está en uso. Prueba con un nombre diferente.`)
+    if (!businessName.trim()) return fail('El nombre del negocio es obligatorio')
+    if (!ownerEmail.trim()) return fail('El email del propietario es obligatorio')
+
+    const tenantId = `tenant_${Date.now()}`
+    const start = toIsoDate(accessStartDate) ?? isoNow()
+    const expiry = toIsoDate(accessExpiresAt) ?? getAccessExpiry(start, billingCycle)
+    const created = toIsoDate(createdAt) ?? isoNow()
+
+    _tenants[slug] = {
+      id: tenantId, slug, businessName, sector, ruc,
+      ownerName, ownerEmail, phone, ownerPassword,
+      plan, billingCycle,
+      accessStartDate: start, accessExpiresAt: expiry,
+      isActive,
+      registrationSource: 'superadmin',
+      internalNotes, systemVersion,
+      createdAt: created,
+    }
+
+    _accesses.push({
+      id: `access_${_accessIdx++}`, tenantId, tenantSlug: slug,
+      businessName, plan, billingCycle,
+      accessStartDate: start, accessExpiresAt: expiry,
+      bonusDays: BONUS_DAYS,
+      notes: internalNotes || 'Creado por superadmin',
+      createdBy: 'superadmin', createdAt: isoNow(),
+    })
+
+    _renewals.unshift({
+      id: `renew_${_renewalIdx++}`, tenantId, businessName,
+      previousPlan: null, newPlan: plan,
+      accessStartDate: start, accessExpiresAt: expiry,
+      renewedBy: 'superadmin', renewedAt: isoNow(),
+      notes: 'Activación inicial por superadmin',
+    })
+
+    _flush()
+    return ok({ ..._tenants[slug] })
+  },
+
+  async superadminUpdateTenant(tenantId, updates) {
+    await delay(300)
+    if (USE_API) {
+      const { data } = await api.patch(`/admin/tenants/${tenantId}`, updates)
+      return ok(data)
+    }
+
+    const tenant = Object.values(_tenants).find(t => t.id === tenantId)
+    if (!tenant) return fail('Negocio no encontrado')
+
+    const allowed = [
+      'businessName', 'sector', 'ruc', 'ownerName', 'ownerEmail',
+      'phone', 'ownerPassword', 'plan', 'billingCycle', 'isActive',
+      'accessStartDate', 'accessExpiresAt', 'createdAt',
+      'internalNotes', 'systemVersion',
+    ]
+    allowed.forEach(key => {
+      if (!(key in updates)) return
+      tenant[key] = ['accessStartDate', 'accessExpiresAt', 'createdAt'].includes(key)
+        ? (toIsoDate(updates[key]) ?? tenant[key])
+        : updates[key]
+    })
+
+    // Recalcular vencimiento si cambió la fecha inicio o el ciclo
+    if (!('accessExpiresAt' in updates) && ('accessStartDate' in updates || 'billingCycle' in updates)) {
+      tenant.accessExpiresAt = getAccessExpiry(tenant.accessStartDate, tenant.billingCycle)
+    }
+
+    _flush()
+    return ok({ ...tenant })
+  },
+
+  async superadminDeleteTenant(tenantId) {
+    await delay(280)
+    if (USE_API) { await api.delete(`/admin/tenants/${tenantId}`); return ok(null) }
+
+    const slug = Object.keys(_tenants).find(s => _tenants[s].id === tenantId)
+    if (!slug) return fail('Negocio no encontrado')
+
+    delete _tenants[slug]
+    _accesses = _accesses.filter(a => a.tenantId !== tenantId)
+    _renewals = _renewals.filter(r => r.tenantId !== tenantId)
+    _flush()
+    return ok(null)
   },
 
   async setActive(tenantId, isActive) {
@@ -424,19 +569,13 @@ export const tenantService = {
 
   async getPrices() {
     await delay(50)
-    if (USE_API) {
-      const { data } = await api.get('/admin/prices')
-      return ok(data)
-    }
+    if (USE_API) { const { data } = await api.get('/admin/prices'); return ok(data) }
     return ok({ ..._prices })
   },
 
   async updatePrices(newPrices) {
     await delay(180)
-    if (USE_API) {
-      const { data } = await api.put('/admin/prices', newPrices)
-      return ok(data)
-    }
+    if (USE_API) { const { data } = await api.put('/admin/prices', newPrices); return ok(data) }
     Object.assign(_prices, newPrices)
     _save(KEYS.prices, _prices)
     return ok({ ..._prices })
@@ -446,19 +585,13 @@ export const tenantService = {
 
   async getLimits() {
     await delay(50)
-    if (USE_API) {
-      const { data } = await api.get('/admin/plan-limits')
-      return ok(data)
-    }
+    if (USE_API) { const { data } = await api.get('/admin/plan-limits'); return ok(data) }
     return ok(JSON.parse(JSON.stringify(_limits)))
   },
 
   async updateLimits(newLimits) {
     await delay(180)
-    if (USE_API) {
-      const { data } = await api.put('/admin/plan-limits', newLimits)
-      return ok(data)
-    }
+    if (USE_API) { const { data } = await api.put('/admin/plan-limits', newLimits); return ok(data) }
     _limits = JSON.parse(JSON.stringify(newLimits))
     _save(KEYS.limits, _limits)
     return ok(JSON.parse(JSON.stringify(_limits)))
@@ -468,42 +601,29 @@ export const tenantService = {
 
   async getSiteSettings() {
     await delay(50)
-    if (USE_API) {
-      const { data } = await api.get('/admin/site-settings')
-      return ok(data)
-    }
-    return ok({ ..._site })
+    if (USE_API) { const { data } = await api.get('/admin/site-settings'); return ok(data) }
+    return ok({ ...DEFAULT_SITE_SETTINGS, ..._site })
   },
 
   async updateSiteSettings(updates) {
     await delay(180)
-    if (USE_API) {
-      const { data } = await api.put('/admin/site-settings', updates)
-      return ok(data)
-    }
+    if (USE_API) { const { data } = await api.put('/admin/site-settings', updates); return ok(data) }
     Object.assign(_site, updates)
     _save(KEYS.site, _site)
-    return ok({ ..._site })
+    return ok({ ...DEFAULT_SITE_SETTINGS, ..._site })
   },
 
-  // ── Umbrales de alerta de vencimiento ──────────────────────────────────────
+  // ── Umbrales de alerta ──────────────────────────────────────────────────────
 
   async getAlertThresholds() {
     await delay(50)
-    if (USE_API) {
-      const { data } = await api.get('/admin/alert-thresholds')
-      return ok(data)
-    }
+    if (USE_API) { const { data } = await api.get('/admin/alert-thresholds'); return ok(data) }
     return ok({ ..._alertThresholds })
   },
 
   async updateAlertThresholds(thresholds) {
     await delay(180)
-    if (USE_API) {
-      const { data } = await api.put('/admin/alert-thresholds', thresholds)
-      return ok(data)
-    }
-    // Validar invariante: critical < urgent < warning, todos >= 1
+    if (USE_API) { const { data } = await api.put('/admin/alert-thresholds', thresholds); return ok(data) }
     if (thresholds.critical < 1 || thresholds.urgent < 1 || thresholds.warning < 1)
       return fail('Todos los umbrales deben ser al menos 1 día')
     if (!(thresholds.critical < thresholds.urgent && thresholds.urgent < thresholds.warning))
@@ -513,11 +633,11 @@ export const tenantService = {
     return ok({ ..._alertThresholds })
   },
 
-  // ── Utilidad: reset del mock (solo desarrollo) ────────────────────────────
+  // ── Reset del mock (solo desarrollo) ────────────────────────────────────────
   _resetMock() {
-    _tenants         = { ...DEFAULT_TENANTS }
-    _accesses        = [...DEFAULT_ACCESSES]
-    _renewals        = [...DEFAULT_RENEWALS]
+    _tenants         = JSON.parse(JSON.stringify(DEFAULT_TENANTS))
+    _accesses        = JSON.parse(JSON.stringify(DEFAULT_ACCESSES))
+    _renewals        = JSON.parse(JSON.stringify(DEFAULT_RENEWALS))
     _prices          = { ...DEFAULT_PRICES }
     _site            = { ...DEFAULT_SITE_SETTINGS }
     _limits          = JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))

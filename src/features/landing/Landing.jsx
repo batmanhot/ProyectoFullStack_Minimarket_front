@@ -1,485 +1,546 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PLANS, PLAN_ORDER, BILLING_CYCLES } from '../../config/plans'
+import {
+  ArrowRight, BarChart3, Check, ChevronRight, Clock3, CreditCard, ExternalLink,
+  Facebook, Gauge, Globe2, Instagram, Mail, MapPin, MessageCircle, Package,
+  Phone, ReceiptText, ShieldCheck, ShoppingCart, Sparkles, Star, Store, Users,
+  Zap,
+} from 'lucide-react'
+import { BILLING_CYCLES, PLAN_ORDER, PLANS } from '../../config/plans'
 import { getStoredPrices, getStoredSiteSettings } from '../../services/tenantService'
-import { Check, Zap, ShoppingCart, BarChart2, Users, Package, Shield, Star, ArrowRight, TrendingUp, Clock, Phone, MessageCircle, Mail, MapPin } from 'lucide-react'
 
-const FEATURES_SHOWCASE = [
-  { icon: ShoppingCart, title: 'Punto de Venta',  desc: 'Yape, Plin, tarjeta, efectivo y mixto. Tickets impresos en segundos.',       bg: '#2563eb', light: '#dbeafe' },
-  { icon: Package,      title: 'Inventario',       desc: 'Stock en tiempo real, alertas automáticas y control por lotes.',            bg: '#7c3aed', light: '#ede9fe' },
-  { icon: BarChart2,    title: 'Reportes',         desc: 'KPIs, gráficas interactivas y exportación a Excel con un clic.',           bg: '#10b981', light: '#d1fae5' },
-  { icon: Users,        title: 'Clientes',         desc: 'Crédito, cobranza, historial de compras y puntos de fidelidad.',           bg: '#f59e0b', light: '#fef3c7' },
-  { icon: Shield,       title: 'Auditoría',        desc: 'Trazabilidad completa de cada operación. Nunca pierdas el control.',       bg: '#ef4444', light: '#fee2e2' },
-  { icon: Zap,          title: 'Multi-rol',        desc: 'Admin, gerente, supervisor y cajero con permisos diferenciados.',          bg: '#06b6d4', light: '#cffafe' },
+const DEFAULT_FEATURES = [
+  { icon: ShoppingCart, title: 'Venta rapida', desc: 'POS agil para mostrador, lectores de codigo y pagos mixtos sin friccion.' },
+  { icon: Package, title: 'Inventario vivo', desc: 'Stock, lotes, alertas y movimientos claros para comprar a tiempo.' },
+  { icon: BarChart3, title: 'Reportes accionables', desc: 'Margen, ventas, productos top y caja diaria listos para decidir.' },
+  { icon: Users, title: 'Clientes y credito', desc: 'Historial, deudas, fidelizacion y seguimiento en una sola vista.' },
+  { icon: ShieldCheck, title: 'Control total', desc: 'Roles, auditoria, trazabilidad y datos ordenados por negocio.' },
+  { icon: ReceiptText, title: 'Comprobantes', desc: 'Base preparada para boletas, facturas y gestion SUNAT.' },
 ]
 
-const STATS = [
-  { value: '+500',  label: 'Negocios activos',   color: '#2563eb' },
-  { value: '18',    label: 'Módulos integrados', color: '#7c3aed' },
-  { value: '99.9%', label: 'Disponibilidad',     color: '#10b981' },
-  { value: '24/7',  label: 'Soporte técnico',    color: '#f59e0b' },
-]
+const FEATURE_ICON_MAP = [ShoppingCart, Package, BarChart3, Users, ShieldCheck, ReceiptText, CreditCard, Gauge, Store, Zap]
 
-const SECTORS = ['Bodega', 'Farmacia', 'Ferretería', 'Boutique', 'Panadería', 'Electrónica', 'Librería', 'Calzado']
-
-const PLAN_DISPLAY_FEATURES = {
-  trial: [
-    'POS con múltiples medios de pago',
-    'Catálogo (hasta 100 productos)',
-    'Control de inventario y stock',
-    'Módulo de clientes',
-    '1 usuario · 1 caja registradora',
-    '30 días completamente gratis',
-  ],
-  basic: [
-    'POS, catálogo e inventario',
-    'Clientes y cobranza',
-    'Compras y proveedores',
-    'Reportes + exportación a Excel',
-    'Hasta 500 productos · 3 usuarios',
-    'Cotizaciones y devoluciones',
-  ],
-  pro: [
-    'Todo lo del plan Básico',
-    'Descuentos y campañas promocionales',
-    'Fidelización y puntos de cliente',
-    'Auditoría y trazabilidad completa',
-    'Hasta 2 000 productos · 10 usuarios',
-    'Multi-caja y alertas automáticas',
-  ],
-  enterprise: [
-    'Todo lo del plan Profesional',
-    'Usuarios ilimitados',
-    'Productos ilimitados',
-    'Soporte prioritario 24/7',
-  ],
+const PLAN_FEATURES = {
+  trial: ['POS y caja', 'Catalogo inicial', 'Inventario basico', 'Clientes', '1 usuario', 'Prueba gratuita'],
+  basic: ['POS completo', 'Inventario y compras', 'Clientes y cobranza', 'Reportes', 'Hasta 3 usuarios', 'Exportacion'],
+  pro: ['Todo Basic', 'Promociones', 'Fidelizacion', 'Auditoria', 'Multi-caja', 'Alertas avanzadas'],
+  enterprise: ['Todo Pro', 'Usuarios ilimitados', 'Productos ilimitados', 'Soporte prioritario', 'Multi-negocio', 'Acompanamiento'],
 }
 
-// ── Estilos globales inyectados una sola vez ───────────────────────────────────
+const CURRENCY = {
+  PEN: { symbol: 'S/', label: 'soles' },
+  USD: { symbol: '$', label: 'dolares' },
+  EUR: { symbol: 'EUR', label: 'euros' },
+}
+
 const GLOBAL_CSS = `
-  @keyframes float { 0%,100% { transform: translateY(0px) } 50% { transform: translateY(-18px) } }
-  @keyframes pulse-ring { 0% { transform: scale(.9); opacity:.7 } 70% { transform: scale(1.15); opacity:0 } 100% { transform: scale(1.15); opacity:0 } }
-  .feat-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.10) !important; transform: translateY(-3px); transition: all .22s; }
-  .plan-card:hover { transform: translateY(-4px); transition: all .2s; }
-
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-bottom: 44px; }
-  .hero-title { font-size: 68px; font-weight: 900; line-height: 1.05; color: #fff; margin: 0 0 22px; letter-spacing: -3px; }
-  .hero-section { max-width: 1200px; margin: 0 auto; padding: 88px 28px 110px; text-align: center; position: relative; z-index: 10; }
-  .hero-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-
+  .lp-shell { color: #102033; background: #f6f9fc; overflow-x: hidden; }
+  .lp-nav-links { display: flex; gap: 24px; align-items: center; }
+  .lp-hero { display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(360px, .98fr); gap: 54px; align-items: center; }
+  .lp-proof { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .lp-feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .lp-pricing-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .lp-demo-grid { display: grid; grid-template-columns: .86fr 1.14fr; gap: 44px; align-items: center; }
+  .lp-footer-grid { display: grid; grid-template-columns: 1.2fr .9fr .9fr; gap: 42px; }
+  .lp-card-hover { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+  .lp-card-hover:hover { transform: translateY(-4px); box-shadow: 0 22px 48px rgba(20, 46, 82, .12); }
+  .lp-reveal { animation: lpRise .65s ease both; }
+  @keyframes lpRise { from { transform: translateY(14px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+  @media (max-width: 980px) {
+    .lp-nav-links { display: none; }
+    .lp-hero, .lp-demo-grid { grid-template-columns: 1fr; gap: 34px; }
+    .lp-proof, .lp-pricing-grid { grid-template-columns: repeat(2, 1fr); }
+    .lp-feature-grid { grid-template-columns: repeat(2, 1fr); }
+  }
   @media (max-width: 640px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .footer-grid { grid-template-columns: 1fr; gap: 28px; }
-    .hero-title { font-size: 36px; letter-spacing: -1.5px; }
-    .hero-section { padding: 52px 20px 64px; }
-    .hero-buttons { flex-direction: column; align-items: stretch; }
-    .hero-buttons button { width: 100%; justify-content: center; }
+    .lp-proof, .lp-feature-grid, .lp-pricing-grid, .lp-footer-grid { grid-template-columns: 1fr; }
+    .lp-hero-title { font-size: 40px !important; }
+    .lp-section-title { font-size: 30px !important; }
+    .lp-nav-cta-secondary { display: none !important; }
+    .lp-hero-actions { flex-direction: column; align-items: stretch !important; }
+    .lp-hero-actions button { justify-content: center; width: 100%; }
   }
 `
 
-export default function Landing() {
-  const navigate = useNavigate()
-  const [billing, setBilling] = useState('monthly')
+const getReadableTextColor = (hex) => {
+  const clean = hex?.replace('#', '')
+  if (!clean || clean.length !== 6) return '#ffffff'
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#102033' : '#ffffff'
+}
 
-  const site        = getStoredSiteSettings()
-  const brandName   = site.brandName  || 'MiniMarket POS'
-  const tagline     = site.tagline    || 'Sistema POS para retail minorista en Perú'
+const getPlanPrice = (planId, cycleKey, storedPrices) => {
+  const base = storedPrices[planId] ?? PLANS[planId]?.price ?? 0
+  if (base === 0) return 0
+  const discount = BILLING_CYCLES[cycleKey]?.discountPct ?? 0
+  return Math.round(base * (1 - discount / 100))
+}
 
-  const storedPrices = getStoredPrices()
-  const getBasePrice = (planId) => storedPrices[planId] ?? PLANS[planId]?.price ?? 0
-  const cycleKey  = billing === 'annual' ? 'annual' : 'monthly'
-  const cycleCfg  = BILLING_CYCLES[cycleKey]
-  const price = (planId) => {
-    const base = getBasePrice(planId)
-    if (base === 0) return 0
-    return Math.round(base * (1 - cycleCfg.discountPct / 100))
+const useLandingData = () => {
+  const site = getStoredSiteSettings()
+  const prices = getStoredPrices()
+  return useMemo(() => {
+    const primary = site.primaryColor || '#16a34a'
+    const features = Array.isArray(site.features) && site.features.length > 0
+      ? site.features.map((feature, index) => ({
+          ...feature,
+          icon: FEATURE_ICON_MAP[index % FEATURE_ICON_MAP.length],
+          title: feature.title || DEFAULT_FEATURES[index % DEFAULT_FEATURES.length].title,
+          desc: feature.desc || DEFAULT_FEATURES[index % DEFAULT_FEATURES.length].desc,
+        }))
+      : DEFAULT_FEATURES
+
+    return {
+      site: {
+        ...site,
+        brandName: site.brandName || 'MiniMarket POS',
+        tagline: site.tagline || 'Sistema POS para retail minorista',
+        description: site.description || 'Sistema de punto de venta disenado para vender mas, controlar mejor el inventario y cerrar caja sin dolores de cabeza.',
+        heroTitle: site.heroTitle || 'Vende mas y controla tu tienda en tiempo real',
+        heroSubtitle: site.heroSubtitle || 'POS moderno para bodegas, minimarkets y comercios que necesitan velocidad en caja, stock claro y reportes utiles desde el primer dia.',
+        heroCtaText: site.heroCtaText || site.heroCta || 'Comenzar prueba gratis',
+        heroCtaSecText: site.heroCtaSecText || 'Ver demo en vivo',
+        heroCtaUrl: site.heroCtaUrl || '/register',
+        heroCtaSecUrl: site.heroCtaSecUrl || '/app/demo',
+        trialDays: Number(site.trialDays || 30),
+        showPricesPublic: site.showPricesPublic !== false,
+        publicCurrency: site.publicCurrency || 'PEN',
+        footerText: site.footerText || '',
+      },
+      primary,
+      onPrimary: getReadableTextColor(primary),
+      prices,
+      features,
+    }
+  }, [site, prices])
+}
+
+function BrandMark({ site, primary }) {
+  if (site.logoUrl) {
+    return (
+      <img
+        src={site.logoUrl}
+        alt={site.brandName}
+        style={{ width: '42px', height: '42px', borderRadius: '12px', objectFit: 'cover', boxShadow: `0 10px 28px ${primary}35` }}
+      />
+    )
   }
-  const goToDemo = () => { window.location.href = '/app/demo' }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", minHeight: '100vh', background: '#f1f5f9' }}>
-      <style>{GLOBAL_CSS}</style>
+    <div style={{ width: '42px', height: '42px', borderRadius: '13px', background: primary, color: getReadableTextColor(primary), display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px', boxShadow: `0 12px 30px ${primary}35` }}>
+      {site.brandName?.[0]?.toUpperCase() || 'M'}
+    </div>
+  )
+}
 
-      {/* ══════════════════════════ HERO (dark) ══════════════════════════════ */}
-      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #1e3a8a 100%)', position: 'relative', overflow: 'hidden' }}>
+function handleConfiguredAction(url, navigate) {
+  if (!url || url === '#planes') {
+    document.getElementById('planes')?.scrollIntoView({ behavior: 'smooth' })
+    return
+  }
+  if (url === '#demo') {
+    window.location.href = '/app/demo'
+    return
+  }
+  if (url.startsWith('http')) {
+    window.open(url, '_blank', 'noreferrer')
+    return
+  }
+  navigate(url)
+}
 
-        {/* Decorative blobs */}
-        <div style={{ position: 'absolute', top: '-160px', right: '-160px', width: '700px', height: '700px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-120px', left: '-120px', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,99,235,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: '40%', right: '8%', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(52,211,153,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-        {/* ── Nav ── */}
-        <nav style={{ position: 'sticky', top: 0, zIndex: 50, backdropFilter: 'blur(14px)', background: 'rgba(15,23,42,0.7)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 28px', height: '66px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg,#3b82f6,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: '18px', boxShadow: '0 4px 14px rgba(99,102,241,0.45)' }}>M</div>
-              <span style={{ fontWeight: 700, fontSize: '18px', color: '#fff' }}>{brandName}</span>
+function MiniDashboard({ primary, site }) {
+  return (
+    <div style={{ position: 'relative' }} className="lp-reveal">
+      {site.heroImage ? (
+        <img
+          src={site.heroImage}
+          alt="Vista del sistema"
+          style={{ width: '100%', borderRadius: '26px', objectFit: 'cover', aspectRatio: '4 / 3', boxShadow: '0 32px 90px rgba(15, 23, 42, .2)', border: '1px solid rgba(255,255,255,.7)' }}
+        />
+      ) : (
+        <div style={{ borderRadius: '28px', background: '#0f172a', padding: '14px', boxShadow: '0 34px 90px rgba(15, 23, 42, .28)', border: '1px solid rgba(255,255,255,.7)' }}>
+          <div style={{ background: '#f8fafc', borderRadius: '20px', overflow: 'hidden' }}>
+            <div style={{ height: '48px', background: '#ffffff', borderBottom: '1px solid #e5edf5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e' }} />
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>Caja abierta</div>
             </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button onClick={goToDemo} style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.07)', color: '#cbd5e1', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                Ver demo
-              </button>
-              <button onClick={() => navigate('/register')} style={{ padding: '9px 22px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#3b82f6,#7c3aed)', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,0.40)' }}>
-                Empezar gratis
-              </button>
-            </div>
-          </div>
-        </nav>
-
-        {/* ── Hero content ── */}
-        <section className="hero-section">
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: '24px', padding: '6px 18px', marginBottom: '30px' }}>
-            <Star size={13} color="#a78bfa" fill="#a78bfa" />
-            <span style={{ fontSize: '12px', color: '#c4b5fd', fontWeight: 600, letterSpacing: '0.04em' }}>{tagline}</span>
-          </div>
-
-          <h1 className="hero-title">
-            Gestiona tu negocio
-            <br />
-            <span style={{ background: 'linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              desde cualquier lugar
-            </span>
-          </h1>
-
-          <p style={{ fontSize: '19px', color: '#94a3b8', lineHeight: 1.8, margin: '0 auto 44px', maxWidth: '560px' }}>
-            POS completo para bodegas, farmacias, ferreterías y más.
-            <br />Ventas, inventario, reportes y fidelización — todo integrado.
-          </p>
-
-          <div className="hero-buttons">
-            <button onClick={() => navigate('/register')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '15px 32px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg,#2563eb,#7c3aed)', color: '#fff', fontSize: '15px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 36px rgba(99,102,241,0.50)' }}>
-              Registrar mi negocio — gratis 30 días <ArrowRight size={16} />
-            </button>
-            <button onClick={goToDemo} style={{ padding: '15px 28px', borderRadius: '12px', border: '1.5px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.06)', color: '#e2e8f0', fontSize: '15px', fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-              Ver demo en vivo →
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '44px' }}>
-            {SECTORS.map(s => (
-              <span key={s} style={{ padding: '5px 14px', borderRadius: '20px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>{s}</span>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {/* ══════════════════════════ STATS STRIP ═══════════════════════════════ */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
-        <div className="stats-grid" style={{ maxWidth: '1200px', margin: '0 auto', padding: '36px 28px' }}>
-          {STATS.map(({ value, label, color }) => (
-            <div key={label} style={{ textAlign: 'center', padding: '8px' }}>
-              <div style={{ fontSize: '38px', fontWeight: 900, color, lineHeight: 1, letterSpacing: '-1px' }}>{value}</div>
-              <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px', fontWeight: 500 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ══════════════════════════ FEATURES ══════════════════════════════════ */}
-      <div style={{ background: '#f8fafc', padding: '88px 0 96px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 28px' }}>
-
-          <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-            <div style={{ display: 'inline-block', background: 'linear-gradient(135deg,#eff6ff,#ede9fe)', color: '#4f46e5', fontSize: '11px', fontWeight: 800, padding: '5px 16px', borderRadius: '20px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #c7d2fe' }}>
-              Funcionalidades
-            </div>
-            <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f172a', margin: '0', letterSpacing: '-1.5px', lineHeight: 1.15 }}>
-              Todo lo que necesitas en un solo lugar
-            </h2>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
-            {FEATURES_SHOWCASE.map(({ icon: Icon, title, desc, bg, light }) => (
-              <div key={title} className="feat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '28px', display: 'flex', gap: '18px', alignItems: 'flex-start', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'all .22s', cursor: 'default' }}>
-                <div style={{ width: '52px', height: '52px', borderRadius: '14px', flexShrink: 0, background: light, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 4px 14px ${bg}25` }}>
-                  <Icon size={24} color={bg} strokeWidth={1.8} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 190px', minHeight: '390px' }}>
+              <div style={{ padding: '22px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                  <div>
+                    <div style={{ color: '#0f172a', fontSize: '20px', fontWeight: 900 }}>Venta del turno</div>
+                    <div style={{ color: '#64748b', fontSize: '12px', marginTop: '3px' }}>Productos, descuentos y pago en una vista</div>
+                  </div>
+                  <div style={{ padding: '8px 12px', borderRadius: '999px', background: `${primary}16`, color: primary, fontSize: '12px', fontWeight: 800 }}>En linea</div>
                 </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '6px', fontSize: '15px' }}>{title}</div>
-                  <div style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.65 }}>{desc}</div>
+                {[
+                  ['Arroz extra 5kg', '2 un.', 'S/ 37.80'],
+                  ['Leche evaporada', '6 un.', 'S/ 25.20'],
+                  ['Aceite vegetal', '1 un.', 'S/ 12.90'],
+                  ['Galletas surtidas', '4 un.', 'S/ 9.60'],
+                ].map(([name, qty, amount]) => (
+                  <div key={name} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 82px', gap: '10px', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #e8eef5' }}>
+                    <div style={{ color: '#172033', fontWeight: 750, fontSize: '13px' }}>{name}</div>
+                    <div style={{ color: '#64748b', fontSize: '12px' }}>{qty}</div>
+                    <div style={{ color: '#0f172a', fontWeight: 900, fontSize: '13px', textAlign: 'right' }}>{amount}</div>
+                  </div>
+                ))}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '20px' }}>
+                  {[
+                    ['Ventas', 'S/ 1,842'],
+                    ['Tickets', '68'],
+                    ['Stock bajo', '9'],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ background: '#fff', border: '1px solid #e5edf5', borderRadius: '14px', padding: '13px' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{label}</div>
+                      <div style={{ fontSize: '19px', color: '#0f172a', fontWeight: 950, marginTop: '5px' }}>{value}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ══════════════════════════ PRICING ═══════════════════════════════════ */}
-      <div style={{ background: '#fff', padding: '88px 0 100px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 28px' }}>
-
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <div style={{ display: 'inline-block', background: 'linear-gradient(135deg,#f0fdf4,#d1fae5)', color: '#059669', fontSize: '11px', fontWeight: 800, padding: '5px 16px', borderRadius: '20px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em', border: '1px solid #a7f3d0' }}>
-              Planes y Precios
-            </div>
-            <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px', letterSpacing: '-1.5px' }}>
-              Precios simples y transparentes
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '16px', margin: 0 }}>Sin contratos. Sin sorpresas. Cancela cuando quieras.</p>
-          </div>
-
-          {/* Billing toggle */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '48px' }}>
-            <div style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: '12px', padding: '5px', gap: '4px' }}>
-              {[['monthly', 'Mensual'], ['annual', 'Anual']].map(([key, label]) => (
-                <button key={key} onClick={() => setBilling(key)} style={{ padding: '8px 22px', borderRadius: '9px', border: 'none', cursor: 'pointer', background: billing === key ? '#fff' : 'transparent', color: billing === key ? '#0f172a' : '#64748b', fontWeight: billing === key ? 700 : 500, fontSize: '13px', boxShadow: billing === key ? '0 1px 6px rgba(0,0,0,0.10)' : 'none', transition: 'all .2s' }}>
-                  {label}
-                  {key === 'annual' && <span style={{ marginLeft: '8px', background: 'linear-gradient(90deg,#10b981,#059669)', color: '#fff', fontSize: '9px', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>−20%</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', alignItems: 'stretch' }}>
-            {PLAN_ORDER.map(planId => {
-              const plan      = PLANS[planId]
-              const featured  = plan.badge === 'Más popular'
-              const basePrice = getBasePrice(planId)
-              const shown     = price(planId)
-
-              return (
-                <div key={planId} className="plan-card" style={{ background: featured ? 'linear-gradient(155deg,#1e3a8a 0%,#312e81 60%,#1e1b4b 100%)' : '#fff', border: featured ? 'none' : '1.5px solid #e2e8f0', borderRadius: '20px', padding: '30px', position: 'relative', boxShadow: featured ? '0 24px 80px rgba(37,99,235,0.32)' : '0 2px 10px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', transition: 'all .2s' }}>
-
-                  {plan.badge && (
-                    <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg,#f59e0b,#ef4444)', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '5px 16px', borderRadius: '20px', letterSpacing: '0.04em', whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(245,158,11,0.4)' }}>
-                      {plan.badge}
-                    </div>
-                  )}
-
-                  <div style={{ marginBottom: '6px' }}>
-                    <span style={{ fontWeight: 800, fontSize: '18px', color: featured ? '#fff' : '#0f172a' }}>{plan.label}</span>
-                  </div>
-                  <div style={{ fontSize: '13px', color: featured ? 'rgba(255,255,255,0.60)' : '#94a3b8', marginBottom: '24px', lineHeight: 1.5 }}>
-                    {plan.description}
-                  </div>
-
-                  <div style={{ marginBottom: '28px' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                      <span style={{ fontSize: '42px', fontWeight: 900, color: featured ? '#fff' : '#0f172a', lineHeight: 1, letterSpacing: '-2px' }}>
-                        {basePrice === 0 ? 'Gratis' : `S/ ${shown}`}
-                      </span>
-                      {basePrice > 0 && <span style={{ fontSize: '14px', color: featured ? 'rgba(255,255,255,0.50)' : '#94a3b8' }}>/mes</span>}
-                    </div>
-                    {basePrice > 0 && billing === 'annual' && (
-                      <div style={{ fontSize: '12px', color: featured ? 'rgba(255,255,255,0.50)' : '#94a3b8', marginTop: '4px' }}>
-                        Total anual: S/ {shown * 12}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => navigate('/register', { state: { plan: planId } })}
-                    style={{ width: '100%', padding: '13px', borderRadius: '10px', border: featured ? '2px solid rgba(255,255,255,0.25)' : 'none', background: featured ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg,#2563eb,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', marginBottom: '24px', backdropFilter: featured ? 'blur(8px)' : 'none' }}>
-                    {basePrice === 0 ? 'Empezar gratis' : 'Elegir este plan'}
-                  </button>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                    {PLAN_DISPLAY_FEATURES[planId].map(feature => (
-                      <div key={feature} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <div style={{ width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0, background: featured ? 'rgba(255,255,255,0.15)' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Check size={11} color={featured ? '#fff' : '#2563eb'} strokeWidth={3} />
-                        </div>
-                        <span style={{ fontSize: '13px', color: featured ? 'rgba(255,255,255,0.85)' : '#374151' }}>{feature}</span>
+              <div style={{ background: '#101827', padding: '18px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Total</div>
+                  <div style={{ fontSize: '34px', fontWeight: 950, marginTop: '8px' }}>S/ 85.50</div>
+                  <div style={{ marginTop: '16px', display: 'grid', gap: '8px' }}>
+                    {['Efectivo', 'Yape', 'Tarjeta'].map((method, index) => (
+                      <div key={method} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 10px', borderRadius: '10px', background: index === 1 ? `${primary}35` : 'rgba(255,255,255,.06)', fontSize: '12px' }}>
+                        <span>{method}</span>
+                        <Check size={14} />
                       </div>
                     ))}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ══════════════════════════ WHY US STRIP ══════════════════════════════ */}
-      <div style={{ background: 'linear-gradient(135deg,#f8fafc,#eff6ff)', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '56px 0' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 28px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '28px' }}>
-          {[
-            { icon: Clock,       color: '#2563eb', bg: '#dbeafe', title: '30 días gratis',        desc: 'Sin tarjeta de crédito requerida. Prueba sin riesgos.' },
-            { icon: Shield,      color: '#7c3aed', bg: '#ede9fe', title: 'Datos seguros',         desc: 'Respaldo diario automático y cifrado en tránsito.' },
-            { icon: TrendingUp,  color: '#10b981', bg: '#d1fae5', title: 'Sin límite de ventas',  desc: 'Procesa todo lo que tu negocio necesite sin restricciones.' },
-            { icon: Zap,         color: '#f59e0b', bg: '#fef3c7', title: 'Soporte en español',    desc: 'Equipo local disponible para ayudarte a crecer.' },
-          ].map(({ icon: Icon, color, bg, title, desc }) => (
-            <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={22} color={color} strokeWidth={1.8} />
-              </div>
-              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '15px' }}>{title}</div>
-              <div style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.65 }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ══════════════════════════ CTA FINAL ════════════════════════════════ */}
-      <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#1e3a8a 100%)', padding: '80px 28px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-60px', left: '-60px', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(52,211,153,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-        <div style={{ position: 'relative', zIndex: 10, maxWidth: '620px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '42px', fontWeight: 900, margin: '0 0 14px', color: '#fff', letterSpacing: '-2px', lineHeight: 1.1 }}>
-            Empieza hoy —<br />
-            <span style={{ background: 'linear-gradient(90deg,#60a5fa,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              30 días completamente gratis
-            </span>
-          </h2>
-          <p style={{ fontSize: '16px', color: '#94a3b8', margin: '0 0 36px', lineHeight: 1.7 }}>
-            Sin tarjeta de crédito. Sin compromisos. Cancela cuando quieras.
-          </p>
-          <button onClick={() => navigate('/register')} style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', padding: '16px 40px', borderRadius: '12px', border: 'none', background: '#fff', color: '#1e3a8a', fontSize: '16px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 36px rgba(0,0,0,0.25)' }}>
-            Registrar mi negocio <ArrowRight size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* ══════════════════════════ FOOTER ════════════════════════════════════ */}
-      <footer style={{ background: '#0b1120', position: 'relative', overflow: 'hidden' }}>
-
-        {/* Acento superior degradado */}
-        <div style={{ height: '3px', background: 'linear-gradient(90deg,#3b82f6,#7c3aed,#10b981)' }} />
-
-        {/* Blob decorativo */}
-        <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '340px', height: '340px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '52px 28px 32px' }}>
-
-          {/* ── 3 columnas principales ── */}
-          <div className="footer-grid">
-
-            {/* Col 1 — Marca */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'linear-gradient(135deg,#3b82f6,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: '18px', flexShrink: 0, boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>M</div>
-                <span style={{ fontSize: '16px', color: '#f1f5f9', fontWeight: 800, letterSpacing: '-0.3px' }}>{brandName}</span>
-              </div>
-              <p style={{ fontSize: '13px', color: '#475569', margin: 0, lineHeight: 1.75 }}>{tagline}</p>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '20px', padding: '5px 12px', width: 'fit-content' }}>
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-                <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 600 }}>Sistema operativo 24/7</span>
-              </div>
-            </div>
-
-            {/* Col 2 — Contacto */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '18px' }}>
-                Soporte y contacto
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {site.phone && (
-                  <a href={`tel:${site.phone}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', textDecoration: 'none', group: true }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                      <Phone size={14} color="#60a5fa" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>Teléfono</div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.phone}</div>
-                    </div>
-                  </a>
-                )}
-
-                {site.whatsapp && (
-                  <a href={`https://wa.me/${site.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', textDecoration: 'none' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                      <MessageCircle size={14} color="#4ade80" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>WhatsApp</div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.whatsapp}</div>
-                    </div>
-                  </a>
-                )}
-
-                {site.email && (
-                  <a href={`mailto:${site.email}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', textDecoration: 'none' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                      <Mail size={14} color="#818cf8" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>Correo electrónico</div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.email}</div>
-                    </div>
-                  </a>
-                )}
-
-                {site.address && (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                      <MapPin size={14} color="#fbbf24" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px' }}>Ubicación</div>
-                      <div style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, lineHeight: 1.4 }}>{site.address}</div>
-                    </div>
-                  </div>
-                )}
-
-                {!site.phone && !site.whatsapp && !site.email && !site.address && (
-                  <p style={{ fontSize: '12px', color: '#334155', fontStyle: 'italic', margin: 0 }}>Configura los datos de contacto desde SuperAdmin → Sitio web.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Col 3 — Navegación */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-                Acceso rápido
-              </div>
-              {[
-                { label: 'Ver demo en vivo', action: goToDemo },
-                { label: 'Planes y precios', action: () => {} },
-                { label: 'Registrar mi negocio', action: () => navigate('/register') },
-              ].map(({ label, action }) => (
-                <button key={label} onClick={action}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', background: 'transparent', border: '1px solid transparent', textAlign: 'left', cursor: 'pointer', transition: 'all .15s', width: '100%' }}
-                  onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.07)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.borderColor='transparent' }}>
-                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'linear-gradient(135deg,#3b82f6,#7c3aed)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>{label}</span>
+                <button style={{ height: '46px', border: 'none', borderRadius: '13px', background: primary, color: getReadableTextColor(primary), fontWeight: 900, fontSize: '13px' }}>
+                  Cobrar ahora
                 </button>
-              ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div style={{ position: 'absolute', left: '-18px', bottom: '34px', borderRadius: '18px', background: '#ffffff', border: '1px solid #dbe5ef', padding: '14px 16px', boxShadow: '0 20px 46px rgba(15, 23, 42, .16)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Sparkles size={17} color="#16a34a" />
+          </div>
+          <div>
+            <div style={{ color: '#0f172a', fontSize: '13px', fontWeight: 900 }}>Cierre listo</div>
+            <div style={{ color: '#64748b', fontSize: '11px' }}>Diferencia: S/ 0.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-              {/* Redes sociales */}
-              {(site.facebook || site.instagram || site.tiktok) && (
-                <div style={{ marginTop: '16px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-                    Redes sociales
+export default function Landing() {
+  const navigate = useNavigate()
+  const { site, primary, onPrimary, prices, features } = useLandingData()
+  const [billing, setBilling] = useState('monthly')
+  const currency = CURRENCY[site.publicCurrency] || CURRENCY.PEN
+  const cycleKey = billing === 'annual' ? 'annual' : 'monthly'
+
+  const proof = [
+    ['3 min', 'para empezar una venta'],
+    ['18+', 'modulos conectados'],
+    ['0', 'archivos sueltos de caja'],
+    ['24/7', 'control desde la nube'],
+  ]
+
+  return (
+    <div className="lp-shell" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
+      <style>{GLOBAL_CSS}</style>
+
+      <header style={{ position: 'sticky', top: 0, zIndex: 60, background: 'rgba(255,255,255,.86)', backdropFilter: 'blur(18px)', borderBottom: '1px solid rgba(205, 216, 228, .72)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 22 }}>
+          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ display: 'flex', alignItems: 'center', gap: 11, border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
+            <BrandMark site={site} primary={primary} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ color: '#102033', fontWeight: 950, fontSize: 16 }}>{site.brandName}</div>
+              <div style={{ color: '#6b7b8d', fontWeight: 650, fontSize: 11 }}>{site.systemVersion || site.tagline}</div>
+            </div>
+          </button>
+
+          <nav className="lp-nav-links">
+            {[
+              ['Producto', 'producto'],
+              ['Funciones', 'funciones'],
+              ...(site.showPricesPublic ? [['Planes', 'planes']] : []),
+              ['Contacto', 'contacto'],
+            ].map(([label, target]) => (
+              <button key={target} onClick={() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' })} style={{ border: 'none', background: 'transparent', color: '#425267', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{label}</button>
+            ))}
+          </nav>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button className="lp-nav-cta-secondary" onClick={() => window.location.href = '/app/demo'} style={{ height: 40, padding: '0 15px', borderRadius: 11, border: '1px solid #d6e0ea', background: '#fff', color: '#102033', fontSize: 13, fontWeight: 850, cursor: 'pointer' }}>
+              Ver demo
+            </button>
+            <button onClick={() => handleConfiguredAction(site.heroCtaUrl, navigate)} style={{ height: 40, padding: '0 17px', borderRadius: 11, border: 'none', background: primary, color: onPrimary, fontSize: 13, fontWeight: 900, cursor: 'pointer', boxShadow: `0 14px 28px ${primary}30` }}>
+              {site.heroCtaText}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, #ffffff 0%, #eef7f2 100%)' }}>
+          <div style={{ position: 'absolute', inset: '0 0 auto 0', height: 520, background: `radial-gradient(circle at 18% 20%, ${primary}24, transparent 34%), radial-gradient(circle at 82% 8%, #38bdf822, transparent 30%)`, pointerEvents: 'none' }} />
+          <div className="lp-hero" style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', padding: '76px 24px 72px' }}>
+            <div className="lp-reveal">
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 22, color: '#102033', fontWeight: 850, fontSize: 13 }}>
+                <Star size={16} color={primary} fill={primary} />
+                <span>{site.tagline}</span>
+              </div>
+              <h1 className="lp-hero-title" style={{ margin: 0, color: '#0f1f32', fontSize: 62, lineHeight: 1.02, letterSpacing: 0, fontWeight: 950, maxWidth: 760 }}>
+                {site.heroTitle}
+              </h1>
+              <p style={{ margin: '22px 0 0', color: '#516172', fontSize: 18, lineHeight: 1.72, maxWidth: 640 }}>
+                {site.heroSubtitle}
+              </p>
+              <p style={{ margin: '14px 0 0', color: '#64748b', fontSize: 14, lineHeight: 1.7, maxWidth: 620 }}>
+                {site.description}
+              </p>
+              <div className="lp-hero-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 32 }}>
+                <button onClick={() => handleConfiguredAction(site.heroCtaUrl, navigate)} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minHeight: 52, padding: '0 24px', borderRadius: 14, border: 'none', background: primary, color: onPrimary, fontSize: 15, fontWeight: 950, cursor: 'pointer', boxShadow: `0 20px 42px ${primary}34` }}>
+                  {site.heroCtaText} <ArrowRight size={18} />
+                </button>
+                <button onClick={() => handleConfiguredAction(site.heroCtaSecUrl, navigate)} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, minHeight: 52, padding: '0 20px', borderRadius: 14, border: '1px solid #cfdae6', background: '#ffffff', color: '#102033', fontSize: 15, fontWeight: 900, cursor: 'pointer' }}>
+                  {site.heroCtaSecText} <ExternalLink size={16} />
+                </button>
+              </div>
+              <div className="lp-proof" style={{ marginTop: 38 }}>
+                {proof.map(([value, label]) => (
+                  <div key={label} style={{ background: 'rgba(255,255,255,.75)', border: '1px solid #dce7f0', borderRadius: 16, padding: '15px 16px' }}>
+                    <div style={{ color: '#0f1f32', fontSize: 24, lineHeight: 1, fontWeight: 950 }}>{value}</div>
+                    <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.35, marginTop: 7, fontWeight: 700 }}>{label}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {site.facebook && (
-                      <a href={site.facebook} target="_blank" rel="noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.20)', color: '#60a5fa', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
-                        f &nbsp;Facebook
-                      </a>
-                    )}
-                    {site.instagram && (
-                      <a href={site.instagram} target="_blank" rel="noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(236,72,153,0.10)', border: '1px solid rgba(236,72,153,0.20)', color: '#f472b6', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
-                        ◎ Instagram
-                      </a>
-                    )}
-                    {site.tiktok && (
-                      <a href={site.tiktok} target="_blank" rel="noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}>
-                        ♪ TikTok
-                      </a>
-                    )}
+                ))}
+              </div>
+            </div>
+
+            <MiniDashboard primary={primary} site={site} />
+          </div>
+        </section>
+
+        <section id="producto" style={{ background: '#ffffff', borderTop: '1px solid #e5edf5', borderBottom: '1px solid #e5edf5' }}>
+          <div className="lp-demo-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '78px 24px' }}>
+            <div>
+              <h2 className="lp-section-title" style={{ color: '#0f1f32', fontSize: 42, lineHeight: 1.12, letterSpacing: 0, fontWeight: 950, margin: 0 }}>
+                La caja, el almacen y los reportes trabajando juntos.
+              </h2>
+              <p style={{ color: '#5f6f80', fontSize: 16, lineHeight: 1.75, margin: '18px 0 0' }}>
+                Cada venta actualiza stock, caja y reportes. Menos doble digitacion, menos errores y mas visibilidad para tomar decisiones cada dia.
+              </p>
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {[
+                [CreditCard, 'Cobro sin friccion', 'Efectivo, tarjeta, Yape, Plin, credito y pagos mixtos.'],
+                [Package, 'Reposicion inteligente', 'Alertas de stock bajo y productos por vencer para comprar antes de perder ventas.'],
+                [BarChart3, 'Gestion con numeros', 'Margen, ticket promedio, ventas por hora y productos estrella en dashboards simples.'],
+              ].map(([Icon, title, desc]) => (
+                <div key={title} className="lp-card-hover" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 18, background: '#f8fbfd', border: '1px solid #dfe9f2', borderRadius: 18 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 14, background: `${primary}15`, color: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={22} />
                   </div>
+                  <div>
+                    <div style={{ color: '#102033', fontSize: 15, fontWeight: 950 }}>{title}</div>
+                    <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.65, marginTop: 5 }}>{desc}</div>
+                  </div>
+                  <ChevronRight size={18} color="#9aaaba" style={{ marginLeft: 'auto', marginTop: 13 }} />
                 </div>
-              )}
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="funciones" style={{ maxWidth: 1200, margin: '0 auto', padding: '84px 24px' }}>
+          <div style={{ maxWidth: 720 }}>
+            <h2 className="lp-section-title" style={{ color: '#0f1f32', fontSize: 42, lineHeight: 1.12, fontWeight: 950, margin: 0 }}>
+              Configura la historia comercial desde SuperAdmin.
+            </h2>
+            <p style={{ color: '#64748b', fontSize: 16, lineHeight: 1.75, margin: '16px 0 0' }}>
+              Estas funcionalidades salen de la configuracion del sitio. Puedes ajustar el mensaje sin tocar codigo.
+            </p>
+          </div>
+
+          <div className="lp-feature-grid" style={{ marginTop: 34 }}>
+            {features.map(({ icon: Icon, title, desc }, index) => (
+              <article key={`${title}-${index}`} className="lp-card-hover" style={{ background: '#ffffff', border: '1px solid #dfe9f2', borderRadius: 20, padding: 22, minHeight: 176 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 15, background: index % 2 ? '#eef6ff' : `${primary}14`, color: index % 2 ? '#2563eb' : primary, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
+                  <Icon size={23} />
+                </div>
+                <h3 style={{ color: '#102033', fontSize: 17, lineHeight: 1.25, fontWeight: 950, margin: 0 }}>{title}</h3>
+                <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.65, margin: '9px 0 0' }}>{desc}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {site.showPricesPublic && (
+          <section id="planes" style={{ background: '#0f1f32', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 20% 5%, ${primary}30, transparent 34%), radial-gradient(circle at 88% 25%, #60a5fa24, transparent 34%)`, pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', maxWidth: 1200, margin: '0 auto', padding: '84px 24px 92px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 34 }}>
+                <div style={{ maxWidth: 670 }}>
+                  <h2 className="lp-section-title" style={{ fontSize: 42, lineHeight: 1.12, fontWeight: 950, margin: 0 }}>
+                    Planes claros para empezar hoy.
+                  </h2>
+                  <p style={{ color: '#a8b6c7', fontSize: 16, lineHeight: 1.75, margin: '16px 0 0' }}>
+                    Precios configurados desde SuperAdmin. La prueba gratuita es de {site.trialDays} dias.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 14, padding: 5 }}>
+                  {[
+                    ['monthly', 'Mensual'],
+                    ['annual', 'Anual'],
+                  ].map(([key, label]) => (
+                    <button key={key} onClick={() => setBilling(key)} style={{ border: 'none', borderRadius: 10, padding: '10px 16px', color: billing === key ? '#0f1f32' : '#d8e1ea', background: billing === key ? '#fff' : 'transparent', fontWeight: 900, cursor: 'pointer' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lp-pricing-grid">
+                {PLAN_ORDER.map((planId) => {
+                  const plan = PLANS[planId]
+                  const amount = getPlanPrice(planId, cycleKey, prices)
+                  const popular = plan.badge
+                  return (
+                    <article key={planId} className="lp-card-hover" style={{ background: popular ? '#ffffff' : 'rgba(255,255,255,.06)', border: popular ? 'none' : '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 22, color: popular ? '#102033' : '#fff', position: 'relative' }}>
+                      {popular && (
+                        <div style={{ position: 'absolute', top: -13, left: 22, borderRadius: 999, background: primary, color: onPrimary, padding: '6px 12px', fontSize: 11, fontWeight: 950 }}>
+                          {plan.badge}
+                        </div>
+                      )}
+                      <h3 style={{ fontSize: 18, fontWeight: 950, margin: '5px 0 6px' }}>{plan.label}</h3>
+                      <p style={{ color: popular ? '#64748b' : '#a8b6c7', fontSize: 12, lineHeight: 1.55, margin: 0, minHeight: 38 }}>{plan.description}</p>
+                      <div style={{ marginTop: 20, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <span style={{ fontSize: amount ? 34 : 28, fontWeight: 950 }}>{amount ? `${currency.symbol} ${amount}` : 'Gratis'}</span>
+                        {amount > 0 && <span style={{ color: popular ? '#64748b' : '#a8b6c7', fontSize: 12 }}>/mes</span>}
+                      </div>
+                      {amount > 0 && billing === 'annual' && (
+                        <div style={{ color: popular ? '#64748b' : '#a8b6c7', fontSize: 11, marginTop: 4 }}>
+                          Total anual: {currency.symbol} {amount * 12}
+                        </div>
+                      )}
+                      <button onClick={() => navigate('/register', { state: { plan: planId } })} style={{ width: '100%', height: 44, marginTop: 18, border: popular ? 'none' : '1px solid rgba(255,255,255,.2)', borderRadius: 13, background: popular ? primary : 'rgba(255,255,255,.1)', color: popular ? onPrimary : '#fff', fontWeight: 950, cursor: 'pointer' }}>
+                        Elegir plan
+                      </button>
+                      <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+                        {(PLAN_FEATURES[planId] || []).map((feature) => (
+                          <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: 9, color: popular ? '#334155' : '#dce8f3', fontSize: 12, fontWeight: 750 }}>
+                            <Check size={15} color={popular ? primary : '#8bd8b6'} />
+                            {feature}
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section id="contacto" style={{ background: '#ffffff' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '82px 24px' }}>
+            <div style={{ borderRadius: 28, background: `linear-gradient(135deg, ${primary} 0%, #0f766e 100%)`, color: onPrimary, padding: '44px 34px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 28, alignItems: 'center', boxShadow: `0 26px 70px ${primary}30` }}>
+              <div>
+                <h2 className="lp-section-title" style={{ fontSize: 38, lineHeight: 1.12, fontWeight: 950, margin: 0 }}>
+                  Listo para convertir visitas en negocios registrados.
+                </h2>
+                <p style={{ fontSize: 15, lineHeight: 1.75, opacity: .86, margin: '14px 0 0', maxWidth: 660 }}>
+                  Activa la demo, muestra tus planes y deja que cada comercio entienda el valor en menos de un minuto.
+                </p>
+              </div>
+              <button onClick={() => handleConfiguredAction(site.heroCtaUrl, navigate)} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minHeight: 52, padding: '0 24px', borderRadius: 15, border: 'none', background: '#ffffff', color: '#102033', fontWeight: 950, fontSize: 15, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {site.heroCtaText} <ArrowRight size={18} />
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer style={{ background: '#08111f', color: '#dbe6f0' }}>
+        <div className="lp-footer-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '48px 24px 28px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              <BrandMark site={site} primary={primary} />
+              <div>
+                <div style={{ fontWeight: 950, color: '#fff' }}>{site.brandName}</div>
+                <div style={{ fontSize: 12, color: '#8ea1b6', marginTop: 2 }}>{site.tagline}</div>
+              </div>
+            </div>
+            <p style={{ color: '#8ea1b6', fontSize: 13, lineHeight: 1.75, margin: '16px 0 0', maxWidth: 380 }}>{site.description}</p>
+          </div>
+
+          <div>
+            <div style={{ color: '#fff', fontWeight: 950, marginBottom: 14 }}>Contacto</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {site.phone && <a href={`tel:${site.phone}`} style={footerLink}><Phone size={15} /> {site.phone}</a>}
+              {site.whatsapp && <a href={`https://wa.me/${site.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={footerLink}><MessageCircle size={15} /> {site.whatsapp}</a>}
+              {site.email && <a href={`mailto:${site.email}`} style={footerLink}><Mail size={15} /> {site.email}</a>}
+              {site.address && <span style={footerText}><MapPin size={15} /> {site.address}</span>}
             </div>
           </div>
 
-          {/* ── Línea de copyright ── */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-            <p style={{ fontSize: '12px', color: '#1e293b', margin: 0 }}>
-              © {new Date().getFullYear()} <span style={{ color: '#334155', fontWeight: 600 }}>{brandName}</span> · Hecho en Perú 🇵🇪
-            </p>
-            <p style={{ fontSize: '11px', color: '#1e293b', margin: 0 }}>Sistema de gestión para retail minorista</p>
+          <div>
+            <div style={{ color: '#fff', fontWeight: 950, marginBottom: 14 }}>Canales</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
+              {site.facebook && <a href={site.facebook} target="_blank" rel="noreferrer" style={socialLink}><Facebook size={16} /> Facebook</a>}
+              {site.instagram && <a href={site.instagram} target="_blank" rel="noreferrer" style={socialLink}><Instagram size={16} /> Instagram</a>}
+              {site.tiktok && <a href={site.tiktok} target="_blank" rel="noreferrer" style={socialLink}><Globe2 size={16} /> TikTok</a>}
+            </div>
           </div>
+        </div>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '18px 24px 26px', borderTop: '1px solid rgba(255,255,255,.08)', color: '#60758c', fontSize: 12, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <span>{site.footerText || `© ${new Date().getFullYear()} ${site.brandName}. Todos los derechos reservados.`}</span>
+          <span>Landing conectada con SuperAdmin</span>
         </div>
       </footer>
     </div>
   )
+}
+
+const footerLink = {
+  color: '#b8c7d7',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 9,
+  textDecoration: 'none',
+  fontSize: 13,
+  fontWeight: 750,
+}
+
+const footerText = {
+  color: '#b8c7d7',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 9,
+  fontSize: 13,
+  fontWeight: 750,
+}
+
+const socialLink = {
+  color: '#dbe6f0',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 7,
+  textDecoration: 'none',
+  border: '1px solid rgba(255,255,255,.12)',
+  background: 'rgba(255,255,255,.06)',
+  borderRadius: 999,
+  padding: '9px 12px',
+  fontSize: 12,
+  fontWeight: 850,
 }
