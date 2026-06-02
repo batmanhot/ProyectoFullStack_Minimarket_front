@@ -192,12 +192,7 @@ export const tenantService = {
       return ok(data)
     }
     const tenant = _tenants[slug] ?? _tenants.demo
-    // La Bodega Demo siempre activa con 30 días desde hoy
-    if (tenant?.slug === 'demo') {
-      const exp = new Date()
-      exp.setDate(exp.getDate() + 30)
-      return ok({ ...tenant, isActive: true, accessExpiresAt: exp.toISOString() })
-    }
+    // Retornar el tenant tal cual está guardado, respetando accessExpiresAt de SuperAdmin
     return ok(tenant)
   },
 

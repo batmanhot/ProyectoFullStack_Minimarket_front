@@ -77,6 +77,15 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
   const [collapsed, setCollapsed]       = useState(() => window.innerWidth < 768)
   const [isMobile, setIsMobile]         = useState(() => window.innerWidth < 768)
   const [showThemePicker, setShowThemePicker] = useState(false)
+  const [alertThresholds, setAlertThresholds] = useState(() => getStoredAlertThresholds())
+
+  // Recargar umbrales de alerta cuando cambian en SuperAdmin o cada 5s para detectar cambios
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAlertThresholds(getStoredAlertThresholds())
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     const onResize = () => {
@@ -99,7 +108,6 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
   const planCfg    = PLANS[plan]
   const planLabel  = planCfg?.label ?? 'Trial'
   const daysLeft   = tenantCtx?.daysLeft ?? null
-  const alertThresholds = getStoredAlertThresholds()
   const alertLevel = getAlertLevel(daysLeft, alertThresholds)
 
   // Devuelve true si el módulo está incluido en el plan activo
@@ -230,6 +238,28 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
         </div>
       )}
 
+      {/* ── ALERTA COMPACTA DE VENCIMIENTO (1 LÍNEA) ────────────────────────── */}
+      {alertLevel && (() => {
+        const cfg = ALERT_CFG[alertLevel]
+        const bgClass = alertLevel === 'critical' ? 'bg-red-100 dark:bg-red-900/50 border-red-300 dark:border-red-700' :
+                        alertLevel === 'urgent' ? 'bg-orange-100 dark:bg-orange-900/50 border-orange-300 dark:border-orange-700' :
+                        'bg-yellow-100 dark:bg-yellow-900/50 border-yellow-300 dark:border-yellow-700'
+        const textColorClass = alertLevel === 'critical' ? 'text-red-800 dark:text-red-100' :
+                               alertLevel === 'urgent' ? 'text-orange-800 dark:text-orange-100' :
+                               'text-yellow-800 dark:text-yellow-100'
+
+        return (
+          <div className={`mx-3 my-2 px-3 py-1.5 rounded-lg border ${bgClass} flex items-center gap-2 text-xs font-medium ${textColorClass}`}>
+            <span className="flex-shrink-0">{cfg.icon}</span>
+            <span className="truncate">
+              {daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? 'Último día' : `Vence en ${daysLeft}d`} 
+              <span className="opacity-75 mx-1">•</span>
+              Crítico ≤ {alertThresholds.critical}d • Urgente ≤ {alertThresholds.urgent}d • Aviso ≤ {alertThresholds.warning}d
+            </span>
+          </div>
+        )
+      })()}
+
       {/* Nav agrupado */}
       <nav className="flex-1 overflow-y-auto py-2 sidebar-nav-scroll" style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}>
         {NAV_GROUPS.map(group => {
@@ -302,19 +332,26 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
         </div>
       </div>
 
-      {/* ── Tira de alerta de vencimiento (solo cuando aplica) ─────────────── */}
+      {/* ── Mini alerta de vencimiento (confirmación visual adicional) ───────── */}
       {alertLevel && (() => {
         const cfg = ALERT_CFG[alertLevel]
+        const bgClass = alertLevel === 'critical' ? 'bg-red-100 dark:bg-red-900/50' :
+                        alertLevel === 'urgent' ? 'bg-orange-100 dark:bg-orange-900/50' :
+                        'bg-yellow-100 dark:bg-yellow-900/50'
+        const borderClass = alertLevel === 'critical' ? 'border-red-400 dark:border-red-600' :
+                            alertLevel === 'urgent' ? 'border-orange-400 dark:border-orange-600' :
+                            'border-yellow-400 dark:border-yellow-600'
+        const textClass = alertLevel === 'critical' ? 'text-red-800 dark:text-red-100' :
+                          alertLevel === 'urgent' ? 'text-orange-800 dark:text-orange-100' :
+                          'text-yellow-800 dark:text-yellow-100'
+
         return (
-          <div style={{ margin: '0 8px 6px', borderRadius: '10px', background: cfg.bg, border: `1px solid ${cfg.border}`, padding: '8px 10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <span style={{ fontSize: '13px' }}>{cfg.icon}</span>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: cfg.text }}>
-                {daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? cfg.verb + ' 1 día' : `${cfg.verb} ${daysLeft} días`}
+          <div className={`mx-2 mb-2 px-3 py-2 rounded-md border ${bgClass} ${borderClass}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg leading-none">{cfg.icon}</span>
+              <span className={`text-xs font-bold ${textClass}`}>
+                {daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? 'Último día' : `${cfg.verb} ${daysLeft} días`}
               </span>
-            </div>
-            <div style={{ fontSize: '10px', color: cfg.text, opacity: 0.75, lineHeight: 1.4 }}>
-              Plan <strong>{planLabel}</strong> — renueva para continuar
             </div>
           </div>
         )
