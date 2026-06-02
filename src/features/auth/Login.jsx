@@ -4,7 +4,7 @@ import { authService } from '../../services/index'
 import { ROLES } from '../../config/app'
 import { PLANS } from '../../config/plans'
 import { useTenantSafe } from '../../context/TenantContext'
-import logo from '../../assets/logo.png'
+import logo from '../../assets/logo.webp'
 import toast from 'react-hot-toast'
 
 const ALL_DEMO_ROLES = [
