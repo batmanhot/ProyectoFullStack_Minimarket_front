@@ -258,95 +258,124 @@ function LoginFormV2({ onLogin }) {
     }, 600)
   }
 
+  const FEATURES = [
+    { icon: Building2, text: 'Gestión de clientes y negocios' },
+    { icon: CreditCard, text: 'Planes, precios y facturación' },
+    { icon: BarChart3,  text: 'Historial de renovaciones' },
+  ]
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
-      {/* Left — branding */}
-      <div style={{ flex: 1, background: 'linear-gradient(145deg, #04091a 0%, #061228 40%, #082040 70%, #0a2e56 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-        {/* Grid pattern */}
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(6,182,212,0.06) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-        {/* Glow circles */}
-        <div style={{ position: 'absolute', top: '20%', left: '15%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%)' }} />
-        <div style={{ position: 'absolute', bottom: '15%', right: '10%', width: '250px', height: '250px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)' }} />
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* ── Fondo — imagen + overlay ── */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        backgroundImage: 'url(/bg_admin.webp)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(100deg, rgba(4,9,26,0.55) 0%, rgba(4,9,26,0.82) 55%, rgba(4,9,26,0.97) 100%)',
+      }} />
 
-        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '40px', maxWidth: '480px' }}>
-          <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', boxShadow: '0 0 40px rgba(6,182,212,0.3)' }}>
-            <Crown size={36} color="#fff" />
+      {/* ── Dot grid ── */}
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(6,182,212,0.05) 1px, transparent 1px)', backgroundSize: '36px 36px', pointerEvents: 'none' }} />
+
+      {/* ── Card derecha ── */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        width: '460px', minWidth: '340px',
+        margin: '0 60px 0 0',
+        background: 'rgba(11,18,34,0.82)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        border: '1px solid rgba(6,182,212,0.14)',
+        borderRadius: '24px',
+        padding: '40px 36px',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+        display: 'flex', flexDirection: 'column', gap: '0',
+      }}>
+
+        {/* ── Branding superior ── */}
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ width: '68px', height: '68px', borderRadius: '18px', background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', boxShadow: '0 0 36px rgba(6,182,212,0.35)' }}>
+            <Crown size={30} color="#fff" />
           </div>
-          <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#f1f5f9', margin: '0 0 12px', letterSpacing: '-0.5px' }}>Panel de Administración</h1>
-          <p style={{ fontSize: '16px', color: '#64748b', margin: '0 0 40px', lineHeight: 1.6 }}>Gestión centralizada de negocios, planes y configuración del sistema SaaS</p>
+          <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#f1f5f9', margin: '0 0 6px', letterSpacing: '-0.4px' }}>
+            Panel de Administración
+          </h1>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>
+            Gestión centralizada de negocios, planes<br/>y configuración del sistema SaaS
+          </p>
+        </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left' }}>
-            {[
-              { icon: Building2, text: 'Gestión de clientes y negocios' },
-              { icon: CreditCard, text: 'Planes, precios y facturación' },
-              { icon: BarChart3, text: 'Historial de renovaciones' },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <Icon size={16} color={D.accent} />
-                <span style={{ fontSize: '13px', color: '#94a3b8' }}>{text}</span>
+        {/* ── Features ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '24px' }}>
+          {FEATURES.map(({ icon: Icon, text }) => (
+            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '10px', background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.1)' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(6,182,212,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon size={14} color={D.accent} />
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ position: 'absolute', bottom: '20px', color: '#1e3a5f', fontSize: '11px' }}>
-          SISTEMA EN LÍNEA ● StockPro v2.0 · Maqueta — localStorage
-        </div>
-      </div>
-
-      {/* Right — form */}
-      <div style={{ width: '440px', minWidth: '340px', background: '#0b1222', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 36px', position: 'relative' }}>
-        <div style={{ width: '100%', maxWidth: '360px' }}>
-          {/* Brand */}
-          <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'linear-gradient(135deg, #06b6d4, #0891b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(6,182,212,0.3)' }}>
-              <Crown size={26} color="#fff" />
+              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>{text}</span>
             </div>
-            <h2 style={{ fontSize: '22px', fontWeight: 800, color: D.t1, margin: '0 0 4px' }}>Admin Sistema</h2>
-            <p style={{ fontSize: '13px', color: D.t3, margin: 0 }}>Acceso exclusivo administrador</p>
-          </div>
+          ))}
+        </div>
 
-          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: D.t3, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>EMAIL</label>
+        {/* ── Divisor ── */}
+        <div style={{ height: '1px', background: 'rgba(255,255,255,0.07)', marginBottom: '24px' }} />
+
+        {/* ── Formulario ── */}
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: D.t3, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>EMAIL</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username"
+              style={{ ...inp, background: 'rgba(13,23,41,0.9)', color: '#e2e8f0' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: D.t3, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>CONTRASEÑA</label>
+            <div style={{ position: 'relative' }}>
               <input
-                type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username"
-                style={{ ...inp, background: '#0d1729' }}
+                type={showPass ? 'text' : 'password'} value={pass} onChange={e => setPass(e.target.value)} required autoComplete="current-password"
+                style={{ ...inp, background: 'rgba(13,23,41,0.9)', paddingRight: '42px', color: '#e2e8f0' }}
               />
+              <button type="button" onClick={() => setShow(p => !p)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: D.t3, display: 'flex' }}>
+                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: D.t3, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>CONTRASEÑA</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPass ? 'text' : 'password'} value={pass} onChange={e => setPass(e.target.value)} required autoComplete="current-password"
-                  style={{ ...inp, background: '#0d1729', paddingRight: '42px' }}
-                />
-                <button type="button" onClick={() => setShow(p => !p)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: D.t3, display: 'flex' }}>
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div style={{ fontSize: '13px', color: D.red, background: D.redB, border: `1px solid ${D.red}30`, padding: '9px 12px', borderRadius: '8px' }}>
-                {error}
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} style={{ padding: '13px', borderRadius: '10px', border: 'none', background: loading ? '#1e3a5f' : `linear-gradient(135deg, ${D.accent}, #0891b2)`, color: '#fff', fontWeight: 700, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: 'inherit', boxShadow: loading ? 'none' : '0 4px 20px rgba(6,182,212,0.25)' }}>
-              {loading ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Crown size={16} />}
-              {loading ? 'Verificando...' : 'Ingresar al Panel'}
-            </button>
-          </form>
-
-          <div style={{ marginTop: '20px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(6,182,212,0.07)', border: '1px solid rgba(6,182,212,0.12)', fontSize: '12px', color: D.t3 }}>
-            <span style={{ color: D.t2, fontWeight: 600 }}>Demo:</span> {SA_EMAIL} / {SA_PASS}
           </div>
+
+          {error && (
+            <div style={{ fontSize: '13px', color: D.red, background: D.redB, border: `1px solid ${D.red}30`, padding: '9px 12px', borderRadius: '8px' }}>
+              {error}
+            </div>
+          )}
+
+          <button type="submit" disabled={loading} style={{ padding: '13px', borderRadius: '10px', border: 'none', background: loading ? '#1e3a5f' : `linear-gradient(135deg, ${D.accent}, #0891b2)`, color: '#fff', fontWeight: 700, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontFamily: 'inherit', boxShadow: loading ? 'none' : '0 4px 20px rgba(6,182,212,0.3)', marginTop: '4px' }}>
+            {loading ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Crown size={16} />}
+            {loading ? 'Verificando...' : 'Ingresar al Panel'}
+          </button>
+        </form>
+
+        {/* ── Demo credentials ── */}
+        <div style={{ marginTop: '18px', padding: '11px 14px', borderRadius: '8px', background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.1)', fontSize: '12px', color: D.t3 }}>
+          <span style={{ color: D.t2, fontWeight: 600 }}>Demo:</span> {SA_EMAIL} / {SA_PASS}
         </div>
 
-        <div style={{ position: 'absolute', bottom: '20px', fontSize: '11px', color: D.t3 }}>
+        {/* ── Footer ── */}
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '11px', color: '#1e3a5f' }}>
           StockPro v2.0 · Maqueta — localStorage
-        </div>
+        </p>
       </div>
     </div>
   )
@@ -940,10 +969,12 @@ function PlansTab() {
   const [editPlan,  setEditPlan]  = useState(null)
   const [view,      setView]      = useState('cards') // 'cards' | 'table'
   const [planFeats, setPlanFeats] = useState(() => loadLocal(PLAN_FEATURES_KEY, DEFAULT_PLAN_FEATURES))
-  const [saved,     setSaved]     = useState(false)
-  const [featSaved, setFeatSaved] = useState(false)
-  const [loading,   setLoading]   = useState(false)
-  const [cardCycle, setCardCycle] = useState('monthly')
+  const [saved,         setSaved]         = useState(false)
+  const [featSaved,     setFeatSaved]     = useState(false)
+  const [loading,       setLoading]       = useState(false)
+  const [cardCycle,     setCardCycle]     = useState('monthly')
+  const [editingLimit,  setEditingLimit]  = useState(null)  // { pid, field }
+  const [editingValue,  setEditingValue]  = useState('')
 
   useEffect(() => {
     tenantService.getPrices().then(r => { if (r.data) setPrices(r.data) })
@@ -954,6 +985,15 @@ function PlansTab() {
     setLoading(true)
     await tenantService.updatePrices(prices)
     setLoading(false); setSaved(true); setTimeout(() => setSaved(false), 3000)
+  }
+
+  const saveLimitInline = async (pid, field, rawValue) => {
+    const parsed = parseInt(rawValue, 10)
+    // Vacío o negativo = ilimitado (null)
+    const numVal = rawValue === '' || isNaN(parsed) || parsed < 0 ? null : parsed
+    const updated = { ...limits, [pid]: { ...(limits?.[pid] ?? {}), [field]: numVal } }
+    setLimits(updated)
+    await tenantService.updateLimits(updated)
   }
   const saveModules = () => {
     saveLocal(PLAN_FEATURES_KEY, planFeats)
@@ -1199,39 +1239,75 @@ function PlansTab() {
                     Límites
                   </td>
                 </tr>
+                {/* Filas editables: Productos y Usuarios */}
                 {[
-                  {
-                    label: 'Productos',
-                    render: (pid) => {
-                      const v = limits?.[pid]?.products ?? DEFAULT_PLAN_LIMITS[pid]?.products ?? null
-                      return v === null ? <span style={{ color: D.green, fontWeight: 700 }}>Ilimitados</span>
-                        : <span style={{ color: D.amber }}>Hasta {v?.toLocaleString()}</span>
-                    },
-                  },
-                  {
-                    label: 'Usuarios',
-                    render: (pid) => {
-                      const v = limits?.[pid]?.users ?? DEFAULT_PLAN_LIMITS[pid]?.users ?? null
-                      return v === null ? <span style={{ color: D.green, fontWeight: 700 }}>Ilimitados</span>
-                        : <span style={{ color: D.amber }}>Hasta {v}</span>
-                    },
-                  },
-                  {
-                    label: 'Roles disponibles',
-                    render: (pid) => <span style={{ color: D.t2, fontSize: '11px' }}>{PLAN_ROLES[pid]}</span>,
-                  },
-                ].map(({ label, render }) => (
+                  { label: 'Productos', field: 'products' },
+                  { label: 'Usuarios',  field: 'users'    },
+                ].map(({ label, field }) => (
                   <tr key={label} style={{ borderBottom: `1px solid ${D.border}` }}>
                     <td style={{ padding: '11px 20px', fontSize: '13px', color: D.t2, background: D.card2, borderRight: `1px solid ${D.border}` }}>
-                      {label}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {label}
+                        <span style={{ fontSize: '10px', color: D.t3 }} title="Clic en el valor para editar">✏️</span>
+                      </div>
                     </td>
-                    {PLAN_ORDER.map(pid => (
-                      <td key={pid} style={{ padding: '11px 20px', textAlign: 'center', fontSize: '13px', background: colBg(pid), ...colBord(pid) }}>
-                        {render(pid)}
-                      </td>
-                    ))}
+                    {PLAN_ORDER.map(pid => {
+                      const v         = limits?.[pid]?.[field] ?? DEFAULT_PLAN_LIMITS[pid]?.[field] ?? null
+                      const isEditing = editingLimit?.pid === pid && editingLimit?.field === field
+                      return (
+                        <td key={pid} style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', background: colBg(pid), ...colBord(pid) }}>
+                          {isEditing ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                              <input
+                                autoFocus
+                                type="number"
+                                min="0"
+                                placeholder="vacío = ∞"
+                                value={editingValue}
+                                onChange={e => setEditingValue(e.target.value)}
+                                onBlur={() => { saveLimitInline(pid, field, editingValue); setEditingLimit(null) }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter')  { saveLimitInline(pid, field, editingValue); setEditingLimit(null) }
+                                  if (e.key === 'Escape') { setEditingLimit(null) }
+                                }}
+                                style={{ width: '90px', padding: '5px 8px', borderRadius: '7px', border: `1.5px solid ${D.accent}`, background: D.card2, color: D.t1, fontSize: '13px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' }}
+                              />
+                              <span style={{ fontSize: '10px', color: D.t3 }}>vacío = ilimitado</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingLimit({ pid, field }); setEditingValue(v === null ? '' : String(v)) }}
+                              title="Clic para editar"
+                              style={{ background: 'none', border: '1px solid transparent', cursor: 'pointer', padding: '5px 10px', borderRadius: '7px', display: 'inline-flex', alignItems: 'center', gap: '5px', transition: 'all .15s', fontFamily: 'inherit' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = D.card2; e.currentTarget.style.borderColor = D.border2 }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent' }}
+                            >
+                              {v === null
+                                ? <span style={{ color: D.green, fontWeight: 700 }}>Ilimitados</span>
+                                : <span style={{ color: D.amber }}>Hasta {v.toLocaleString()}</span>
+                              }
+                            </button>
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
+
+                {/* Fila informativa: Roles disponibles (solo lectura) */}
+                <tr style={{ borderBottom: `1px solid ${D.border}` }}>
+                  <td style={{ padding: '11px 20px', fontSize: '13px', color: D.t2, background: D.card2, borderRight: `1px solid ${D.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      Roles disponibles
+                      <span style={{ fontSize: '10px', color: D.t3 }} title="Configurable en la pestaña Límites del Plan">🔒</span>
+                    </div>
+                  </td>
+                  {PLAN_ORDER.map(pid => (
+                    <td key={pid} style={{ padding: '11px 20px', textAlign: 'center', fontSize: '11px', color: D.t2, background: colBg(pid), ...colBord(pid) }}>
+                      {PLAN_ROLES[pid]}
+                    </td>
+                  ))}
+                </tr>
 
                 {/* ── GRUPOS DE MÓDULOS ── */}
                 {MODULE_GROUPS.map(({ label: grpLabel, color: grpColor, modules }) => (

@@ -26,7 +26,14 @@ export const saleService = {
 
   async create(payload) {
     await delay()
-    if (USE_API) { const { data } = await api.post('/sales', payload); return ok(data.data) }
+    if (USE_API) {
+      if (navigator.onLine) {
+        const { data } = await api.post('/sales', payload)
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'sale.create', endpoint: '/sales', method: 'POST', payload })
+      // Cae al bloque local para reflejar el stock en pantalla inmediatamente
+    }
 
     const invoiceNumber = payload.invoiceNumber || 'VENTA'
     const enrichedItems = []
@@ -210,8 +217,12 @@ export const saleService = {
   async cancel(id, reason, userId) {
     await delay()
     if (USE_API) {
-      const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
-      return ok(data.data)
+      if (navigator.onLine) {
+        const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'sale.cancel', endpoint: `/sales/${id}/cancel`, method: 'PATCH', payload: { reason, userId } })
+      // Cae al bloque local para reflejar el cambio de estado en pantalla inmediatamente
     }
     const state = gs()
     const sale  = state.sales.find(s => s.id === id)

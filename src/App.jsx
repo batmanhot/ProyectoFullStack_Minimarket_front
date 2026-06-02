@@ -9,9 +9,11 @@ import Sidebar from './shared/components/ui/Sidebar'
 import PlanUpgradePrompt from './shared/components/ui/PlanUpgradePrompt'
 import ExcelPreviewHost from './shared/components/ui/ExcelPreviewHost'
 import PDFPreviewHost from './shared/components/ui/PDFPreviewHost'
+import SyncQueuePanel from './shared/components/ui/SyncQueuePanel'
 import Login from './features/auth/Login'
 import toast from 'react-hot-toast'
 import { useServiceWorker } from './shared/hooks/useServiceWorker'
+import { useOfflineSync } from './shared/hooks/useOfflineSync'
 import InstallPWA from './shared/components/InstallPWA'
 import { Wifi, WifiOff, Lock, AlertTriangle, ArrowLeft, PhoneCall } from 'lucide-react'
 import { TenantProvider, useTenantSafe } from './context/TenantContext'
@@ -197,8 +199,10 @@ function TenantApp() {
   const { currentUser } = useStore()
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [, setPermissionVersion] = useState(0)
+  const [syncPanelOpen, setSyncPanelOpen] = useState(false)
   const { theme, toggle, setDirect } = useTheme()
   const { isOnline } = useServiceWorker()
+  useOfflineSync()
   const tenantCtx = useTenantSafe()
   const plan = tenantCtx?.plan ?? 'trial'
 
@@ -274,6 +278,7 @@ function TenantApp() {
         theme={theme}
         onThemeToggle={toggle}
         onThemeSet={setDirect}
+        onOpenSyncPanel={() => setSyncPanelOpen(true)}
       />
 
       <main className={`flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 ${!isOnline ? 'mt-10' : ''}`}>
@@ -289,6 +294,7 @@ function TenantApp() {
 
       <ExcelPreviewHost/>
       <PDFPreviewHost/>
+      {syncPanelOpen && <SyncQueuePanel onClose={() => setSyncPanelOpen(false)} />}
     </div>
   )
 }
@@ -300,11 +306,6 @@ function TenantRoot() {
   return (
     <TenantProvider>
       <TenantApp />
-      <Toaster position="top-right" toastOptions={{
-        style: { fontSize: '13px', borderRadius: '8px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' },
-        success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
-        error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-      }}/>
     </TenantProvider>
   )
 }
@@ -325,15 +326,21 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/"                   element={<Suspense fallback={null}><Landing /></Suspense>} />
-        <Route path="/register"           element={<Suspense fallback={null}><Register /></Suspense>} />
-        <Route path="/app/:tenantSlug/*"  element={<TenantRoot />} />
-        <Route path="/superadmin/*"       element={<Suspense fallback={null}><SuperAdmin /></Suspense>} />
-        <Route path="*"                   element={<Navigate to="/" replace />} />
+        <Route path="/"                                    element={<Suspense fallback={null}><Landing /></Suspense>} />
+        <Route path="/register"                           element={<Suspense fallback={null}><Register /></Suspense>} />
+        {/* Ruta pública sin auth — segundo monitor del cliente */}
+        <Route path="/app/:tenantSlug/customer-display"  element={<Suspense fallback={null}><CustomerDisplay /></Suspense>} />
+        <Route path="/app/:tenantSlug/*"                 element={<TenantRoot />} />
+        <Route path="/superadmin/*"                      element={<Suspense fallback={null}><SuperAdmin /></Suspense>} />
+        <Route path="*"                                  element={<Navigate to="/" replace />} />
       </Routes>
 
       {/* Toaster global para páginas fuera del TenantApp (landing, register) */}
-      <Toaster position="top-right" toastOptions={{ style: { fontSize: '13px', borderRadius: '8px' } }}/>
+      <Toaster position="top-right" toastOptions={{ 
+        style: { fontSize: '13px', borderRadius: '8px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' },
+        success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+        error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+      }}/>
     </>
   )
 }

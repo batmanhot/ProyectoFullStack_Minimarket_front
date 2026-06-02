@@ -1,10 +1,17 @@
+import { useStore } from '../store/index'
 import { formatNumber } from '../shared/utils/helpers'
 import { api, USE_API, ok, fail, gs, delay } from './_base'
 
 export const cashService = {
   async open(payload) {
     await delay()
-    if (USE_API) { const { data } = await api.post('/cash/open', payload); return ok(data.data) }
+    if (USE_API) {
+      if (navigator.onLine) {
+        const { data } = await api.post('/cash/open', payload)
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'cash.open', endpoint: '/cash/open', method: 'POST', payload })
+    }
     const state = gs()
     if (state.activeCashSession) return fail('Ya existe una caja abierta')
     const session = { ...payload, id: crypto.randomUUID(), status: 'abierta', openedAt: new Date().toISOString() }
@@ -14,7 +21,13 @@ export const cashService = {
 
   async close(id, payload) {
     await delay()
-    if (USE_API) { const { data } = await api.post(`/cash/${id}/close`, payload); return ok(data.data) }
+    if (USE_API) {
+      if (navigator.onLine) {
+        const { data } = await api.post(`/cash/${id}/close`, payload)
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'cash.close', endpoint: `/cash/${id}/close`, method: 'POST', payload })
+    }
     const state = gs()
     if (!state.activeCashSession) return fail('No hay caja abierta')
     const session = state.activeCashSession

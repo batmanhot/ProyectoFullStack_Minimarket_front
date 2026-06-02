@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { tenantService } from '../../services/tenantService'
+import { tenantService, makeSlug } from '../../services/tenantService'
+import { paymentService } from '../../services/paymentService'
 import { PLANS, PLAN_ORDER, BILLING_CYCLES, CYCLE_ORDER, BONUS_DAYS, getPlanPrice, getTotalPrice, getAccessExpiry } from '../../config/plans'
+import { getStoredPrices } from '../../services/tenantService'
 import { SECTORS } from '../../config/app'
-import { Check, ArrowLeft, ArrowRight, Loader, Calendar, Phone, Mail, Lock, User, Zap } from 'lucide-react'
+import { Check, ArrowLeft, ArrowRight, Loader, Calendar, Phone, Mail, Lock, User, Zap, CreditCard } from 'lucide-react'
 
 const STEPS = ['Tu negocio', 'Tus datos', 'Plan de acceso']
 
@@ -197,6 +199,16 @@ export default function Register() {
 
   const submit = async () => {
     setLoading(true); setError('')
+
+    // Verificar que el slug no esté tomado antes de registrar
+    const slug = makeSlug(form.businessName)
+    const slugCheck = await tenantService.checkSlugAvailable(slug)
+    if (!slugCheck.data) {
+      setLoading(false)
+      setError(`El nombre "${form.businessName}" ya está registrado. Prueba con un nombre diferente.`)
+      return
+    }
+
     const result = await tenantService.register({
       businessName: form.businessName,
       sector:       form.sector,
@@ -207,9 +219,29 @@ export default function Register() {
       plan:         form.plan,
       billingCycle: form.billingCycle,
     })
-    setLoading(false)
-    if (result.error) { setError(result.error); return }
-    setDone(result.data)
+    if (result.error) { setLoading(false); setError(result.error); return }
+
+    const isFree = PLANS[form.plan]?.price === 0
+    if (isFree) {
+      setLoading(false)
+      setDone(result.data)
+      return
+    }
+
+    // Plan pagado: crear preferencia de Mercado Pago y redirigir
+    try {
+      const pref = await paymentService.createPreference({
+        planId:       form.plan,
+        billingCycle: form.billingCycle,
+        userData:     { email: form.ownerEmail, name: form.ownerName, businessName: form.businessName },
+      })
+      window.location.href = pref.data.initPoint
+    } catch {
+      // Si el pago falla, el tenant ya fue creado — mostramos la pantalla de éxito
+      // y el usuario puede pagar después desde su panel.
+      setLoading(false)
+      setDone(result.data)
+    }
   }
 
   // ── Pantalla de éxito ────────────────────────────────────────────────────────
@@ -355,7 +387,18 @@ export default function Register() {
             ) : (
               <button onClick={submit} disabled={loading}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 24px', borderRadius: '8px', border: 'none', background: loading ? '#94a3b8' : 'linear-gradient(135deg,#2563eb,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: loading ? 'not-allowed' : 'pointer' }}>
-                {loading ? <><Loader size={13} /> Creando...</> : 'Crear mi negocio →'}
+                {loading
+                  ? <><Loader size={13} className="animate-spin" /> Procesando...</>
+                  : PLANS[form.plan]?.price === 0
+                    ? <>Crear mi negocio <ArrowRight size={13} /></>
+                    : (() => {
+                        const prices = getStoredPrices()
+                        const base = prices[form.plan] ?? PLANS[form.plan]?.price ?? 0
+                        const disc = BILLING_CYCLES[form.billingCycle]?.discountPct ?? 0
+                        const total = Math.round(base * (1 - disc / 100)) * (BILLING_CYCLES[form.billingCycle]?.months ?? 1)
+                        return <><CreditCard size={13} /> Crear y pagar S/ {total}</>
+                      })()
+                }
               </button>
             )}
           </div>

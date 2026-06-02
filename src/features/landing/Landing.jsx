@@ -4,7 +4,7 @@ import {
   ArrowRight, BarChart3, Check, ChevronRight, Clock3, CreditCard, ExternalLink,
   Facebook, Gauge, Globe2, Instagram, Mail, MapPin, MessageCircle, Package,
   Phone, ReceiptText, ShieldCheck, ShoppingCart, Sparkles, Star, Store, Users,
-  Zap,
+  Zap
 } from 'lucide-react'
 import { BILLING_CYCLES, PLAN_ORDER, PLANS } from '../../config/plans'
 import { getStoredPrices, getStoredSiteSettings } from '../../services/tenantService'
@@ -245,8 +245,13 @@ export default function Landing() {
   const navigate = useNavigate()
   const { site, primary, onPrimary, prices, features } = useLandingData()
   const [billing, setBilling] = useState('monthly')
+
   const currency = CURRENCY[site.publicCurrency] || CURRENCY.PEN
   const cycleKey = billing === 'annual' ? 'annual' : 'monthly'
+
+  const handleChoosePlan = (planId) => {
+    navigate('/register', { state: { plan: planId } })
+  }
 
   const proof = [
     ['3 min', 'para empezar una venta'],
@@ -433,7 +438,15 @@ export default function Landing() {
                           Total anual: {currency.symbol} {amount * 12}
                         </div>
                       )}
-                      <button onClick={() => navigate('/register', { state: { plan: planId } })} style={{ width: '100%', height: 44, marginTop: 18, border: popular ? 'none' : '1px solid rgba(255,255,255,.2)', borderRadius: 13, background: popular ? primary : 'rgba(255,255,255,.1)', color: popular ? onPrimary : '#fff', fontWeight: 950, cursor: 'pointer' }}>
+                      <button 
+                        onClick={() => handleChoosePlan(planId)} 
+                        style={{ 
+                          width: '100%', height: 44, marginTop: 18, border: popular ? 'none' : '1px solid rgba(255,255,255,.2)', 
+                          borderRadius: 13, background: popular ? primary : 'rgba(255,255,255,.1)', 
+                          color: popular ? onPrimary : '#fff', fontWeight: 950, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                        }}
+                      >
                         Elegir plan
                       </button>
                       <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>

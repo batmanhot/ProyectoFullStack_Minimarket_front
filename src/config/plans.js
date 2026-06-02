@@ -1,4 +1,5 @@
 // Definición de planes SaaS, ciclos de facturación y utilidades de acceso.
+import { PLAN_LIMITS } from './planLimits'
 
 /** Días de bonus agregados en cada activación / renovación */
 export const BONUS_DAYS = 3
@@ -38,10 +39,10 @@ export const PLANS = {
     features: [
       'dashboard', 'pos', 'catalog', 'inventory',
       'clients', 'cash', 'reports', 'quotations', 'returns',
-      'comprobantes',
+      'comprobantes', 'customer-display',
       'users', 'settings', 'about',
     ],
-    limits:    { products: 100, users: 1, exportData: false, multiCash: false },
+    limits: PLAN_LIMITS.trial,
     availableRoles: ['admin'],
     badge: null,
   },
@@ -52,10 +53,10 @@ export const PLANS = {
     features: [
       'dashboard', 'pos', 'catalog', 'inventory',
       'clients', 'cash', 'reports', 'suppliers', 'purchases', 'returns', 'quotations',
-      'comprobantes',
+      'comprobantes', 'customer-display',
       'users', 'settings', 'about',
     ],
-    limits:    { products: 500, users: 3, exportData: true, multiCash: false },
+    limits: PLAN_LIMITS.basic,
     availableRoles: ['admin', 'cajero'],
     badge: null,
   },
@@ -67,10 +68,10 @@ export const PLANS = {
       'dashboard', 'pos', 'catalog', 'inventory',
       'clients', 'cash', 'reports', 'suppliers', 'purchases', 'returns', 'quotations',
       'discounts', 'tickets', 'loyalty', 'merma', 'trazabilidad', 'audit', 'alerts',
-      'comprobantes',
+      'comprobantes', 'customer-display',
       'users', 'settings', 'about',
     ],
-    limits:    { products: 2000, users: 10, exportData: true, multiCash: true },
+    limits: PLAN_LIMITS.pro,
     availableRoles: ['admin', 'gerente', 'supervisor', 'cajero'],
     badge: 'Más popular',
   },
@@ -79,7 +80,7 @@ export const PLANS = {
     description: 'Sin límites para grandes operaciones',
     price: 199,
     features: 'all',
-    limits:    { products: null, users: null, exportData: true, multiCash: true },
+    limits: PLAN_LIMITS.enterprise,
     availableRoles: ['admin', 'gerente', 'supervisor', 'cajero'],
     badge: null,
   },
@@ -119,10 +120,10 @@ export const getTotalPrice = (planId, billingCycle = 'monthly') => {
  * @param {string|Date} startDate
  * @param {string} billingCycle — clave de BILLING_CYCLES (default: 'monthly')
  */
-export const getAccessExpiry = (startDate, billingCycle = 'monthly') => {
+export const getAccessExpiry = (startDate, billingCycle = 'monthly', bonusDays = BONUS_DAYS) => {
   const cycleDays = BILLING_CYCLES[billingCycle]?.days ?? 30
   const d = new Date(startDate)
-  d.setDate(d.getDate() + cycleDays + BONUS_DAYS)
+  d.setDate(d.getDate() + cycleDays + bonusDays)
   return d.toISOString()
 }
 

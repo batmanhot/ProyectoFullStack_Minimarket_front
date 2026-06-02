@@ -60,11 +60,11 @@ export const daysUntil = (iso) => {
 export const formatInvoice = (n, prefix = 'B001') => `${prefix}-${String(n).padStart(6, '0')}`
 
 // ─── CÁLCULOS POS ─────────────────────────────────────────────────────────────
-export const calcCartTotals = (items) => {
+export const calcCartTotals = (items, igvRate = APP_CONFIG.igvRate) => {
   const subtotal  = formatNumber(items.reduce((acc, i) => acc + i.subtotal, 0))
   const discount  = formatNumber(items.reduce((acc, i) => acc + (i.discount || 0), 0))
   const base      = formatNumber(subtotal - discount)
-  const baseImpon = formatNumber(base / (1 + APP_CONFIG.igvRate))
+  const baseImpon = formatNumber(base / (1 + igvRate))
   const tax       = formatNumber(base - baseImpon)
   return { subtotal, discount, base, tax, total: base }
 }

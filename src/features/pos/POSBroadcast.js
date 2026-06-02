@@ -30,16 +30,42 @@ const CHANNEL_NAME = 'pos_customer_display'
  * usePOSBroadcast — Hook que maneja el canal de comunicación con el CustomerDisplay.
  * Devuelve funciones para emitir eventos y abrir la pantalla del cliente.
  */
-export function usePOSBroadcast() {
-  const channelRef = useRef(null)
+/**
+ * @param {object} [opts]
+ * @param {React.MutableRefObject} [opts.cartSnapshotRef]    — ref con el carrito actual (buildCartForDisplay)
+ * @param {React.MutableRefObject} [opts.businessConfigRef] — ref con businessConfig actual
+ *
+ * Cuando la Pantalla Cliente envía REQUEST_STATE, el hook lee los refs y responde
+ * con CART_UPDATE directamente desde el canal (evita la dependencia circular de
+ * usar `broadcast` antes de que sea inicializado en POS.jsx).
+ */
+export function usePOSBroadcast({ cartSnapshotRef, businessConfigRef } = {}) {
+  const channelRef         = useRef(null)
+  const cartRef            = useRef(cartSnapshotRef)
+  const bizRef             = useRef(businessConfigRef)
   const { businessConfig } = useStore()
+
+  // Mantener las refs actualizadas si cambian las props
+  useEffect(() => { cartRef.current = cartSnapshotRef }, [cartSnapshotRef])
+  useEffect(() => { bizRef.current  = businessConfigRef }, [businessConfigRef])
 
   // Inicializar el canal al montar
   useEffect(() => {
     try {
       channelRef.current = new BroadcastChannel(CHANNEL_NAME)
+      // Cuando la Pantalla Cliente pide el estado actual, respondemos con el carrito vigente
+      channelRef.current.onmessage = (evt) => {
+        if (evt.data?.type !== 'REQUEST_STATE') return
+        try {
+          channelRef.current?.postMessage({
+            type:           'CART_UPDATE',
+            cart:           cartRef.current?.current ?? [],
+            businessConfig: bizRef.current?.current  ?? {},
+            ts:             Date.now(),
+          })
+        } catch {}
+      }
     } catch {
-      // BroadcastChannel no disponible (contexto inseguro o browser antiguo)
       channelRef.current = null
     }
     return () => {
@@ -71,11 +97,9 @@ export function usePOSBroadcast() {
    * Intenta abrir en una nueva ventana (ideal para segundo monitor).
    */
   const openDisplay = useCallback(() => {
-    // Construir URL de la pantalla del cliente
-    const base = window.location.href.split('#')[0].split('?')[0]
-    const url  = base.includes('localhost')
-      ? `${window.location.origin}/#customer-display`
-      : `${window.location.href.split('#')[0]}#customer-display`
+    // Extraer el slug del tenant de la URL actual (/app/:slug/...)
+    const slug = window.location.pathname.match(/\/app\/([^/]+)/)?.[1] ?? 'demo'
+    const url  = `${window.location.origin}/app/${slug}/customer-display`
 
     const win = window.open(
       url,

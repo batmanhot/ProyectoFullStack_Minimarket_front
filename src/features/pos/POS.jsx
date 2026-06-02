@@ -224,7 +224,23 @@ export default function POS({ onNavigate }) {
   // Atajos teclado con ref pattern (fix stale closure)
   const actionsRef = useRef({})
   // ── Pantalla del cliente ────────────────────────────────────────────────
-  const { broadcast, openDisplay } = usePOSBroadcast()
+  // Refs con el estado actual — el hook los lee cuando llega REQUEST_STATE,
+  // evitando la dependencia circular de usar broadcast antes de definirlo.
+  const cartSnapshotRef    = useRef([])
+  const businessConfigRef  = useRef(businessConfig)
+
+  useEffect(() => {
+    cartSnapshotRef.current = buildCartForDisplay(mergedCartItems, products)
+  }, [mergedCartItems, products])
+
+  useEffect(() => {
+    businessConfigRef.current = businessConfig
+  }, [businessConfig])
+
+  const { broadcast, openDisplay } = usePOSBroadcast({
+    cartSnapshotRef,
+    businessConfigRef,
+  })
 
   useEffect(() => {
     actionsRef.current = {

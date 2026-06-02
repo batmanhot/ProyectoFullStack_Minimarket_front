@@ -25,7 +25,7 @@ const NAV_GROUPS = [
   { label:'Principal',   items:[
     { key:'dashboard',  label:'Dashboard',           icon:'📊' },
     { key:'pos',        label:'Punto de Venta',      icon:'🖥️' },
-    { key:'customer-display', label:'Pantalla Cliente', icon:'📺' },
+    { key:'customer-display', label:'Pantalla Cliente', icon:'📺', isExternal: true },
   ]},
   { label:'Operaciones', items:[
     { key:'catalog',    label:'Catálogo',             icon:'🗂️' },
@@ -51,6 +51,7 @@ const NAV_GROUPS = [
     { key:'audit',      label:'Auditoría',            icon:'🔍' },
     { key:'users',      label:'Usuarios',             icon:'⚙️' },
     { key:'settings',   label:'Configuración',        icon:'🛠️' },
+    { key:'sync',       label:'Sincronización',       icon:'🔄', isPanel: true },
     { key:'about',      label:'Acerca del Sistema',   icon:'ℹ️' },
   ]},
 ]
@@ -65,11 +66,13 @@ const THEME_OPTIONS = [
   { value:'nature',   icon:'🍃',  label:'Naturaleza', desc:'Tierra & ámbar orgánico'  },
 ]
 
-export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle, onThemeSet }) {
+export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle, onThemeSet, onOpenSyncPanel }) {
   const { currentUser, activeCashSession, logout, businessConfig } = useStore()
   const lowStockCount   = useStore(s => selectLowStockProducts(s).length)
   const nearExpiryCount = useStore(s => selectNearExpiryProducts(s).length)
   const unreadCount     = useStore(selectUnreadNotifications)
+  const pendingSync     = useStore(s => (s.offlineQueue || []).filter(op => op.status === 'pending' || op.status === 'syncing').length)
+  const conflictSync    = useStore(s => (s.offlineQueue || []).filter(op => op.status === 'conflict' || op.status === 'error').length)
 
   const [collapsed, setCollapsed]       = useState(() => window.innerWidth < 768)
   const [isMobile, setIsMobile]         = useState(() => window.innerWidth < 768)
@@ -103,18 +106,22 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
   const isPlanAllowed = (key) => canUsePlan(plan, key)
 
   const getBadge = (key) => {
-    if (key==='inventory') {
+    if (key === 'inventory') {
       const t = lowStockCount + nearExpiryCount
       return t > 0 ? { count: t, color: lowStockCount > 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600' } : null
     }
-    if (key==='alerts' && unreadCount > 0) return { count: unreadCount, color: 'bg-blue-100 text-blue-700' }
+    if (key === 'alerts' && unreadCount > 0) return { count: unreadCount, color: 'bg-blue-100 text-blue-700' }
+    if (key === 'sync') {
+      if (conflictSync > 0) return { count: conflictSync, color: 'bg-red-100 text-red-600', pulse: false }
+      if (pendingSync > 0)  return { count: pendingSync,  color: 'bg-amber-100 text-amber-700', pulse: true }
+    }
     return null
   }
 
   const currentThemeOpt = THEME_OPTIONS.find(t => t.value === theme) || THEME_OPTIONS[0]
 
   if (collapsed) {
-    const allItems = NAV_GROUPS.flatMap(g => g.items).filter(i => canAccess(currentUser?.role, i.key))
+    const allItems = NAV_GROUPS.flatMap(g => g.items).filter(i => i.isPanel || i.isExternal || canAccess(currentUser?.role, i.key))
     return (
       <aside className="w-14 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col h-screen sticky top-0">
         <button onClick={() => setCollapsed(false)} className="p-4 text-gray-400 hover:text-gray-600 border-b border-gray-100 dark:border-gray-800">
@@ -122,12 +129,26 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
         </button>
         <nav className="flex-1 py-2 overflow-y-auto sidebar-nav-scroll">
           {allItems.map(item => {
-            const badge = getBadge(item.key)
+            const badge    = getBadge(item.key)
+            const isActive = !item.isPanel && !item.isExternal && currentPage === item.key
+            const handleCollapsedClick = () => {
+              if (item.isPanel) { onOpenSyncPanel?.(); return }
+              if (item.isExternal) {
+                const slug = tenantCtx?.tenantSlug ?? 'demo'
+                window.open(`${window.location.origin}/app/${slug}/${item.key}`, `pos_${item.key}`, 'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no,resizable=yes')
+                return
+              }
+              handleNavigate(item.key)
+            }
             return (
-              <button key={item.key} onClick={() => handleNavigate(item.key)} title={item.label}
-                className={`w-full flex items-center justify-center py-2.5 relative ${currentPage===item.key?'text-blue-600':'text-gray-400 hover:text-gray-600'}`}>
+              <button key={item.key}
+                onClick={handleCollapsedClick}
+                title={item.isExternal ? `${item.label} (nueva ventana)` : item.label}
+                className={`w-full flex items-center justify-center py-2.5 relative ${isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
                 <span className="text-lg leading-none">{item.icon}</span>
-                {badge && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500"/>}
+                {badge && (
+                  <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${badge.color?.includes('red') ? 'bg-red-500' : 'bg-amber-400'} ${badge.pulse ? 'animate-pulse' : ''}`}/>
+                )}
               </button>
             )
           })}
@@ -138,6 +159,14 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
             style={{ margin: '4px auto 2px', width: '28px', height: '28px', borderRadius: '8px', background: ALERT_CFG[alertLevel].bg, border: `1px solid ${ALERT_CFG[alertLevel].border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', cursor: 'default' }}>
             {ALERT_CFG[alertLevel].icon}
           </div>
+        )}
+        {/* Badge de sincronización offline en modo colapsado — clic abre el panel */}
+        {(pendingSync > 0 || conflictSync > 0) && (
+          <button onClick={onOpenSyncPanel}
+            title={conflictSync > 0 ? `${conflictSync} conflicto(s) — ver cola` : `${pendingSync} pendiente(s) de sync — ver cola`}
+            className={`mx-auto mb-1 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-colors ${conflictSync > 0 ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-amber-100 text-amber-700 animate-pulse hover:bg-amber-200'}`}>
+            {conflictSync > 0 ? '⚠' : `↑${pendingSync}`}
+          </button>
         )}
         {/* Theme toggle en modo colapsado */}
         <button onClick={onThemeToggle} title={`Tema: ${currentThemeOpt.label}`}
@@ -160,9 +189,26 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
             <div className="text-xs text-gray-400">Sistema POS</div>
           </div>
         </div>
-        <button onClick={() => setCollapsed(true)} className="text-gray-300 hover:text-gray-500 flex-shrink-0">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
-        </button>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Badge de cola offline — clic abre el panel */}
+          {conflictSync > 0 && (
+            <button onClick={onOpenSyncPanel}
+              title={`${conflictSync} conflicto(s) — clic para ver detalles`}
+              className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold hover:bg-red-200 transition-colors">
+              ⚠{conflictSync}
+            </button>
+          )}
+          {pendingSync > 0 && conflictSync === 0 && (
+            <button onClick={onOpenSyncPanel}
+              title={`${pendingSync} pendiente(s) — clic para ver detalles`}
+              className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold animate-pulse hover:bg-amber-200 transition-colors">
+              ↑{pendingSync}
+            </button>
+          )}
+          <button onClick={() => setCollapsed(true)} className="text-gray-300 hover:text-gray-500">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+          </button>
+        </div>
       </div>
 
       {/* Usuario */}
@@ -187,29 +233,42 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
       {/* Nav agrupado */}
       <nav className="flex-1 overflow-y-auto py-2 sidebar-nav-scroll" style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}>
         {NAV_GROUPS.map(group => {
-          // Ítems que el rol permite (visibles) — los bloqueados por plan se muestran con candado
-          const visible = group.items.filter(i => canAccess(currentUser?.role, i.key))
+          // Ítems visibles: rol lo permite, o es panel/externo (siempre visibles para el usuario logueado)
+          const visible = group.items.filter(i => i.isPanel || i.isExternal || canAccess(currentUser?.role, i.key))
           if (visible.length === 0) return null
           return (
             <div key={group.label} className="mb-1">
               <p className="px-4 py-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">{group.label}</p>
               {visible.map(item => {
                 const badge      = getBadge(item.key)
-                const planOk     = isPlanAllowed(item.key)
-                const isActive   = currentPage === item.key
+                const planOk     = item.isPanel || item.isExternal || isPlanAllowed(item.key)
+                const isActive   = !item.isPanel && !item.isExternal && currentPage === item.key
 
-                // Módulo bloqueado por plan → invisible (el usuario no sabe lo que no tiene)
                 if (!planOk) return null
 
+                const handleClick = () => {
+                  if (item.isPanel) { onOpenSyncPanel?.(); return }
+                  if (item.isExternal) {
+                    const slug = tenantCtx?.tenantSlug ?? 'demo'
+                    window.open(`${window.location.origin}/app/${slug}/${item.key}`, `pos_${item.key}`, 'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no,resizable=yes')
+                    return
+                  }
+                  handleNavigate(item.key)
+                }
+
                 return (
-                  <button key={item.key} onClick={() => handleNavigate(item.key)}
+                  <button key={item.key}
+                    onClick={handleClick}
                     style={{ width: 'calc(100% - 8px)', marginLeft: '4px' }}
                     className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200'}`}>
                     <div className="flex items-center gap-2.5">
                       <span className="text-base leading-none">{item.icon}</span>
                       {item.label}
                     </div>
-                    {badge && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badge.color}`}>{badge.count}</span>}
+                    {item.isExternal
+                      ? <span className="text-gray-300 dark:text-gray-600" title="Se abre en nueva ventana">↗</span>
+                      : badge && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${badge.color} ${badge.pulse ? 'animate-pulse' : ''}`}>{badge.count}</span>
+                    }
                   </button>
                 )
               })}

@@ -75,6 +75,12 @@ export default function CustomerDisplay() {
       channelRef.current = new BroadcastChannel(CHANNEL_NAME)
       setConnected(true)
 
+      // Pedir el estado actual al POS en cuanto el canal esté listo.
+      // Si el POS está abierto en otra ventana, responderá con CART_UPDATE.
+      setTimeout(() => {
+        try { channelRef.current?.postMessage({ type: 'REQUEST_STATE', ts: Date.now() }) } catch {}
+      }, 400)
+
       channelRef.current.onmessage = (evt) => {
         const msg = evt.data
         setLastEvent(msg)

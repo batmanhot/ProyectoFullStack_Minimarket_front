@@ -10,7 +10,13 @@ export const purchaseService = {
 
   async create(payload) {
     await delay()
-    if (USE_API) { const { data } = await api.post('/purchases', payload); return ok(data.data) }
+    if (USE_API) {
+      if (navigator.onLine) {
+        const { data } = await api.post('/purchases', payload)
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'purchase.create', endpoint: '/purchases', method: 'POST', payload })
+    }
 
     const purchase = {
       ...payload, id: crypto.randomUUID(), status: 'confirmada',

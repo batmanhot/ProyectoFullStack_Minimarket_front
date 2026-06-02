@@ -11,19 +11,19 @@ export const APP_CONFIG = {
 export const ROLES = {
   admin: {
     label: 'Administrador', color: 'bg-blue-100 text-blue-700',
-    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings','returns','loyalty','quotations','comprobantes','about'],
+    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','suppliers','purchases','cash','clients','reports','users','audit','alerts','discounts','tickets','settings','returns','loyalty','quotations','comprobantes','customer-display','about'],
   },
   gerente: {
     label: 'Gerente', color: 'bg-purple-100 text-purple-700',
-    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets','loyalty','quotations','comprobantes','about'],
+    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','suppliers','purchases','cash','clients','reports','audit','alerts','discounts','tickets','loyalty','quotations','comprobantes','customer-display','about'],
   },
   supervisor: {
     label: 'Supervisor', color: 'bg-amber-100 text-amber-700',
-    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','cash','clients','alerts','discounts','tickets','returns','loyalty','quotations','comprobantes','about'],
+    pages: ['dashboard','pos','catalog','inventory','merma','trazabilidad','cash','clients','alerts','discounts','tickets','returns','loyalty','quotations','comprobantes','customer-display','about'],
   },
   cajero: {
     label: 'Cajero', color: 'bg-green-100 text-green-700',
-    pages: ['dashboard','pos','cash','returns','quotations','about'],
+    pages: ['dashboard','pos','cash','returns','quotations','customer-display','about'],
   },
 }
 

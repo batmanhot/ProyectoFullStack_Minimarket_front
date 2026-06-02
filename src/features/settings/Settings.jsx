@@ -2,6 +2,7 @@
 import { useStore } from '../../store/index'
 import { useTenantSafe } from '../../context/TenantContext'
 import { SECTORS } from '../../config/app'
+import { STORAGE_KEYS } from '../../config/storageKeys'
 import toast from 'react-hot-toast'
 
 const Section = ({ title, children }) => (
@@ -486,7 +487,7 @@ export default function Settings() {
   const tenantCtx  = useTenantSafe()
   const tenantSlug = tenantCtx?.tenantSlug ?? 'demo'
   const isDemo     = tenantSlug === 'demo'
-  const storeKey   = `mm_store_v5_${tenantSlug}`
+  const storeKey   = `${STORAGE_KEYS.storePrefix}${tenantSlug}`
 
   const [biz, setBiz]         = useState({ ...businessConfig })
   const [sys, setSys]         = useState({ costMethod: 'peps', ...systemConfig })

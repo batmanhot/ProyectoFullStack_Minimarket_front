@@ -1,5 +1,7 @@
 import { api, USE_API, ok, fail, delay } from './_base'
 import { getAccessExpiry, BONUS_DAYS, BILLING_CYCLES } from '../config/plans'
+import { PLAN_LIMITS } from '../config/planLimits'
+import { STORAGE_KEYS } from '../config/storageKeys'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isoNow   = ()     => new Date().toISOString()
@@ -7,19 +9,19 @@ const toIsoDate = (date) => {
   if (!date) return null
   return date.includes('T') ? date : new Date(`${date}T00:00:00`).toISOString()
 }
-const makeSlug = (name) => name.toLowerCase()
+export const makeSlug = (name) => name.toLowerCase()
   .normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
 
 // ─── Persistencia mock en localStorage ───────────────────────────────────────
 const KEYS = {
-  tenants:         'mm_mock_tenants_v1',
-  accesses:        'mm_mock_accesses_v1',
-  renewals:        'mm_mock_renewals_v1',
-  prices:          'mm_mock_prices_v1',
-  site:            'mm_mock_site_v2',    // v2 — campos expandidos de landing
-  limits:          'mm_saas_plan_limits_v2', // v2 — campos expandidos por plan
-  alertThresholds: 'mm_alert_thresholds_v1',
+  tenants:         STORAGE_KEYS.mockTenants,
+  accesses:        STORAGE_KEYS.mockAccesses,
+  renewals:        STORAGE_KEYS.mockRenewals,
+  prices:          STORAGE_KEYS.mockPrices,
+  site:            STORAGE_KEYS.mockSite,
+  limits:          STORAGE_KEYS.mockPlanLimits,
+  alertThresholds: STORAGE_KEYS.mockAlertThresholds,
 }
 
 const _load = (key) => {
@@ -30,8 +32,8 @@ const _save = (key, data) => {
 }
 
 // ─── Fechas demo ──────────────────────────────────────────────────────────────
-const START_DEMO   = '2025-04-12T00:00:00Z'
-const START_TIENDA = '2025-03-14T00:00:00Z'
+const START_DEMO   = '2026-05-01T00:00:00Z'
+const START_TIENDA = '2026-05-15T00:00:00Z'
 
 // ─── Tenants por defecto ──────────────────────────────────────────────────────
 const DEFAULT_TENANTS = {
@@ -104,34 +106,8 @@ const DEFAULT_RENEWALS = [
 // ─── Precios configurables ────────────────────────────────────────────────────
 const DEFAULT_PRICES = { basic: 49, pro: 99, enterprise: 199 }
 
-// ─── Límites por plan (v2 — campos expandidos) ────────────────────────────────
-// null = ilimitado | -1 también es interpretado como ilimitado en algunos contextos
-export const DEFAULT_PLAN_LIMITS = {
-  trial: {
-    products: 100,  users: 1,   warehouses: 1,  suppliers: 0,
-    customers: 50,  ordersPerMonth: 100, storageGB: 1,
-    supportType: 'email',
-    apiAccess: false, multiCompany: false, advancedExport: false, advancedReports: false,
-  },
-  basic: {
-    products: 500,  users: 3,   warehouses: 2,  suppliers: 50,
-    customers: 100, ordersPerMonth: 300, storageGB: 5,
-    supportType: 'email',
-    apiAccess: false, multiCompany: false, advancedExport: true, advancedReports: false,
-  },
-  pro: {
-    products: 2000, users: 10,  warehouses: 5,  suppliers: 200,
-    customers: 500, ordersPerMonth: 1000, storageGB: 20,
-    supportType: 'chat',
-    apiAccess: true, multiCompany: false, advancedExport: true, advancedReports: true,
-  },
-  enterprise: {
-    products: null, users: null, warehouses: null, suppliers: null,
-    customers: null, ordersPerMonth: null, storageGB: null,
-    supportType: 'phone',
-    apiAccess: true, multiCompany: true, advancedExport: true, advancedReports: true,
-  },
-}
+// Alias exportado para compatibilidad con SuperAdmin (que lo importa por este nombre)
+export { PLAN_LIMITS as DEFAULT_PLAN_LIMITS }
 
 // ─── Umbrales de alerta ────────────────────────────────────────────────────────
 export const DEFAULT_ALERT_THRESHOLDS = {
@@ -175,7 +151,7 @@ let _accesses        = _load(KEYS.accesses)        ?? [...DEFAULT_ACCESSES]
 let _renewals        = _load(KEYS.renewals)        ?? [...DEFAULT_RENEWALS]
 let _prices          = _load(KEYS.prices)          ?? { ...DEFAULT_PRICES }
 let _site            = _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS }
-let _limits          = _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+let _limits          = _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(PLAN_LIMITS))
 let _alertThresholds = _load(KEYS.alertThresholds) ?? { ...DEFAULT_ALERT_THRESHOLDS }
 
 // Migrar registros existentes con campos faltantes (retrocompat)
@@ -201,7 +177,7 @@ const _flush = () => {
 // Lectura sincrónica para componentes que no pueden usar async
 export const getStoredPrices           = () => _load(KEYS.prices)          ?? { ...DEFAULT_PRICES }
 export const getStoredSiteSettings     = () => _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS }
-export const getStoredPlanLimits       = () => _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+export const getStoredPlanLimits       = () => _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(PLAN_LIMITS))
 export const getStoredAlertThresholds  = () => _load(KEYS.alertThresholds) ?? { ...DEFAULT_ALERT_THRESHOLDS }
 
 // ─── Servicio ─────────────────────────────────────────────────────────────────
@@ -210,7 +186,7 @@ export const tenantService = {
   // ── App (tenant context) ────────────────────────────────────────────────────
 
   async getBySlug(slug) {
-    await delay(120)
+    await delay(100)
     if (USE_API) {
       const { data } = await api.get(`/tenants/${slug}`)
       return ok(data)
@@ -228,7 +204,7 @@ export const tenantService = {
   // ── Registro self-service ───────────────────────────────────────────────────
 
   async register({ businessName, sector, ownerName, ownerEmail, phone = '', password, plan = 'trial', billingCycle = 'monthly' }) {
-    await delay(900)
+    await delay(600)
     if (USE_API) {
       const { data } = await api.post('/tenants/register', { businessName, sector, ownerName, ownerEmail, phone, password, plan, billingCycle })
       return ok(data)
@@ -286,7 +262,7 @@ export const tenantService = {
   },
 
   async checkSlugAvailable(slug) {
-    await delay(280)
+    await delay(100)
     if (USE_API) {
       const { data } = await api.get(`/tenants/check-slug/${slug}`)
       return ok(data.available)
@@ -295,7 +271,7 @@ export const tenantService = {
   },
 
   async updateConfig(tenantId, config) {
-    await delay(400)
+    await delay(300)
     if (USE_API) {
       const { data } = await api.patch(`/tenants/${tenantId}/config`, config)
       return ok(data)
@@ -308,7 +284,7 @@ export const tenantService = {
   // ── SuperAdmin — CRUD de Negocios ───────────────────────────────────────────
 
   async listAll({ search = '' } = {}) {
-    await delay(200)
+    await delay(100)
     if (USE_API) {
       const { data } = await api.get('/admin/tenants', { params: { search } })
       return ok(data.items, data.total)
@@ -332,7 +308,7 @@ export const tenantService = {
     accessExpiresAt = null, createdAt = null,
     internalNotes = '', systemVersion = 'MiniMarket POS v1.0', isActive = true,
   }) {
-    await delay(400)
+    await delay(300)
     if (USE_API) {
       const { data } = await api.post('/admin/tenants', {
         businessName, sector, ownerName, ownerEmail, phone, ownerPassword, ruc,
@@ -417,7 +393,7 @@ export const tenantService = {
   },
 
   async superadminDeleteTenant(tenantId) {
-    await delay(280)
+    await delay(300)
     if (USE_API) { await api.delete(`/admin/tenants/${tenantId}`); return ok(null) }
 
     const slug = Object.keys(_tenants).find(s => _tenants[s].id === tenantId)
@@ -431,7 +407,7 @@ export const tenantService = {
   },
 
   async setActive(tenantId, isActive) {
-    await delay(280)
+    await delay(300)
     if (USE_API) await api.patch(`/admin/tenants/${tenantId}/status`, { isActive })
     const tenant = Object.values(_tenants).find(t => t.id === tenantId)
     if (tenant) { tenant.isActive = isActive; _flush() }
@@ -441,7 +417,7 @@ export const tenantService = {
   // ── SuperAdmin — Renovaciones ───────────────────────────────────────────────
 
   async renewAccess(tenantId, { plan, billingCycle = 'monthly', startMode = 'today', notes = '' }) {
-    await delay(500)
+    await delay(300)
     if (USE_API) {
       const { data } = await api.post(`/admin/tenants/${tenantId}/renew`, { plan, billingCycle, startMode, notes })
       return ok(data)
@@ -477,7 +453,7 @@ export const tenantService = {
   },
 
   async getRenewals({ tenantId = null } = {}) {
-    await delay(180)
+    await delay(100)
     if (USE_API) {
       const { data } = await api.get('/admin/renewals', { params: { tenantId } })
       return ok(data)
@@ -489,7 +465,7 @@ export const tenantService = {
   // ── SuperAdmin — CRUD de Accesos ────────────────────────────────────────────
 
   async listAccesses({ tenantId = null, search = '' } = {}) {
-    await delay(180)
+    await delay(100)
     if (USE_API) {
       const { data } = await api.get('/admin/accesses', { params: { tenantId, search } })
       return ok(data)
@@ -500,7 +476,7 @@ export const tenantService = {
   },
 
   async createAccess({ tenantId, plan, billingCycle = 'monthly', accessStartDate, bonusDays = BONUS_DAYS, notes = '' }) {
-    await delay(400)
+    await delay(300)
     if (USE_API) {
       const { data } = await api.post('/admin/accesses', { tenantId, plan, billingCycle, accessStartDate, bonusDays, notes })
       return ok(data)
@@ -508,10 +484,7 @@ export const tenantService = {
     const tenant = Object.values(_tenants).find(t => t.id === tenantId)
     if (!tenant) return fail('Negocio no encontrado')
 
-    const cycleDays = BILLING_CYCLES[billingCycle]?.days ?? 30
-    const d = new Date(accessStartDate)
-    d.setDate(d.getDate() + cycleDays + Number(bonusDays))
-    const accessExpiresAt = d.toISOString()
+    const accessExpiresAt = getAccessExpiry(accessStartDate, billingCycle, Number(bonusDays))
 
     const newAccess = {
       id: `access_${_accessIdx++}`, tenantId, tenantSlug: tenant.slug,
@@ -526,7 +499,7 @@ export const tenantService = {
   },
 
   async updateAccess(accessId, { plan, billingCycle = 'monthly', accessStartDate, bonusDays = BONUS_DAYS, notes }) {
-    await delay(400)
+    await delay(300)
     if (USE_API) {
       const { data } = await api.patch(`/admin/accesses/${accessId}`, { plan, billingCycle, accessStartDate, bonusDays, notes })
       return ok(data)
@@ -534,10 +507,7 @@ export const tenantService = {
     const access = _accesses.find(a => a.id === accessId)
     if (!access) return fail('Registro de acceso no encontrado')
 
-    const cycleDays = BILLING_CYCLES[billingCycle]?.days ?? 30
-    const d = new Date(accessStartDate)
-    d.setDate(d.getDate() + cycleDays + Number(bonusDays))
-    const accessExpiresAt = d.toISOString()
+    const accessExpiresAt = getAccessExpiry(accessStartDate, billingCycle, Number(bonusDays))
 
     Object.assign(access, { plan, billingCycle, accessStartDate, accessExpiresAt, bonusDays, notes })
     const tenant = Object.values(_tenants).find(t => t.id === access.tenantId)
@@ -547,7 +517,7 @@ export const tenantService = {
   },
 
   async deleteAccess(accessId) {
-    await delay(280)
+    await delay(300)
     if (USE_API) { await api.delete(`/admin/accesses/${accessId}`); return ok(null) }
     const idx = _accesses.findIndex(a => a.id === accessId)
     if (idx === -1) return fail('Registro no encontrado')
@@ -568,13 +538,13 @@ export const tenantService = {
   // ── Precios configurables ───────────────────────────────────────────────────
 
   async getPrices() {
-    await delay(50)
+    await delay(100)
     if (USE_API) { const { data } = await api.get('/admin/prices'); return ok(data) }
     return ok({ ..._prices })
   },
 
   async updatePrices(newPrices) {
-    await delay(180)
+    await delay(300)
     if (USE_API) { const { data } = await api.put('/admin/prices', newPrices); return ok(data) }
     Object.assign(_prices, newPrices)
     _save(KEYS.prices, _prices)
@@ -584,13 +554,13 @@ export const tenantService = {
   // ── Límites por plan ────────────────────────────────────────────────────────
 
   async getLimits() {
-    await delay(50)
+    await delay(100)
     if (USE_API) { const { data } = await api.get('/admin/plan-limits'); return ok(data) }
     return ok(JSON.parse(JSON.stringify(_limits)))
   },
 
   async updateLimits(newLimits) {
-    await delay(180)
+    await delay(300)
     if (USE_API) { const { data } = await api.put('/admin/plan-limits', newLimits); return ok(data) }
     _limits = JSON.parse(JSON.stringify(newLimits))
     _save(KEYS.limits, _limits)
@@ -600,13 +570,13 @@ export const tenantService = {
   // ── Configuración del sitio ─────────────────────────────────────────────────
 
   async getSiteSettings() {
-    await delay(50)
+    await delay(100)
     if (USE_API) { const { data } = await api.get('/admin/site-settings'); return ok(data) }
     return ok({ ...DEFAULT_SITE_SETTINGS, ..._site })
   },
 
   async updateSiteSettings(updates) {
-    await delay(180)
+    await delay(300)
     if (USE_API) { const { data } = await api.put('/admin/site-settings', updates); return ok(data) }
     Object.assign(_site, updates)
     _save(KEYS.site, _site)
@@ -616,13 +586,13 @@ export const tenantService = {
   // ── Umbrales de alerta ──────────────────────────────────────────────────────
 
   async getAlertThresholds() {
-    await delay(50)
+    await delay(100)
     if (USE_API) { const { data } = await api.get('/admin/alert-thresholds'); return ok(data) }
     return ok({ ..._alertThresholds })
   },
 
   async updateAlertThresholds(thresholds) {
-    await delay(180)
+    await delay(300)
     if (USE_API) { const { data } = await api.put('/admin/alert-thresholds', thresholds); return ok(data) }
     if (thresholds.critical < 1 || thresholds.urgent < 1 || thresholds.warning < 1)
       return fail('Todos los umbrales deben ser al menos 1 día')
@@ -640,7 +610,7 @@ export const tenantService = {
     _renewals        = JSON.parse(JSON.stringify(DEFAULT_RENEWALS))
     _prices          = { ...DEFAULT_PRICES }
     _site            = { ...DEFAULT_SITE_SETTINGS }
-    _limits          = JSON.parse(JSON.stringify(DEFAULT_PLAN_LIMITS))
+    _limits          = JSON.parse(JSON.stringify(PLAN_LIMITS))
     _alertThresholds = { ...DEFAULT_ALERT_THRESHOLDS }
     _accessIdx  = DEFAULT_ACCESSES.length + 1
     _renewalIdx = DEFAULT_RENEWALS.length + 1

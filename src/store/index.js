@@ -33,6 +33,7 @@ import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { getInitialDemoState, SEED_VARIANTS } from '../data/seedData'
 import { isCampaignActive }             from '../shared/utils/discountEngine'
 import { APP_CONFIG }                   from '../config/app'
+import { STORAGE_KEYS }                 from '../config/storageKeys'
 
 // Deriva el tenantSlug de la URL al momento de cargar el módulo.
 // Como el store es un singleton, el slug queda fijo para toda la sesión,
@@ -41,7 +42,7 @@ import { APP_CONFIG }                   from '../config/app'
 const _getTenantSlug = () =>
   window.location.pathname.match(/\/app\/([^/]+)/)?.[1] ?? 'demo'
 
-const _STORE_KEY = `mm_store_v5_${_getTenantSlug()}`
+const _STORE_KEY = `${STORAGE_KEYS.storePrefix}${_getTenantSlug()}`
 
 // ─── Slices ───────────────────────────────────────────────────────────────────
 import { createAuditSlice }         from './slices/auditSlice'
@@ -54,6 +55,7 @@ import { createStakeholdersSlice }  from './slices/stakeholdersSlice'
 import { createDiscountsSlice }     from './slices/discountsSlice'
 import { createSessionTrackingSlice } from './slices/sessionTrackingSlice'
 import { createLocationSlice }        from './slices/locationSlice'
+import { createOfflineQueueSlice }    from './slices/offlineQueueSlice'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE PRINCIPAL
@@ -78,6 +80,7 @@ export const useStore = create(
         ...createDiscountsSlice(set, get),
         ...createSessionTrackingSlice(set, get),
         ...createLocationSlice(set, get),
+        ...createOfflineQueueSlice(set, get),
 
         // ─── Limpiar todos los datos transaccionales (solo modo demo) ─────────
         // Borra toda la data operativa registrada por el usuario dejando el
@@ -220,6 +223,8 @@ export const useStore = create(
           sessionHistory:    s.sessionHistory,
           // Maestro de ubicaciones
           locations:         s.locations,
+          // Cola de operaciones offline pendientes de sincronizar
+          offlineQueue:      s.offlineQueue,
         }),
       }
     )

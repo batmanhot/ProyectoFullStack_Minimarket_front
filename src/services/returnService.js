@@ -5,8 +5,11 @@ export const returnService = {
   async create(payload) {
     await delay()
     if (USE_API) {
-      const { data } = await api.post('/returns', payload)
-      return ok(data.data)
+      if (navigator.onLine) {
+        const { data } = await api.post('/returns', payload)
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'return.create', endpoint: '/returns', method: 'POST', payload })
     }
 
     const state = gs()
@@ -81,8 +84,11 @@ export const returnService = {
   async anular(id, motivo, userId) {
     await delay()
     if (USE_API) {
-      const { data } = await api.patch(`/returns/${id}/anular`, { motivo, userId })
-      return ok(data.data)
+      if (navigator.onLine) {
+        const { data } = await api.patch(`/returns/${id}/anular`, { motivo, userId })
+        return ok(data.data)
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'return.anular', endpoint: `/returns/${id}/anular`, method: 'PATCH', payload: { motivo, userId } })
     }
     const nc = (gs().returns || []).find(r => r.id === id)
     if (!nc)                    return fail('Nota de Crédito no encontrada')

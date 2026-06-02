@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { APP_CONFIG } from '../config/app'
+import { STORAGE_KEYS } from '../config/storageKeys'
 import { useStore } from '../store/index'
 
 export const USE_API = APP_CONFIG.useApi
@@ -12,7 +13,7 @@ const _slugFromUrl = () =>
   window.location.pathname.match(/\/app\/([^/]+)/)?.[1] ?? null
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('mm_token')
+  const token = localStorage.getItem(STORAGE_KEYS.authToken)
   if (token) config.headers.Authorization = `Bearer ${token}`
 
   // Identificación de tenant en cada request al backend.
@@ -31,7 +32,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('mm_token')
+      localStorage.removeItem(STORAGE_KEYS.authToken)
       useStore.getState().logout()
     }
     return Promise.reject(err)

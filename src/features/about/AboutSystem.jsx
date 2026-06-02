@@ -3,6 +3,7 @@ import { useStore }       from '../../store/index'
 import { PLANS, PLAN_ORDER } from '../../config/plans'
 import { ROLES }          from '../../config/app'
 import { useTheme }       from '../../shared/hooks/useTheme'
+import { getStoredPlanLimits, getStoredPrices } from '../../services/tenantService'
 
 // ── Datos descriptivos del sistema ────────────────────────────────────────────
 const BENEFITS = [
@@ -103,8 +104,13 @@ export default function AboutSystem() {
   const userRole    = currentUser?.role ?? 'cajero'
   const availRoles  = planCfg?.availableRoles ?? ['admin']
 
+  const storedLimits  = getStoredPlanLimits()
+  const storedPrices  = getStoredPrices()
+
   const colBg = (pc, isActive) => isActive ? (isDark ? pc.bgDark : pc.bg) : 'transparent'
   const colHeader = (pc) => isDark ? pc.headerDark : pc.header
+
+  const getLimitValue = (planId, field) => storedLimits?.[planId]?.[field] ?? PLANS[planId]?.limits?.[field] ?? null
 
   const planHas = (planId, key) => {
     const f = PLANS[planId]?.features
@@ -244,8 +250,12 @@ export default function AboutSystem() {
                           <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Activo</span>
                         )}
                         <span className="font-bold text-sm text-gray-700 dark:text-slate-200">
-                          {pcfg.price === 0 ? 'Gratis' : `S/ ${pcfg.price}`}
-                          {pcfg.price > 0 && <span className="text-gray-400 font-normal">/mes</span>}
+                          {(() => {
+                            const price = storedPrices[planId] ?? pcfg.price ?? 0
+                            return price === 0
+                              ? 'Gratis'
+                              : <>{`S/ ${price}`}<span className="text-gray-400 font-normal">/mes</span></>
+                          })()}
                         </span>
                       </div>
                     </th>
@@ -259,26 +269,29 @@ export default function AboutSystem() {
                 <td className="px-4 py-2 font-semibold text-gray-600 dark:text-slate-300" colSpan={5}>Límites</td>
               </tr>
               {[
-                { label: 'Productos', key: 'products', fmt: v => v === null ? 'Ilimitados' : `Hasta ${v}` },
-                { label: 'Usuarios',  key: 'users',    fmt: v => v === null ? 'Ilimitados' : `Hasta ${v}` },
-                { label: 'Roles disponibles', key: null },
+                { label: 'Productos',         field: 'products' },
+                { label: 'Usuarios',           field: 'users'    },
+                { label: 'Roles disponibles',  field: null       },
               ].map(row => (
                 <tr key={row.label} className="border-t border-gray-50 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/30">
                   <td className="px-4 py-2.5 text-gray-600 dark:text-slate-400">{row.label}</td>
                   {PLAN_ORDER.map(planId => {
-                    const pc  = PLAN_COLORS[planId]
-                    const pcfg = PLANS[planId]
+                    const pc       = PLAN_COLORS[planId]
                     const isActive = planId === plan
-                    let value
-                    if (row.key === null) {
-                      value = pcfg.availableRoles.map(r => ROLES[r]?.label).join(', ')
+                    let content
+                    if (row.field === null) {
+                      const roles = PLANS[planId].availableRoles.map(r => ROLES[r]?.label).join(', ')
+                      content = <span className="text-gray-500 dark:text-slate-400 text-xs">{roles}</span>
                     } else {
-                      value = row.fmt(pcfg.limits[row.key])
+                      const v = getLimitValue(planId, row.field)
+                      content = v === null
+                        ? <span className="text-green-600 dark:text-green-400 font-bold">Ilimitados</span>
+                        : <span className="text-amber-600 dark:text-amber-400 font-semibold">Hasta {v.toLocaleString()}</span>
                     }
                     return (
                       <td key={planId} className="px-3 py-2.5 text-center"
                         style={{ background: colBg(pc, isActive) }}>
-                        <span className="text-gray-600 dark:text-slate-300">{value}</span>
+                        {content}
                       </td>
                     )
                   })}
