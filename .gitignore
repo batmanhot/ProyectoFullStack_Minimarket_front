@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Variables de entorno — copiar .env.example → .env y editar localmente
+.env
+.env.*
+!.env.example
+
+# Reportes de tests
+playwright-report/
+test-results/
+coverage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

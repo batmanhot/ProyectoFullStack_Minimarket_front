@@ -61,8 +61,8 @@ function getPromoColor(campaignId) {
 export function isCampaignActive(campaign) {
   if (!campaign?.isActive) return false
   const now  = new Date()
-  const from = campaign.dateFrom ? new Date(campaign.dateFrom)              : null
-  const to   = campaign.dateTo   ? new Date(campaign.dateTo + 'T23:59:59') : null
+  const from = campaign.dateFrom ? new Date(campaign.dateFrom + 'T00:00:00') : null
+  const to   = campaign.dateTo   ? new Date(campaign.dateTo   + 'T23:59:59') : null
   if (from && now < from) return false
   if (to   && now > to)   return false
   if (campaign.daysOfWeek?.length > 0) {
