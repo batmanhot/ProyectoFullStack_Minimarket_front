@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store/index'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -25,7 +25,7 @@ function OpenForm({ currentUser, onBack }) {
       <button onClick={onBack} className="text-sm text-blue-600 hover:underline mb-4">← Volver</button>
       <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold text-gray-800 dark:text-slate-100">Apertura de caja</h2>
-        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto inicial (S/) *</label><input type="number" step="0.50" {...register('openingAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.openingAmount && <p className="text-xs text-red-500 mt-1">{errors.openingAmount.message}</p>}</div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto inicial (S/) *</label><input type="number" step="1" min="0" {...register('openingAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.openingAmount && <p className="text-xs text-red-500 mt-1">{errors.openingAmount.message}</p>}</div>
         <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Notas</label><textarea {...register('notes')} rows={2} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/></div>
         <div className="flex gap-3">
           <button onClick={onBack} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
@@ -96,7 +96,7 @@ function CloseForm({ session, sessionTotals, sessionSales, sessionDebtPayments, 
             {debtCash > 0 ? ` + cobros deuda efectivo (${formatCurrency(debtCash)})` : ''}
           </p>
         </div>
-        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto contado físicamente (S/) *</label><input type="number" step="0.50" {...register('countedAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00"/>{errors.countedAmount && <p className="text-xs text-red-500 mt-1">{errors.countedAmount.message}</p>}</div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto contado físicamente (S/) *</label><input type="number" step="1" min="0" {...register('countedAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00"/>{errors.countedAmount && <p className="text-xs text-red-500 mt-1">{errors.countedAmount.message}</p>}</div>
         {counted > 0 && (
           <div className={`rounded-lg p-3 text-sm font-medium flex justify-between ${Math.abs(difference) < 0.01 ? 'bg-green-50 text-green-700' : difference > 0 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
             <span>{difference > 0 ? 'Sobrante' : difference < 0 ? 'Faltante' : '✓ Sin diferencia'}</span>
@@ -155,6 +155,8 @@ export default function Cash() {
   const { activeCashSession, cashSessions, sales, debtPayments, currentUser } = useStore()
   const [view, setView] = useState('main')
   const [detailSession, setDetailSession] = useState(null)
+
+  useEffect(() => { cashService.syncStatus() }, [])
 
   const sessionSales = useMemo(() => {
     if (!activeCashSession) return []

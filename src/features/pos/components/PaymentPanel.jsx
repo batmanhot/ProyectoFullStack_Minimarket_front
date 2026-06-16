@@ -534,7 +534,7 @@ export default function PaymentPanel({
                 ref={amountRef}
                 type="number"
                 min="0"
-                step="0.50"
+                step="1"
                 value={currentAmount}
                 onChange={e => setCurrentAmount(e.target.value)}
                 onKeyDown={handleKeyDown}

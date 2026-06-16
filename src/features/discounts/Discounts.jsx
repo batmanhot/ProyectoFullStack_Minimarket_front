@@ -10,8 +10,10 @@
  *  - Cada subcomponente tiene una responsabilidad única y es testeable
  */
 
-import { useState, useMemo } from 'react'
-import { useStore }          from '../../store/index'
+import { useState, useMemo, useEffect } from 'react'
+import { useStore }              from '../../store/index'
+import { discountCampaignService } from '../../services/index'
+import { USE_API }               from '../../services/_base'
 import { CAMPAIGN_TYPES, isCampaignActive } from '../../shared/utils/discountEngine'
 import Modal                 from '../../shared/components/ui/Modal'
 import ConfirmModal          from '../../shared/components/ui/ConfirmModal'
@@ -27,6 +29,8 @@ export default function Discounts() {
     discountCampaigns = [], categories, products,
     updateDiscountCampaign, deleteDiscountCampaign,
   } = useStore()
+
+  useEffect(() => { if (USE_API) discountCampaignService.getAll() }, [])
 
   const [modal,         setModal]         = useState(null)
   const [deleteTarget,  setDeleteTarget]  = useState(null)

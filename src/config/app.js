@@ -4,7 +4,8 @@ export const APP_CONFIG = {
   address: import.meta.env.VITE_COMPANY_ADDRESS || 'Av. Principal 123',
   phone: import.meta.env.VITE_COMPANY_PHONE || '01-000-0000',
   currency: 'PEN', locale: 'es-PE', igvRate: 0.18,
-  useApi: import.meta.env.VITE_USE_API === 'true',
+  useApi:      import.meta.env.VITE_USE_API      === 'true',
+  useFactuApi: import.meta.env.VITE_USE_FACTUAPI === 'true',
   apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
 }
 

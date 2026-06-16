@@ -1,5 +1,7 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useStore } from '../../store/index'
+import { discountTicketService } from '../../services/index'
+import { USE_API } from '../../services/_base'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel } from '../../shared/utils/export'
 import { ExcelButton } from '../../shared/components/ui/ExportButtons'
@@ -218,7 +220,7 @@ function TicketForm({ ticket, onClose }) {
             <label className={lbl}>{discountType==='pct'?'Porcentaje *':'Monto en soles *'}</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-bold">{discountType==='pct'?'%':'S/'}</span>
-              <input type="number" min="0.01" step={discountType==='pct'?'1':'0.50'} value={discountValue} onChange={e=>setDiscountValue(e.target.value)} className={inp+' pl-8'} placeholder={discountType==='pct'?'10':'50.00'}/>
+              <input type="number" min="0.01" step="1" value={discountValue} onChange={e=>setDiscountValue(e.target.value)} className={inp+' pl-8'} placeholder={discountType==='pct'?'10':'50.00'}/>
             </div>
           </div>
           {discountType==='pct' && (
@@ -226,7 +228,7 @@ function TicketForm({ ticket, onClose }) {
               <label className={lbl}>Descuento máximo (S/) — opcional</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">S/</span>
-                <input type="number" min="0" step="0.50" value={maxAmount} onChange={e=>setMaxAmount(e.target.value)} className={inp+' pl-8'} placeholder="Sin límite"/>
+                <input type="number" min="0" step="1" value={maxAmount} onChange={e=>setMaxAmount(e.target.value)} className={inp+' pl-8'} placeholder="Sin límite"/>
               </div>
             </div>
           )}
@@ -318,6 +320,8 @@ function TicketForm({ ticket, onClose }) {
 export default function DiscountTickets() {
   const { discountTickets = [], updateDiscountTicket, businessConfig, addAuditLog } = useStore()
   const [modal, setModal]           = useState(null)
+
+  useEffect(() => { if (USE_API) discountTicketService.getAll() }, [])
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [search, setSearch]         = useState('')
   const [filterStatus, setFilterStatus] = useState('all')

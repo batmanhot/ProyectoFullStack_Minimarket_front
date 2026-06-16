@@ -4,8 +4,14 @@ export const discountTicketService = {
   async getAll(filters = {}) {
     await delay(150)
     if (USE_API) {
-      const { data } = await api.get('/tickets', { params: filters })
-      return ok(data.data, data.meta?.total)
+      try {
+        const { data } = await api.get('/tickets', { params: filters })
+        const noFilter = filters.used === undefined && filters.isActive === undefined
+        if (noFilter) gs().setDiscountTickets(data.data)
+        return ok(data.data, data.meta?.total)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al obtener tickets')
+      }
     }
     let tickets = gs().discountTickets || []
     if (filters.used     !== undefined) tickets = tickets.filter(t => t.used     === filters.used)
@@ -15,7 +21,16 @@ export const discountTicketService = {
 
   async create(payload) {
     await delay()
-    if (USE_API) { const { data } = await api.post('/tickets', payload); return ok(data.data) }
+    if (USE_API) {
+      try {
+        const { data } = await api.post('/tickets', payload)
+        const ticket = data.data
+        gs().addDiscountTicket(ticket)
+        return ok(ticket)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.response?.data?.details || err.message || 'Error al crear ticket')
+      }
+    }
     const ticket = { ...payload, id: crypto.randomUUID(), used: false, createdAt: new Date().toISOString() }
     gs().addDiscountTicket(ticket)
     return ok(ticket)
@@ -23,14 +38,29 @@ export const discountTicketService = {
 
   async update(id, updates) {
     await delay()
-    if (USE_API) { const { data } = await api.put(`/tickets/${id}`, updates); return ok(data.data) }
+    if (USE_API) {
+      try {
+        const { data } = await api.put(`/tickets/${id}`, updates)
+        const ticket = data.data
+        gs().updateDiscountTicket(id, ticket)
+        return ok(ticket)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al actualizar ticket')
+      }
+    }
     gs().updateDiscountTicket(id, updates)
     return ok({ id, ...updates })
   },
 
   async remove(id) {
     await delay()
-    if (USE_API) { await api.delete(`/tickets/${id}`); return ok({ id, deleted: true }) }
+    if (USE_API) {
+      try {
+        await api.delete(`/tickets/${id}`)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al eliminar ticket')
+      }
+    }
     gs().deleteDiscountTicket(id)
     return ok({ id, deleted: true })
   },
@@ -38,8 +68,12 @@ export const discountTicketService = {
   async validate(code) {
     await delay(100)
     if (USE_API) {
-      const { data } = await api.get(`/tickets/validate/${code}`)
-      return ok(data.data)
+      try {
+        const { data } = await api.get(`/tickets/validate/${code}`)
+        return ok(data.data)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Código no válido')
+      }
     }
     const ticket = (gs().discountTickets || []).find(
       t => t.code?.toUpperCase() === code?.toUpperCase()
@@ -56,8 +90,11 @@ export const discountTicketService = {
   async redeem(code, saleId, saleTotal, userId) {
     await delay()
     if (USE_API) {
-      const { data } = await api.post(`/tickets/${code}/redeem`, { saleId, saleTotal, userId })
-      return ok(data.data)
+      try {
+        await api.post(`/tickets/${code}/redeem`, { saleId, saleTotal, userId })
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al redimir ticket')
+      }
     }
     gs().redeemDiscountTicket(code, saleId, saleTotal, userId)
     return ok({ code, saleId, redeemed: true })

@@ -14,9 +14,15 @@ export const authService = {
   async login(role, tenantSlug = 'demo') {
     await delay(350)
     if (USE_API) {
-      const { data } = await api.post('/auth/login', { role, tenantSlug })
-      localStorage.setItem(STORAGE_KEYS.authToken, data.token)
-      return ok(data.user)
+      // En modo API los botones rápidos usan las credenciales del seed
+      const DEMO_CREDS = {
+        admin:      { username: 'admin@demo.com', password: 'admin123'   },
+        gerente:    { username: 'gerente',         password: 'gerente123' },
+        supervisor: { username: 'cajero',          password: 'cajero123'  },
+        cajero:     { username: 'cajero',          password: 'cajero123'  },
+      }
+      const creds = DEMO_CREDS[role] ?? DEMO_CREDS.cajero
+      return this.loginWithCredentials(creds.username, creds.password, tenantSlug)
     }
     const user = gs().users.find(u => u.role === role && u.isActive)
     if (!user) return fail('Usuario no encontrado')
@@ -41,9 +47,13 @@ export const authService = {
   async loginWithCredentials(username, password, tenantSlug = 'demo') {
     await delay(350)
     if (USE_API) {
-      const { data } = await api.post('/auth/login', { username, password, tenantSlug })
-      localStorage.setItem(STORAGE_KEYS.authToken, data.token)
-      return ok(data.user)
+      try {
+        const { data } = await api.post('/auth/login', { username, password, tenantSlug })
+        localStorage.setItem(STORAGE_KEYS.authToken, data.token)
+        return ok(data.user)
+      } catch (err) {
+        return fail(err.response?.data?.message || err.message || 'No se pudo conectar con el servidor')
+      }
     }
     const user = gs().users.find(u => u.username === username && u.isActive)
     if (!user) return fail('Usuario o contraseña incorrectos')

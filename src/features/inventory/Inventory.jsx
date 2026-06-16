@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore, selectLowStockProducts } from '../../store/index'
+import { USE_API } from '../../services/_base'
 import { useForm } from 'react-hook-form'
 import Stocktaking from './Stocktaking'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -54,7 +55,7 @@ function StockAdjustForm({ product, currentUser, onClose }) {
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Cantidad *</label>
-        <input type="number" min="0.01" step="0.01" {...register('quantity')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <input type="number" min="1" step="1" {...register('quantity')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
         {errors.quantity && <p className="text-xs text-red-500 mt-1">{errors.quantity.message}</p>}
       </div>
       <div>
@@ -304,7 +305,11 @@ export default function Inventory() {
   const [modal, setModal]         = useState(null)
   const dq = useDebounce(search, 150)
   const lowCount = useStore(s => selectLowStockProducts(s).length)
-   
+
+  useEffect(() => {
+    if (USE_API) productService.getAll()
+  }, [])
+
   const filtered = useMemo(() => {
     let list = products.filter(p => p.isActive)
     if (dq)              { const q = dq.toLowerCase(); list = list.filter(p => p.name.toLowerCase().includes(q) || p.barcode.includes(q) || p.sku?.toLowerCase().includes(q)) }

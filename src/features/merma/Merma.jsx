@@ -13,8 +13,10 @@
  *  - Estadísticas de pérdida valorizada
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore }          from '../../store/index'
+import { mermaService }      from '../../services/index'
+import { USE_API }           from '../../services/_base'
 import { formatCurrency, formatDate } from '../../shared/utils/helpers'
 import { useDebounce }       from '../../shared/hooks/useDebounce'
 import { allocateMerma }     from '../../shared/utils/inventoryEngine'
@@ -98,15 +100,25 @@ function MermaForm({ onClose }) {
       createdAt:   new Date().toISOString(),
     })
 
-    // Guardar registro en el almacén de merma
-    addMermaRecord?.({
-      ...result.mermaRecord,
-      supplierId:   product.supplierId || null,
-      supplierName: null, // se resuelve al devolver
-      userId:       currentUser?.id,
-      userName:     currentUser?.fullName,
-      unitCost:     product.priceBuy || 0,
-      totalLoss:    parseFloat(((product.priceBuy || 0) * parseFloat(quantity)).toFixed(2)),
+    // Registrar merma via servicio (API o localStorage)
+    const validApiReasons = ['vencido', 'dañado', 'hurto', 'otro']
+    const apiReason = validApiReasons.includes(reasonKey) ? reasonKey : 'otro'
+    mermaService.create({
+      productId,
+      batchId:  batchId || '',
+      quantity: parseFloat(quantity),
+      reason:   apiReason,
+      notes:    fullReason,
+      costUnit: product.priceBuy || 0,
+    }).catch(() => {
+      addMermaRecord?.({
+        ...result.mermaRecord,
+        supplierId:   product.supplierId || null,
+        userId:       currentUser?.id,
+        userName:     currentUser?.fullName,
+        unitCost:     product.priceBuy || 0,
+        totalLoss:    parseFloat(((product.priceBuy || 0) * parseFloat(quantity)).toFixed(2)),
+      })
     })
 
     toast.success(`${quantity} ${product.unit || 'u'} de "${product.name}" registradas en merma`)
@@ -240,6 +252,8 @@ export default function Merma() {
   const [statusFilter,setStatusFilter]= useState('todas')
   const [modal,       setModal]       = useState(null)
   const dq = useDebounce(search, 150)
+
+  useEffect(() => { if (USE_API) mermaService.getAll() }, [])
 
   const filtered = useMemo(() => {
     let list = mermaRecords

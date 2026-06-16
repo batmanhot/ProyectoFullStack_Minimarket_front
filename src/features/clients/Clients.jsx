@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store/index'
+import { USE_API } from '../../services/_base'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { clientSchema } from '../../shared/schemas/index'
@@ -63,7 +64,7 @@ function ClientForm({ client, onClose }) {
         <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Teléfono</label><input {...register('phone')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
         <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Email</label><input {...register('email')} type="email" className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}</div>
         <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Dirección</label><input {...register('address')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
-        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Límite de crédito (S/)</label><input type="number" step="50" {...register('creditLimit')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Límite de crédito (S/)</label><input type="number" step="1" min="0" {...register('creditLimit')} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/></div>
       </div>
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
@@ -182,7 +183,7 @@ ${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ D
       <div>
         <label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto a pagar (S/) *</label>
         <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500">S/</span>
-        <input type="number" min="0.01" step="0.01" max={deuda} value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-8 pr-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={deuda.toFixed(2)}/></div>
+        <input type="number" min="0.01" step="1" max={deuda} value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-8 pr-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={deuda.toFixed(2)}/></div>
         <div className="flex gap-2 mt-2">
           <button onClick={() => setAmount(deuda.toFixed(2))} className="text-xs px-3 py-1 bg-green-50 text-green-600 rounded-lg hover:bg-green-100">Pagar total ({formatCurrency(deuda)})</button>
         </div>
@@ -250,6 +251,8 @@ function ClientDetail({ client, sales, onClose }) {
 export default function Clients() {
   const { clients, sales, debtPayments, businessConfig, addAuditLog } = useStore()
   const [search,      setSearch]      = useState('')
+
+  useEffect(() => { if (USE_API) clientService.getAll() }, [])
   const [modal,       setModal]       = useState(null)
   const [activeTab,   setActiveTab]   = useState('clientes')
   const [importOpen,  setImportOpen]  = useState(false)

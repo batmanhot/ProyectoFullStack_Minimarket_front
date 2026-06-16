@@ -10,8 +10,10 @@
  *  5. Componente queda solo con UI — sin lógica de negocio
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useStore } from '../../store/index'
+import { saleService, clientService, returnService } from '../../services/index'
+import { USE_API } from '../../services/_base'
 import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,7 +23,6 @@ import { downloadExcel, exportToExcel, exportToPDF }  from '../../shared/utils/e
 import { ExcelButton, PDFButton }                       from '../../shared/components/ui/ExportButtons'
 import { useReportMetrics }                            from './hooks/useReportMetrics'
 import Modal                                            from '../../shared/components/ui/Modal'
-import { saleService }                                 from '../../services/index'
 import toast                                           from 'react-hot-toast'
 import { useTenantSafe }                               from '../../context/TenantContext'
 import { canUsePlan, PLANS, PLAN_ORDER }               from '../../config/plans'
@@ -151,6 +152,14 @@ export default function Reports() {
   const { sales, products, clients, categories, returns = [], businessConfig, systemConfig, addAuditLog, currentUser } = useStore()
   const tenantCtx  = useTenantSafe()
   const currentPlan = tenantCtx?.plan ?? 'trial'
+
+  useEffect(() => {
+    if (USE_API) {
+      saleService.getAll()
+      clientService.getAll()
+      returnService.getAll()
+    }
+  }, [])
 
   const [range, setRange]           = useState('month')
   const [activeTab, setActiveTab]   = useState('ventas')

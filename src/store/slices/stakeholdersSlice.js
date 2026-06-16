@@ -25,6 +25,9 @@ export const createStakeholdersSlice = (set, get) => ({
       clients: s.clients.map((c) => (c.id === id ? { ...c, ...updates } : c)),
     })),
 
+  setClients:   (clients)   => set({ clients }),
+  setSuppliers: (suppliers) => set({ suppliers }),
+
   // ─── Proveedores ───────────────────────────────────────────────────────────
   addSupplier: (supplier) => {
     get().addAuditLog({
@@ -70,6 +73,8 @@ export const createStakeholdersSlice = (set, get) => ({
       users: s.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
     }))
   },
+
+  setUsers: (users) => set({ users }),
 
   // ─── Compras a proveedor ───────────────────────────────────────────────────
   addPurchase: (purchase) => {

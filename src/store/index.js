@@ -32,7 +32,6 @@ import { create }                      from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
 import { getInitialDemoState, SEED_VARIANTS } from '../data/seedData'
 import { isCampaignActive }             from '../shared/utils/discountEngine'
-import { APP_CONFIG }                   from '../config/app'
 import { STORAGE_KEYS }                 from '../config/storageKeys'
 
 // Deriva el tenantSlug de la URL al momento de cargar el módulo.
@@ -65,9 +64,10 @@ export const useStore = create(
     persist(
       (set, get) => ({
 
-        // 1. Datos iniciales: solo en modo demo (sin API). En modo API la
-        //    data viene del backend y reemplaza este estado en cada fetch.
-        ...(APP_CONFIG.useApi ? {} : getInitialDemoState()),
+        // 1. Datos iniciales: seed data siempre presente (modo API y demo).
+        //    En modo API las mutaciones sincronizan con el backend Y actualizan
+        //    el store local — el store es la fuente de verdad para la UI.
+        ...getInitialDemoState(),
 
         // 2. Slices — ORDEN IMPORTANTE: auditSlice va primero
         ...createAuditSlice(set, get),

@@ -15,8 +15,10 @@
  *  - El campo "Nota de venta" del POS recibe referencia de la cotización
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore }           from '../../store/index'
+import { quotationService }   from '../../services/index'
+import { USE_API }            from '../../services/_base'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { useDebounce }        from '../../shared/hooks/useDebounce'
 import toast                  from 'react-hot-toast'
@@ -771,9 +773,14 @@ export default function Quotations({ onNavigate }) {
     try { return JSON.parse(localStorage.getItem('pos_quotations') || '[]') } catch { return [] }
   })
 
+  useEffect(() => {
+    if (!USE_API) return
+    quotationService.getAll({ limit: 200 }).then(res => { if (res.ok) setQuotations(res.data) })
+  }, [])
+
   const saveQuotations = (list) => {
     setQuotations(list)
-    localStorage.setItem('pos_quotations', JSON.stringify(list))
+    if (!USE_API) localStorage.setItem('pos_quotations', JSON.stringify(list))
   }
 
   const [modal,        setModal]        = useState(null)
@@ -803,17 +810,31 @@ export default function Quotations({ onNavigate }) {
                    .reduce((a, q) => a + q.total, 0),
   }), [quotations])
 
-  const handleSave = (q) => {
-    const existing = quotations.findIndex(x => x.id === q.id)
-    const updated  = existing >= 0
-      ? quotations.map(x => x.id === q.id ? q : x)
-      : [q, ...quotations]
-    saveQuotations(updated)
+  const handleSave = async (q) => {
+    if (USE_API) {
+      const isNew = !quotations.find(x => x.id === q.id)
+      const res = isNew ? await quotationService.create(q) : await quotationService.update(q.id, q)
+      if (!res.ok) { toast.error(res.error); return }
+      const saved = res.data
+      setQuotations(prev => {
+        const exists = prev.findIndex(x => x.id === saved.id)
+        return exists >= 0 ? prev.map(x => x.id === saved.id ? saved : x) : [saved, ...prev]
+      })
+    } else {
+      const existing = quotations.findIndex(x => x.id === q.id)
+      saveQuotations(existing >= 0 ? quotations.map(x => x.id === q.id ? q : x) : [q, ...quotations])
+    }
     toast.success(`Cotización ${q.number} ${q.status === 'borrador' ? 'guardada' : 'enviada'}`)
   }
 
-  const handleStatusChange = (id, status) => {
-    saveQuotations(quotations.map(q => q.id === id ? { ...q, status, updatedAt: new Date().toISOString() } : q))
+  const handleStatusChange = async (id, status) => {
+    if (USE_API) {
+      const res = await quotationService.changeStatus(id, status)
+      if (!res.ok) { toast.error(res.error); return }
+      setQuotations(prev => prev.map(q => q.id === id ? res.data : q))
+    } else {
+      saveQuotations(quotations.map(q => q.id === id ? { ...q, status, updatedAt: new Date().toISOString() } : q))
+    }
     toast.success(`Estado actualizado: ${Q_STATUS[status]?.label}`)
   }
 
@@ -880,8 +901,14 @@ export default function Quotations({ onNavigate }) {
     setModal({ type: 'doc', data: q })
   }
 
-  const handleDelete = (id) => {
-    saveQuotations(quotations.filter(q => q.id !== id))
+  const handleDelete = async (id) => {
+    if (USE_API) {
+      const res = await quotationService.remove(id)
+      if (!res.ok) { toast.error(res.error); return }
+      setQuotations(prev => prev.filter(q => q.id !== id))
+    } else {
+      saveQuotations(quotations.filter(q => q.id !== id))
+    }
     toast.success('Cotización eliminada')
   }
 

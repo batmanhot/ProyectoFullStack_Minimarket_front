@@ -48,7 +48,7 @@ function buildTicketHTML(sale, businessConfig) {
     ? `<div style="text-align:center;margin-bottom:2mm"><img src="${businessConfig.logo}" style="max-width:35mm;max-height:15mm"/></div>`
     : ''
 
-  const itemsHtml = (sale.items || []).filter(i => !i._fromBundle).map(item => {
+  const itemsHtml = (sale.items || []).filter(i => !i._fromBundle && !i.fromBundle).map(item => {
     const qty         = item.quantity ?? item.qty ?? 1
     const pu          = item.unitPrice ?? item.price ?? 0
     const itemDiscount = item.totalDiscount ?? item.discount ?? 0
@@ -66,6 +66,17 @@ function buildTicketHTML(sale, businessConfig) {
       <div style="font-size:9px;color:#555;margin-left:2px">
         ${qty} ${item.unit || 'u'} × ${formatCurrency(pu)}${itemDiscount > 0 ? ` · dto -${formatCurrency(itemDiscount)}` : ''}
       </div>
+      ${(() => {
+        const isBundle = item.type === 'bundle' || item.isBundle
+        if (!isBundle) return ''
+        const fromSale    = (sale.items || []).filter(si => si.fromBundle === item.productId || si._fromBundle === item.productId)
+        const fromCart    = item.components || []
+        const fromStore   = (storeProducts.find(p => p.id === item.productId)?.components || [])
+        const comps = fromSale.length > 0 ? fromSale : fromCart.length > 0 ? fromCart : fromStore
+        return comps.length > 0
+          ? comps.map(c => `<div style="font-size:8px;color:#ea580c;margin-left:6px">↳ ${c._name || c.name || c.productName || ''} ×${c.quantity}</div>`).join('')
+          : ''
+      })()}
       ${discHtml}
       ${item.manualDiscount > 0 ? `<div style="font-size:9px;color:#6b7280;margin-left:4px">Dto. manual: -${formatCurrency(item.manualDiscount)}</div>` : ''}
     </div>`
@@ -153,7 +164,7 @@ const Divider = () => (
 
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function SaleTicket({ sale, onClose }) {
-  const { businessConfig } = useStore()
+  const { businessConfig, products: storeProducts } = useStore()
   const [showPhone, setShowPhone] = useState(false)
   const [phone, setPhone]         = useState('')
   const [phoneError, setPhoneError] = useState('')
@@ -356,7 +367,7 @@ export default function SaleTicket({ sale, onClose }) {
               <Divider />
 
               {/* Ítems */}
-              {(sale.items || []).filter(item => !item._fromBundle).map((item, idx) => {
+              {(sale.items || []).filter(item => !item._fromBundle && !item.fromBundle).map((item, idx) => {
                 const qty          = item.quantity ?? item.qty ?? 1
                 const pu           = item.unitPrice ?? item.price ?? 0
                 const itemDiscount = item.totalDiscount ?? item.discount ?? 0
@@ -381,6 +392,24 @@ export default function SaleTicket({ sale, onClose }) {
                         <span style={{ color: '#059669' }}> · dto −{formatCurrency(itemDiscount)}</span>
                       )}
                     </div>
+                    {/* Componentes del bundle */}
+                    {(() => {
+                      const isBundle = item.type === 'bundle' || item.isBundle
+                      if (!isBundle) return null
+                      const fromSale  = (sale.items || []).filter(si => si.fromBundle === item.productId || si._fromBundle === item.productId)
+                      const fromCart  = item.components || []
+                      const fromStore = (storeProducts.find(p => p.id === item.productId)?.components || [])
+                      const comps = fromSale.length > 0 ? fromSale : fromCart.length > 0 ? fromCart : fromStore
+                      return comps.length > 0 ? (
+                        <div style={{ marginTop: '2px' }}>
+                          {comps.map((c, ci) => (
+                            <div key={ci} style={{ fontSize: '9px', color: '#ea580c', marginLeft: '6px' }}>
+                              ↳ {c._name || c.name || c.productName || c.productId} ×{c.quantity}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null
+                    })()}
                     {/* Descuentos de campaña */}
                     {discDetails.map((d, di) => (
                       <div key={di} style={{ fontSize: '9px', color: '#059669', marginTop: '1px' }}>

@@ -11,6 +11,8 @@ export const createDiscountsSlice = (set, get) => ({
   // ─── Campañas de descuento ─────────────────────────────────────────────────
   discountCampaigns: [],
 
+  setDiscountCampaigns: (discountCampaigns) => set({ discountCampaigns }),
+
   addDiscountCampaign: (campaign) => {
     get().addAuditLog({
       action:   'CREATE',
@@ -49,6 +51,8 @@ export const createDiscountsSlice = (set, get) => ({
 
   // ─── Tickets / Vales de descuento ──────────────────────────────────────────
   discountTickets: [],
+
+  setDiscountTickets: (discountTickets) => set({ discountTickets }),
 
   addDiscountTicket: (ticket) => {
     get().addAuditLog({
@@ -105,6 +109,8 @@ export const createDiscountsSlice = (set, get) => ({
 
   // ─── Devoluciones / Notas de Crédito ──────────────────────────────────────
   returns: [],
+
+  setReturns: (returns) => set({ returns }),
 
   addReturn: (creditNote) => {
     get().addAuditLog({

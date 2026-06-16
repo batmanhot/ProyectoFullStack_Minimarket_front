@@ -59,6 +59,8 @@ export const createSalesSlice = (set, get) => ({
             discount:    0,
             subtotal:    formatNumber(quantity * product.priceSell),
             unit:        product.unit || 'unidad',
+            type:        product.type || 'simple',
+            components:  product.components || [],
           },
         ],
       }))
@@ -96,6 +98,8 @@ export const createSalesSlice = (set, get) => ({
   restoreCart: (items) => set({ cart: items }),
 
   // ─── Ventas ────────────────────────────────────────────────────────────────
+  setSales: (sales) => set({ sales }),
+
   addSale: (sale) => {
     get().addAuditLog({
       action:   'CREATE',

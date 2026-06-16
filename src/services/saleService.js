@@ -7,13 +7,15 @@ import {
   buildEarnTransaction,
   buildRedeemTransaction,
 } from '../shared/utils/LoyaltyEngine'
-import { api, USE_API, ok, fail, gs, delay } from './_base'
+import { api, USE_API, USE_FACTUAPI, ok, fail, gs, delay } from './_base'
 
 export const saleService = {
   async getAll(filters = {}) {
     await delay()
     if (USE_API) {
       const { data } = await api.get('/sales', { params: filters })
+      const noFilter = !filters.status && !filters.dateFrom && !filters.dateTo && !filters.clientId
+      if (noFilter) gs().setSales(data.data)
       return ok(data.data, data.meta?.total)
     }
     let sales = gs().sales
@@ -26,19 +28,13 @@ export const saleService = {
 
   async create(payload) {
     await delay()
-    if (USE_API) {
-      if (navigator.onLine) {
-        const { data } = await api.post('/sales', payload)
-        return ok(data.data)
-      }
-      useStore.getState().enqueueOfflineOp({ type: 'sale.create', endpoint: '/sales', method: 'POST', payload })
-      // Cae al bloque local para reflejar el stock en pantalla inmediatamente
-    }
 
     const invoiceNumber = payload.invoiceNumber || 'VENTA'
     const enrichedItems = []
 
-    // ── Expandir Bundles antes de procesar inventario ──────────────────────────
+    // ── Expandir Bundles SIEMPRE (antes del API call y antes del motor local) ────
+    // CRÍTICO: debe ocurrir antes de api.post() para que el backend reciba
+    // los ítems ya expandidos (bundle padre + componentes con _fromBundle).
     const expandedItems = []
     for (const item of payload.items) {
       const freshState = useStore.getState()
@@ -48,7 +44,7 @@ export const saleService = {
           const compProduct = freshState.products.find(p => p.id === comp.productId)
           expandedItems.push({
             productId:   comp.productId,
-            productName: compProduct?.name || comp.productId,
+            productName: compProduct?.name || comp._name || comp.name || comp.productId,
             quantity:    comp.quantity * item.quantity,
             unitPrice:   0,
             unit:        compProduct?.unit || 'unidad',
@@ -60,6 +56,43 @@ export const saleService = {
       } else {
         expandedItems.push(item)
       }
+    }
+
+    if (USE_API) {
+      if (navigator.onLine) {
+        try {
+          // Enviar payload con ítems ya expandidos: el backend recibe
+          // el bundle padre (isBundle:true) + componentes (_fromBundle).
+          const expandedPayload = { ...payload, items: [...enrichedItems, ...expandedItems] }
+          const { data } = await api.post('/sales', expandedPayload)
+          const sale = data.data
+          // Reflejar stock localmente (el backend ya lo descontó en DB)
+          for (const item of expandedItems) {
+            const st = useStore.getState()
+            const prod = st.products.find(p => p.id === item.productId)
+            if (prod) st.updateProduct(item.productId, { stock: Math.max(0, (prod.stock || 0) - item.quantity) })
+          }
+          // Recalcular stock de bundles
+          for (const item of enrichedItems) {
+            if (!item.isBundle) continue
+            const st = useStore.getState()
+            const bp = st.products.find(p => p.id === item.productId)
+            if (!bp?.components?.length) continue
+            const newStock = Math.floor(Math.min(...bp.components.map(comp => {
+              const cp = st.products.find(p => p.id === comp.productId)
+              return cp && comp.quantity > 0 ? Math.floor((cp.stock || 0) / comp.quantity) : 0
+            })))
+            st.updateProduct(item.productId, { stock: newStock })
+          }
+          useStore.getState().addSale(sale)
+          useStore.getState().clearCart()
+          return ok(sale)
+        } catch (err) {
+          return fail(err.response?.data?.message || err.message || 'Error al registrar la venta')
+        }
+      }
+      useStore.getState().enqueueOfflineOp({ type: 'sale.create', endpoint: '/sales', method: 'POST', payload: { ...payload, items: [...enrichedItems, ...expandedItems] } })
+      // Cae al bloque local para reflejar el stock en pantalla inmediatamente
     }
 
     // ── Motor de inventario FEFO/FIFO/Serie/Simple + Variantes ──────────────────
@@ -160,7 +193,7 @@ export const saleService = {
       }
     })()
 
-    const sale = { ...payload, ...saleClientEnrich, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
+    let sale = { ...payload, ...saleClientEnrich, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
 
     // ── Programa de Puntos — delegado a LoyaltyEngine ─────────────────────────
     if (payload.clientId) {
@@ -209,6 +242,26 @@ export const saleService = {
       }
     }
 
+    // ── Envío a backend para emisión SUNAT (boleta / factura) ────────────────
+    if (USE_FACTUAPI && sale.tipoComprobante !== 'ticket') {
+      try {
+        const { data: apiData } = await api.post('/sales', sale)
+        const r = apiData?.data ?? {}
+        sale = {
+          ...sale,
+          comprobanteId:     r.comprobanteId     ?? null,
+          comprobanteNumero: r.comprobanteNumero ?? null,
+          invoiceNumber:     r.invoiceNumber     ?? sale.invoiceNumber,
+          factuApiResult:    r.factuApiResult    ?? null,
+          sunatStatus:       r.comprobanteId ? 'emitido' : 'error',
+          comprobanteError:  r.comprobanteError  ?? null,
+        }
+      } catch (err) {
+        console.error('[saleService] Error al enviar a backend SUNAT:', err)
+        sale = { ...sale, sunatStatus: 'error', comprobanteError: err.message }
+      }
+    }
+
     useStore.getState().addSale(sale)
     useStore.getState().clearCart()
     return ok(sale)
@@ -218,8 +271,13 @@ export const saleService = {
     await delay()
     if (USE_API) {
       if (navigator.onLine) {
-        const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
-        return ok(data.data)
+        try {
+          const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
+          useStore.getState().updateSale(id, { status: 'cancelada', cancelReason: reason, cancelledAt: new Date().toISOString() })
+          return ok(data.data)
+        } catch (err) {
+          return fail(err.response?.data?.message || err.message || 'Error al cancelar la venta')
+        }
       }
       useStore.getState().enqueueOfflineOp({ type: 'sale.cancel', endpoint: `/sales/${id}/cancel`, method: 'PATCH', payload: { reason, userId } })
       // Cae al bloque local para reflejar el cambio de estado en pantalla inmediatamente

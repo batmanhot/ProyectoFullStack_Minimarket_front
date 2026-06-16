@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store/index'
-import { purchaseService } from '../../services/index'
+import { purchaseService, supplierService, productService } from '../../services/index'
+import { USE_API } from '../../services/_base'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
 import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
@@ -287,14 +288,14 @@ function NewPurchaseForm({ onClose }) {
                   </td>
                   <td className="px-3 py-2.5 text-center text-xs text-gray-500 dark:text-slate-400">{item.currentStock}</td>
                   <td className="px-3 py-2.5">
-                    <input type="number" min="0.01" step="0.01" value={item.quantity}
+                    <input type="number" min="1" step="1" value={item.quantity}
                       onChange={e => updateItem(item.productId,'quantity',e.target.value)}
                       className="w-20 text-center px-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"/>
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="relative w-28">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-slate-500">S/</span>
-                      <input type="number" min="0.01" step="0.01" value={item.priceBuy}
+                      <input type="number" min="0" step="1" value={item.priceBuy}
                         onChange={e => updateItem(item.productId,'priceBuy',e.target.value)}
                         className="w-full pl-7 pr-2 py-1 border border-gray-200 dark:border-slate-600 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"/>
                     </div>
@@ -375,6 +376,10 @@ function PurchaseDetail({ purchase }) {
 export default function Purchases() {
   const { purchases, suppliers, updatePurchase, businessConfig, currentUser, addAuditLog } = useStore()
   const [showForm, setShowForm] = useState(false)
+
+  useEffect(() => {
+    if (USE_API) { supplierService.getAll(); productService.getAll() }
+  }, [])
   const [modal, setModal] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [search, setSearch] = useState('')

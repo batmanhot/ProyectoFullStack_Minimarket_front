@@ -116,13 +116,14 @@ async function networkFirst(request) {
   try {
     // Intentar obtener de la red
     const networkResponse = await fetch(request)
-    
-    // Si es exitoso, guardar en caché
+
+    // Si es exitoso, guardar en caché (clonar ANTES de retornar)
     if (networkResponse && networkResponse.status === 200) {
+      const responseToCache = networkResponse.clone()
       const cache = await caches.open(RUNTIME_CACHE)
-      cache.put(request, networkResponse.clone())
+      cache.put(request, responseToCache)
     }
-    
+
     return networkResponse
   } catch (error) {
     // Si falla la red, intentar caché
@@ -159,13 +160,14 @@ async function cacheFirst(request) {
   // Si no está en caché, obtener de la red
   try {
     const networkResponse = await fetch(request)
-    
-    // Guardar en caché para futuras requests
+
+    // Guardar en caché para futuras requests (clonar ANTES de retornar)
     if (networkResponse && networkResponse.status === 200) {
+      const responseToCache = networkResponse.clone()
       const cache = await caches.open(CACHE_NAME)
-      cache.put(request, networkResponse.clone())
+      cache.put(request, responseToCache)
     }
-    
+
     return networkResponse
   } catch (error) {
     console.error('[SW] Error obteniendo recurso:', request.url, error)
@@ -183,8 +185,8 @@ async function staleWhileRevalidate(request) {
   const fetchPromise = fetch(request)
     .then((networkResponse) => {
       if (networkResponse && networkResponse.status === 200) {
-        const cache = caches.open(RUNTIME_CACHE)
-        cache.then((c) => c.put(request, networkResponse.clone()))
+        const responseToCache = networkResponse.clone()
+        caches.open(RUNTIME_CACHE).then((c) => c.put(request, responseToCache))
       }
       return networkResponse
     })

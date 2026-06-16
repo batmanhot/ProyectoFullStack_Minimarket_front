@@ -1,22 +1,22 @@
 import { useStore } from '../store/index'
 import { formatNumber } from '../shared/utils/helpers'
-import { api, USE_API, ok, gs, delay } from './_base'
+import { api, USE_API, ok, fail, gs, delay } from './_base'
 
 export const purchaseService = {
   async getAll() {
-    if (USE_API) { const { data } = await api.get('/purchases'); return ok(data.data) }
+    if (USE_API) {
+      try {
+        const { data } = await api.get('/purchases')
+        return ok(data.data)
+      } catch (err) {
+        return fail(err.response?.data?.message || err.message || 'Error al obtener compras')
+      }
+    }
     return ok(gs().purchases, gs().purchases.length)
   },
 
   async create(payload) {
     await delay()
-    if (USE_API) {
-      if (navigator.onLine) {
-        const { data } = await api.post('/purchases', payload)
-        return ok(data.data)
-      }
-      useStore.getState().enqueueOfflineOp({ type: 'purchase.create', endpoint: '/purchases', method: 'POST', payload })
-    }
 
     const purchase = {
       ...payload, id: crypto.randomUUID(), status: 'confirmada',
@@ -24,6 +24,19 @@ export const purchaseService = {
       total: formatNumber(payload.items.reduce((a, i) => a + i.quantity * i.priceBuy, 0)),
     }
 
+    if (USE_API) {
+      if (navigator.onLine) {
+        try {
+          await api.post('/purchases', payload)
+        } catch (err) {
+          return fail(err.response?.data?.message || err.message || 'Error al registrar la compra')
+        }
+      } else {
+        useStore.getState().enqueueOfflineOp({ type: 'purchase.create', endpoint: '/purchases', method: 'POST', payload })
+      }
+    }
+
+    // Actualizar stock local en todos los casos (API y demo)
     for (const item of payload.items) {
       const freshState = useStore.getState()
       const product    = freshState.products.find(p => p.id === item.productId)

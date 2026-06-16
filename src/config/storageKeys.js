@@ -3,7 +3,7 @@
 
 export const STORAGE_KEYS = {
   authToken:   'mm_token',
-  storePrefix: 'mm_store_v5_',
+  storePrefix: 'mm_store_v6_',
 
   // Mock de tenants (solo modo desarrollo, sin API real)
   mockTenants:         'mm_mock_tenants_v1',

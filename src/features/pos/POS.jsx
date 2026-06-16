@@ -548,6 +548,15 @@ export default function POS({ onNavigate }) {
                       {/* 1. Producto */}
                       <div className="min-w-0">
                         <p className="text-base font-semibold text-gray-900 leading-tight truncate">{item.productName}</p>
+                        {item.type === 'bundle' && item.components?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.components.map((c, ci) => (
+                              <span key={ci} className="text-[10px] text-orange-600 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 leading-none">
+                                {c._name || c.name || c.productId} ×{c.quantity}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <span className="text-xs text-gray-400">{formatCurrency(item.unitPrice)}<span className="text-gray-300">/{item.unit || 'und'}</span></span>
                           {hasDisc && (
@@ -615,7 +624,7 @@ export default function POS({ onNavigate }) {
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-amber-700 whitespace-nowrap shrink-0">Dto. manual:</span>
                           <input
-                            type="number" min="0" max={item.subtotal} step="0.01"
+                            type="number" min="0" max={item.subtotal} step="1"
                             value={ed.value}
                             onChange={e => setDiscountEdit(d => ({...d,[key]:{...d[key],value:e.target.value}}))}
                             className="flex-1 px-2 py-1 border border-amber-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white text-right min-w-0"
@@ -718,7 +727,7 @@ export default function POS({ onNavigate }) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">Dto. global S/:</span>
           <input
-            type="number" min="0" step="0.50"
+            type="number" min="0" step="1"
             value={globalDiscount}
             onChange={e => setGlobalDiscount(e.target.value)}
             className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 text-right bg-gray-50"
@@ -902,8 +911,7 @@ export default function POS({ onNavigate }) {
       {showPayment && (
         <Suspense fallback={null}>
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={e => { if (e.target === e.currentTarget) setShowPayment(false) }}>
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white w-full max-w-lg max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
                 <div className="flex items-center gap-2">

@@ -7,33 +7,28 @@ export const productSchema = z.object({
   sku:          z.string().max(50).optional().default(''),
   description:  z.string().max(500).optional().default(''),
   brand:        z.string().max(100).optional().default(''),
-  categoryId:   z.string().min(1, 'Selecciona una categoría'),
-  supplierId:   z.string().min(1, 'Selecciona un proveedor'),
-  priceBuy:     z.coerce.number().positive('Precio de compra requerido'),
-  priceSell:    z.coerce.number().positive('Precio de venta requerido'),
-  stock:        z.coerce.number().min(0, 'Stock no puede ser negativo').default(0),
-  stockMin:     z.coerce.number().int().min(0).default(5),
-  stockMax:     z.coerce.number().int().min(1).default(100),
+  categoryId:   z.string().optional().default(''),
+  supplierId:   z.string().optional().default(''),
+  priceBuy:     z.coerce.number().min(0, 'Precio de compra inválido').default(0),
+  priceSell:    z.coerce.number().min(0, 'Precio de venta inválido').default(0),
+  stock:        z.coerce.number().min(0).default(0),
+  stockMin:     z.coerce.number().min(0).default(5),
+  stockMax:     z.coerce.number().min(0).default(100),
   unit:         z.enum(['unidad','kg','g','litro','ml','metro','cm','docena','caja','paquete']).default('unidad'),
   hasVariants:  z.boolean().default(false),
-  expiryDate:   z.string().optional().nullable(),
+  expiryDate:   z.string().optional().nullable().default(''),
   serialNumber: z.string().max(100).optional().default(''),
   location:     z.string().max(100).optional().default(''),
-  attributes:   z.record(z.string()).optional().default({}),
+  attributes:   z.record(z.any()).optional().default({}),
   isActive:     z.boolean().default(true),
-  imageUrl:     z.string().url('URL de imagen inválida').optional().or(z.literal('')).default(''),
+  imageUrl:     z.string().optional().default(''),
   useBatches:   z.boolean().default(false),
-
-  // ── Estrategia de control de inventario ────────────────────────────────────
-  // 'simple'    → stock manual, sin lotes (ropa, plásticos, librería)
-  // 'lote_fefo' → lotes con vencimiento, sale el que vence antes (alimentos, medicamentos)
-  // 'lote_fifo' → lotes sin vencimiento, sale el que entró antes (ferretería, repuestos)
-  // 'serie'     → cada unidad con número de serie único (electrónica, óptica)
   stockControl: z.enum(['simple','lote_fefo','lote_fifo','serie']).default('simple'),
-
-}).refine(d => d.priceSell >= d.priceBuy, {
-  message: 'El precio de venta debe ser ≥ al precio de compra',
-  path: ['priceSell'],
+  type:         z.enum(['simple','bundle']).default('simple'),
+  components:   z.array(z.object({
+    productId: z.string(),
+    quantity:  z.coerce.number().positive(),
+  })).optional().default([]),
 })
 
 // ─── VARIANTE DE PRODUCTO ─────────────────────────────────────────────────────

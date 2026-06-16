@@ -12,6 +12,10 @@ import { formatInvoice } from '../../shared/utils/helpers'
 export const createCatalogSlice = (set, get) => ({
 
   // ─── Productos ─────────────────────────────────────────────────────────────
+  setProducts:    (products)    => set({ products }),
+  setCategories:  (categories)  => set({ categories }),
+  setBrands:      (brands)      => set({ brands }),
+
   addProduct: (product) => {
     get().addAuditLog({
       action:   'CREATE',
@@ -148,6 +152,8 @@ export const createCatalogSlice = (set, get) => ({
   },
 
   // ─── Merma ─────────────────────────────────────────────────────────────────
+  setMermaRecords: (mermaRecords) => set({ mermaRecords }),
+
   addMermaRecord: (record) => {
     get().addAuditLog({
       action: 'CREATE',

@@ -13,8 +13,10 @@
  *                     acceso rápido a POS
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useStore }          from '../../store/index'
+import { dashboardService }  from '../../services/index'
+import { USE_API }           from '../../services/_base'
 import { formatCurrency, formatDateTime } from '../../shared/utils/helpers'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -884,6 +886,11 @@ export default function Dashboard() {
     mermaRecords,
     activeCashSession, currentUser, users,
   } = useStore()
+  const [apiKPIs, setApiKPIs] = useState(null)
+
+  useEffect(() => {
+    if (USE_API) dashboardService.getKPIs().then(res => { if (res.ok) setApiKPIs(res.data) })
+  }, [])
 
   const role = currentUser?.role || 'cajero'
 

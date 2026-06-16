@@ -3,7 +3,8 @@ import { useStore } from '../../store/index'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema } from '../../shared/schemas/index'
-import { productService } from '../../services/index'
+import { productService, categoryService, brandService } from '../../services/index'
+import { api, USE_API } from '../../services/_base'
 import { formatCurrency, formatDate } from '../../shared/utils/helpers'
 import { exportToExcel } from '../../shared/utils/export'
 import { ExcelButton, ImportButton } from '../../shared/components/ui/ExportButtons'
@@ -189,13 +190,11 @@ function VariantManager({ productId }) {
     const attrs = [...f.attrs]; attrs[idx] = { ...attrs[idx], [field]: value }; return { ...f, attrs }
   })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.barcode.trim()) { toast.error('El código de barras es requerido'); return }
-    // Validar que cada atributo tenga AMBOS campos completados
     const incomplete = form.attrs.filter(a => a.key.trim() && !a.value.trim())
     if (incomplete.length > 0) {
       toast.error(`Completa el valor de: ${incomplete.map(a => a.key).join(', ')}`, { duration: 3500 })
-      // Enfocar el primer campo de valor vacío
       const idx = form.attrs.findIndex(a => a.key.trim() && !a.value.trim())
       if (idx >= 0 && valueInputsRef.current[idx]) valueInputsRef.current[idx].focus()
       return
@@ -203,11 +202,26 @@ function VariantManager({ productId }) {
     const attributes = Object.fromEntries(form.attrs.filter(a => a.key.trim() && a.value.trim()).map(a => [a.key.trim(), a.value.trim()]))
     const payload = {
       productId, barcode: form.barcode.trim(), sku: form.sku.trim(),
-      stock: parseInt(form.stock) || 0, stockMin: parseInt(form.stockMin) || 2,
+      stock: parseInt(form.stock)||0, stockMin: parseInt(form.stockMin)||2,
       priceSell: form.priceSell !== '' ? parseFloat(form.priceSell) : null, attributes,
     }
-    if (form.id) { updateVariant(form.id, payload); toast.success('Variante actualizada') }
-    else         { addVariant({ id: createSafeId(), ...payload, createdAt: new Date().toISOString() }); toast.success('Variante agregada') }
+    if (USE_API) {
+      try {
+        if (form.id) {
+          const { data } = await api.put(`/products/${productId}/variants/${form.id}`, payload)
+          updateVariant(form.id, data.data)
+        } else {
+          const { data } = await api.post(`/products/${productId}/variants`, payload)
+          addVariant(data.data)
+        }
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Error al guardar variante'); return
+      }
+    } else {
+      if (form.id) { updateVariant(form.id, payload) }
+      else         { addVariant({ id: createSafeId(), ...payload, createdAt: new Date().toISOString() }) }
+    }
+    toast.success(form.id ? 'Variante actualizada' : 'Variante agregada')
     setForm(null)
   }
 
@@ -251,7 +265,14 @@ function VariantManager({ productId }) {
                   className="p-1.5 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" title="Editar">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                 </button>
-                <button type="button" onClick={() => { deleteVariant(v.id); toast.success('Variante eliminada') }}
+                <button type="button" onClick={async () => {
+                  if (USE_API) {
+                    try { await api.delete(`/products/${productId}/variants/${v.id}`) }
+                    catch (err) { toast.error(err.response?.data?.error || 'Error al eliminar'); return }
+                  }
+                  deleteVariant(v.id)
+                  toast.success('Variante eliminada')
+                }}
                   className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Eliminar">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -402,7 +423,7 @@ function VariantManager({ productId }) {
             </div>
             <div>
               <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Precio venta S/ (opcional)</label>
-              <input type="number" step="0.01" min="0" value={form.priceSell} onChange={e => setField('priceSell', e.target.value)}
+              <input type="number" step="1" min="0" value={form.priceSell} onChange={e => setField('priceSell', e.target.value)}
                 placeholder="Del padre" className={inCls}/>
             </div>
           </div>
@@ -443,7 +464,8 @@ function ProductForm({ product, onClose }) {
     defaultValues: product ? {
       ...product,
       stockControl: product.stockControl || 'simple',
-      type:         product.type         || 'simple',
+      // 'normal' en backend = 'simple' en frontend
+      type:         (product.type === 'normal' ? 'simple' : product.type) || 'simple',
       useBatches:   product.useBatches   ?? false,
       components:   (product.components || []).map(comp => {
         const p = allProducts.find(pr => pr.id === comp.productId)
@@ -456,7 +478,7 @@ function ProductForm({ product, onClose }) {
         }
       }),
       imageUrl:     product.imageUrl     || '',
-      brand:        product.brand        || '',
+      brand:        product.brandId      || product.brand || '',
     } : {
       unit: 'unidad', stockMin: 5, stockMax: 100,
       isActive: true, hasVariants: false, useBatches: false,
@@ -613,23 +635,23 @@ function ProductForm({ product, onClose }) {
           {/* Precios */}
           <div>
             <label className={labelCls}>Precio de compra (S/) *</label>
-            <input type="number" step="0.01" {...register('priceBuy')} className={inputCls}/>
+            <input type="number" step="1" min="0" {...register('priceBuy')} className={inputCls}/>
             {errors.priceBuy && <p className="text-xs text-red-500 mt-1">{errors.priceBuy.message}</p>}
           </div>
           <div>
             <label className={labelCls}>Precio de venta (S/) *</label>
-            <input type="number" step="0.01" {...register('priceSell')} className={inputCls}/>
+            <input type="number" step="1" min="0" {...register('priceSell')} className={inputCls}/>
             {errors.priceSell && <p className="text-xs text-red-500 mt-1">{errors.priceSell.message}</p>}
           </div>
 
           {/* Stock */}
           <div>
             <label className={labelCls}>Stock actual</label>
-            <input type="number" {...register('stock')} className={inputCls}/>
+            <input type="number" step="1" min="0" {...register('stock')} className={inputCls}/>
           </div>
           <div>
             <label className={labelCls}>Stock mínimo</label>
-            <input type="number" {...register('stockMin')} className={inputCls}/>
+            <input type="number" step="1" min="0" {...register('stockMin')} className={inputCls}/>
           </div>
 
           {/* Ubicación */}
@@ -707,7 +729,11 @@ function ProductForm({ product, onClose }) {
                 }[opt.value]
                 return (
                   <button key={opt.value} type="button"
-                    onClick={() => setValue('stockControl', opt.value)}
+                    onClick={() => {
+                      setValue('stockControl', opt.value)
+                      // Sincronizar toggle de lotes con la estrategia elegida
+                      setValue('useBatches', opt.value === 'lote_fefo' || opt.value === 'lote_fifo')
+                    }}
                     className={`text-left p-3 rounded-xl border-2 transition-all ${sel ? selColor : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'}`}>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-lg">{opt.icon}</span>
@@ -845,7 +871,7 @@ function ProductForm({ product, onClose }) {
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-xs text-gray-500">Cant.:</span>
-                          <input type="number" min="0.01" step="0.01" value={comp.quantity}
+                          <input type="number" min="1" step="1" value={comp.quantity}
                             onChange={e => {
                               const c = [...(watch('components')||[])]
                               c[idx] = { ...c[idx], quantity: parseFloat(e.target.value)||1 }
@@ -875,7 +901,14 @@ function ProductForm({ product, onClose }) {
           <div className="col-span-2">
             <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
               <button type="button"
-                onClick={() => setValue('useBatches', !useBatches)}
+                onClick={() => {
+                  const next = !useBatches
+                  setValue('useBatches', next)
+                  // Sincronizar stockControl: activar lotes → lote_fefo, desactivar → simple
+                  const sc = watch('stockControl') || 'simple'
+                  if (next && sc !== 'lote_fefo' && sc !== 'lote_fifo') setValue('stockControl', 'lote_fefo')
+                  if (!next && (sc === 'lote_fefo' || sc === 'lote_fifo')) setValue('stockControl', 'simple')
+                }}
                 className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${useBatches ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'}`}>
                 <span className={`inline-block h-3 w-3 mt-1 rounded-full bg-white transition-transform ${useBatches ? 'translate-x-5' : 'translate-x-1'}`}/>
               </button>
@@ -993,27 +1026,32 @@ const CATEGORY_COLORS = [
 ]
 
 function CategoryForm({ category, onClose }) {
-  const { addCategory, updateCategory } = useStore()
+  // El servicio ya sincroniza el store — no necesitamos los setters aquí
+  useStore()
   const [name, setName]               = useState(category?.name || '')
   const [description, setDescription] = useState(category?.description || '')
   const [color, setColor]             = useState(category?.color || CATEGORY_COLORS[0])
   const [error, setError]             = useState('')
+  const [saving, setSaving]           = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim()) { setError('El nombre es obligatorio'); return }
-    if (category) {
-      updateCategory(category.id, { name: name.trim(), description: description.trim(), color })
-      toast.success('Categoría actualizada')
-    } else {
-      addCategory({
-        id: `cat-${createSafeId().slice(0,8)}`,
-        name: name.trim(), description: description.trim(), color,
-        createdAt: new Date().toISOString(),
-      })
-      toast.success('Categoría creada')
+    setSaving(true)
+    try {
+      if (category) {
+        const result = await categoryService.update(category.id, { name: name.trim(), description: description.trim(), color })
+        if (result.error) { setError(result.error); return }
+        toast.success('Categoría actualizada')
+      } else {
+        const result = await categoryService.create({ name: name.trim(), description: description.trim(), color, isActive: true })
+        if (result.error) { setError(result.error); return }
+        toast.success('Categoría creada')
+      }
+      onClose()
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   return (
@@ -1047,7 +1085,7 @@ function CategoryForm({ category, onClose }) {
       </div>
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className={btnSecondary}>Cancelar</button>
-        <button type="submit" className={btnPrimary}>{category ? 'Guardar cambios' : 'Crear categoría'}</button>
+        <button type="submit" disabled={saving} className={btnPrimary}>{saving ? 'Guardando...' : category ? 'Guardar cambios' : 'Crear categoría'}</button>
       </div>
     </form>
   )
@@ -1062,27 +1100,32 @@ const BRAND_COLORS = [
 ]
 
 function BrandForm({ brand, onClose }) {
-  const { addBrand, updateBrand } = useStore()
+  // El servicio ya sincroniza el store — no necesitamos los setters aquí
+  useStore()
   const [name, setName]               = useState(brand?.name || '')
   const [description, setDescription] = useState(brand?.description || '')
   const [color, setColor]             = useState(brand?.color || BRAND_COLORS[0])
   const [error, setError]             = useState('')
+  const [saving, setSaving]           = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim()) { setError('El nombre es obligatorio'); return }
-    if (brand) {
-      updateBrand(brand.id, { name: name.trim(), description: description.trim(), color })
-      toast.success('Marca actualizada')
-    } else {
-      addBrand({
-        id: `brn-${createSafeId().slice(0,8)}`,
-        name: name.trim(), description: description.trim(), color,
-        isActive: true, createdAt: new Date().toISOString(),
-      })
-      toast.success('Marca creada')
+    setSaving(true)
+    try {
+      if (brand) {
+        const result = await brandService.update(brand.id, { name: name.trim(), description: description.trim(), color })
+        if (result.error) { setError(result.error); return }
+        toast.success('Marca actualizada')
+      } else {
+        const result = await brandService.create({ name: name.trim(), description: description.trim(), color, isActive: true })
+        if (result.error) { setError(result.error); return }
+        toast.success('Marca creada')
+      }
+      onClose()
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   return (
@@ -1116,7 +1159,7 @@ function BrandForm({ brand, onClose }) {
       </div>
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onClose} className={btnSecondary}>Cancelar</button>
-        <button type="submit" className={btnPrimary}>{brand ? 'Guardar cambios' : 'Crear marca'}</button>
+        <button type="submit" disabled={saving} className={btnPrimary}>{saving ? 'Guardando...' : brand ? 'Guardar cambios' : 'Crear marca'}</button>
       </div>
     </form>
   )
@@ -1166,8 +1209,9 @@ function ProductsView({ products, categories, brands, suppliers, businessConfig,
     return list
   }, [products, status, catFilter, brandFilter, dq])
 
-  const handleDelete = (product) => {
-    deleteProduct(product.id)
+  const handleDelete = async (product) => {
+    const result = await productService.remove(product.id)
+    if (result?.error) { toast.error(result.error); return }
     toast.success(`"${product.name}" desactivado`)
     setDeleteTarget(null)
   }
@@ -1388,13 +1432,14 @@ function CategoriesView({ categories, products }) {
 
   const productCount = (catId) => products.filter(p => p.categoryId === catId && p.isActive).length
 
-  const handleDelete = (cat) => {
+  const handleDelete = async (cat) => {
     if (productCount(cat.id) > 0) {
       toast.error(`No se puede eliminar: tiene ${productCount(cat.id)} productos activos`)
       setDeleteTarget(null)
       return
     }
-    deleteCategory(cat.id)
+    const result = await categoryService.remove(cat.id)
+    if (result?.error) { toast.error(result.error); setDeleteTarget(null); return }
     toast.success(`Categoría "${cat.name}" eliminada`)
     setDeleteTarget(null)
   }
@@ -1536,13 +1581,14 @@ function BrandsView({ brands, products }) {
 
   const productCount = (brandName) => products.filter(p => p.brand === brandName && p.isActive).length
 
-  const handleDelete = (brand) => {
+  const handleDelete = async (brand) => {
     if (productCount(brand.name) > 0) {
       toast.error(`No se puede eliminar: tiene ${productCount(brand.name)} productos activos`)
       setDeleteTarget(null)
       return
     }
-    deleteBrand(brand.id)
+    const result = await brandService.remove(brand.id)
+    if (result?.error) { toast.error(result.error); setDeleteTarget(null); return }
     toast.success(`Marca "${brand.name}" eliminada`)
     setDeleteTarget(null)
   }
@@ -1790,6 +1836,14 @@ export default function Catalog() {
   const { products, categories, brands, suppliers, businessConfig, addAuditLog, productVariants } = useStore()
   const [tab, setTab] = useState('products')
 
+  useEffect(() => {
+    if (USE_API) {
+      productService.getAll()
+      categoryService.getAll()
+      brandService.getAll()
+    }
+  }, [])
+
   const tabs = [
     { key: 'products',   label: 'Productos',   icon: '📦', count: products.filter(p => p.isActive).length },
     { key: 'categories', label: 'Categorías',  icon: '🗂️', count: categories.length },
@@ -1873,28 +1927,41 @@ function BatchesView({ products }) {
     selectedProd ? (selectedProd.batches || []).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
   , [selectedProd])
 
-  const handleSaveBatch = () => {
+  const handleSaveBatch = async () => {
     if (!batchForm.batchNumber.trim()) { toast.error('El N° de lote es requerido'); return }
     if (!selectedProd) return
 
-    const batch = {
-      id:          modal?.batch?.id || createSafeId(),
-      ...batchForm,
-      quantity:    parseFloat(batchForm.quantity) || 0,
-      priceBuy:    parseFloat(batchForm.priceBuy) || 0,
-      productId:   selectedProd.id,
-      productName: selectedProd.name,
-      status:      'activo',
-      createdAt:   modal?.batch?.createdAt || new Date().toISOString(),
+    let savedBatch
+    if (USE_API) {
+      try {
+        const payload = { ...batchForm, quantity: parseFloat(batchForm.quantity)||0, priceBuy: parseFloat(batchForm.priceBuy)||0 }
+        if (modal?.batch) {
+          const { data } = await api.put(`/products/${selectedProd.id}/batches/${modal.batch.id}`, payload)
+          savedBatch = data.data
+        } else {
+          const { data } = await api.post(`/products/${selectedProd.id}/batches`, payload)
+          savedBatch = data.data
+        }
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Error al guardar lote'); return
+      }
+    } else {
+      savedBatch = {
+        id: modal?.batch?.id || createSafeId(),
+        ...batchForm,
+        quantity: parseFloat(batchForm.quantity)||0,
+        priceBuy: parseFloat(batchForm.priceBuy)||0,
+        productId: selectedProd.id,
+        status: 'activo',
+        createdAt: modal?.batch?.createdAt || new Date().toISOString(),
+      }
     }
 
     const current = selectedProd.batches || []
-    const updated  = modal?.batch
-      ? current.map(b => b.id === batch.id ? batch : b)
-      : [batch, ...current]
+    const updated = modal?.batch
+      ? current.map(b => b.id === savedBatch.id ? savedBatch : b)
+      : [savedBatch, ...current]
 
-    updateBatch?.(selectedProd.id, updated)
-    // También actualizar el producto directamente en el store
     useStore.getState().updateProduct(selectedProd.id, { batches: updated })
     setSelectedProd(prev => ({ ...prev, batches: updated }))
     toast.success(modal?.batch ? 'Lote actualizado' : 'Lote registrado')
@@ -1902,7 +1969,14 @@ function BatchesView({ products }) {
     setBatchForm({ batchNumber:'', quantity:0, priceBuy:0, expiryDate:'', notes:'' })
   }
 
-  const handleDeleteBatch = (batchId) => {
+  const handleDeleteBatch = async (batchId) => {
+    if (USE_API) {
+      try {
+        await api.delete(`/products/${selectedProd.id}/batches/${batchId}`)
+      } catch (err) {
+        toast.error(err.response?.data?.error || 'Error al eliminar lote'); return
+      }
+    }
     const updated = (selectedProd.batches || []).filter(b => b.id !== batchId)
     useStore.getState().updateProduct(selectedProd.id, { batches: updated })
     setSelectedProd(prev => ({ ...prev, batches: updated }))
@@ -2098,13 +2172,13 @@ function BatchesView({ products }) {
               </div>
               <div>
                 <label className={labelCls}>Cantidad</label>
-                <input type="number" min="0" step="0.01" value={batchForm.quantity}
+                <input type="number" min="0" step="1" value={batchForm.quantity}
                   onChange={e => setBatchForm(p => ({...p, quantity: e.target.value}))}
                   className={inputCls}/>
               </div>
               <div>
                 <label className={labelCls}>Precio de compra (S/)</label>
-                <input type="number" min="0" step="0.01" value={batchForm.priceBuy}
+                <input type="number" min="0" step="1" value={batchForm.priceBuy}
                   onChange={e => setBatchForm(p => ({...p, priceBuy: e.target.value}))}
                   className={inputCls}/>
               </div>

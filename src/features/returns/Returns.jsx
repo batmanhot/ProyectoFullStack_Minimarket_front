@@ -12,8 +12,10 @@
  *  - Estados visuales más expresivos por cada paso del flujo
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStore } from '../../store/index'
+import { returnService, clientService, productService } from '../../services/index'
+import { api, USE_API } from '../../services/_base'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { calcStockDisponible } from '../../shared/utils/inventoryEngine'
 import toast from 'react-hot-toast'
@@ -170,6 +172,14 @@ export default function Returns() {
     businessConfig, systemConfig, currentUser,
   } = useStore()
 
+  useEffect(() => {
+    if (USE_API) {
+      returnService.getAll()
+      clientService.getAll()
+      productService.getAll()
+    }
+  }, [])
+
   const [step, setStep]             = useState('search')
   const [query, setQuery]           = useState('')
   const [foundSale, setFoundSale]   = useState(null)
@@ -225,27 +235,136 @@ export default function Returns() {
     return list
   }, [existingReturns, historyFilter])
 
-  // Items de la venta encontrada
-  // Filtramos los ítems expandidos de bundles (_fromBundle) — son detalles internos
-  // de descomposición de stock, no líneas facturables independientes. Solo mostramos
-  // el bundle padre (isBundle: true) para que el usuario devuelva el kit completo.
+  // Items de la venta: productos simples tal cual; bundles se expanden en sus
+  // componentes con precio prorrateado según el peso relativo de cada componente.
   const selectedItems = useMemo(() => {
     if (!foundSale) return []
-    return foundSale.items
-      .filter(item => !item._fromBundle)
-      .map(item => ({
+    const allItems      = foundSale.items || []
+    const bundleParents = allItems.filter(i => i.isBundle)
+    const regularItems  = allItems.filter(i => !i._fromBundle && !i.fromBundle && !i.isBundle)
+    const result        = []
+
+    // ── Productos simples ──────────────────────────────────────────────────────
+    regularItems.forEach(item => {
+      result.push({
         ...item,
-        returnableQty: getReturnableQty(item, existingReturns, foundSale.id),
-        selectedQty:   selected[item.id] || 0,
-        netUnitPrice:  calcItemNetUnitPrice(item),
-      }))
-  }, [foundSale, selected, existingReturns])
+        returnableQty:      getReturnableQty(item, existingReturns, foundSale.id),
+        selectedQty:        selected[item.id] || 0,
+        netUnitPrice:       calcItemNetUnitPrice(item),
+        _isBundleComponent: false,
+      })
+    })
+
+    // ── Bundles → expandir a componentes con precio prorrateado ───────────────
+    bundleParents.forEach(bundleItem => {
+      const bundleProduct = products.find(p => p.id === bundleItem.productId)
+      const componentDefs = bundleProduct?.components || bundleItem.components || []
+      const compSaleItems = allItems.filter(
+        si => si._fromBundle === bundleItem.productId || si.fromBundle === bundleItem.productId
+      )
+
+      if (compSaleItems.length === 0 && componentDefs.length === 0) {
+        // Sin datos de componentes → tratar el bundle como ítem simple
+        result.push({
+          ...bundleItem,
+          returnableQty:      getReturnableQty(bundleItem, existingReturns, foundSale.id),
+          selectedQty:        selected[bundleItem.id] || 0,
+          netUnitPrice:       calcItemNetUnitPrice(bundleItem),
+          _isBundleComponent: false,
+        })
+        return
+      }
+
+      // Peso total del bundle = Σ(priceSell_comp × qty_comp_por_bundle)
+      const totalWeight = componentDefs.reduce((sum, c) => {
+        const ps  = c._priceSell ?? c.priceSell ?? 0
+        const qty = c.quantity   ?? 1
+        return sum + ps * qty
+      }, 0)
+
+      compSaleItems.forEach(compSaleItem => {
+        const compDef      = componentDefs.find(c => c.productId === compSaleItem.productId)
+        const priceSell    = compDef?._priceSell ?? compDef?.priceSell ?? 0
+        const qtyPerBundle = compDef?.quantity   ?? 1
+        const compWeight   = priceSell * qtyPerBundle
+
+        // Proporción de este componente dentro del bundle
+        const proportion = totalWeight > 0
+          ? compWeight / totalWeight
+          : 1 / Math.max(compSaleItems.length, 1)
+
+        // Monto total a devolver por este componente = precio_bundle × cant_bundle × proporción
+        const totalForComp      = bundleItem.unitPrice * bundleItem.quantity * proportion
+        const proratedUnitPrice = compSaleItem.quantity > 0
+          ? HALF_UP(totalForComp / compSaleItem.quantity)
+          : 0
+
+        result.push({
+          ...compSaleItem,
+          netUnitPrice:       proratedUnitPrice,
+          unitPrice:          proratedUnitPrice,
+          _isBundleComponent: true,
+          _bundleId:          bundleItem.productId,
+          _bundleName:        bundleItem.productName,
+          _bundleUnitPrice:   bundleItem.unitPrice,
+          _bundleQty:         bundleItem.quantity,
+          _priceSell:         priceSell,
+          _qtyPerBundle:      qtyPerBundle,
+          _compWeight:        compWeight,
+          _totalWeight:       totalWeight,
+          _proportion:        proportion,
+          returnableQty:      getReturnableQty(compSaleItem, existingReturns, foundSale.id),
+          selectedQty:        selected[compSaleItem.id] || 0,
+        })
+      })
+    })
+
+    return result
+  }, [foundSale, selected, existingReturns, products])
 
   const totalRefund = useMemo(() =>
     HALF_UP(selectedItems.reduce((acc, item) =>
       acc + item.netUnitPrice * (selected[item.id] || 0), 0
     )), [selectedItems, selected]
   )
+
+  // Agrupa selectedItems para el render: un grupo por bundle + items regulares sueltos
+  const groupedItems = useMemo(() => {
+    const groups      = []
+    const seenBundles = new Set()
+    for (const item of selectedItems) {
+      if (!item._isBundleComponent) {
+        groups.push({ type: 'item', item })
+      } else if (!seenBundles.has(item._bundleId)) {
+        seenBundles.add(item._bundleId)
+        groups.push({
+          type:            'bundle',
+          bundleId:        item._bundleId,
+          bundleName:      item._bundleName,
+          bundleUnitPrice: item._bundleUnitPrice,
+          bundleQty:       item._bundleQty,
+          components:      selectedItems.filter(i => i._bundleId === item._bundleId),
+        })
+      }
+    }
+    return groups
+  }, [selectedItems])
+
+  const handleSelectWholeKit = useCallback((components) => {
+    setSelected(prev => {
+      const updates = { ...prev }
+      components.forEach(c => { updates[c.id] = c.returnableQty })
+      return updates
+    })
+  }, [])
+
+  const handleClearKit = useCallback((components) => {
+    setSelected(prev => {
+      const updates = { ...prev }
+      components.forEach(c => { updates[c.id] = 0 })
+      return updates
+    })
+  }, [])
 
   const hasSelection = Object.values(selected).some(q => q > 0)
   const selectedCount = Object.values(selected).reduce((a, q) => a + (q || 0), 0)
@@ -287,7 +406,7 @@ export default function Returns() {
     setSelected(prev => ({ ...prev, [itemId]: v }))
   }, [])
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
     if (!hasSelection) { toast.error('Selecciona al menos un producto'); return }
     if (!reason)       { toast.error('Selecciona el motivo de devolución'); return }
 
@@ -298,15 +417,20 @@ export default function Returns() {
         const saleItem   = foundSale.items?.find(si => si.id === i.id)
         const firstBatch = saleItem?.batchAllocations?.[0] ?? null
         return {
-          saleItemId:   i.id,
-          productId:    i.productId,
-          variantId:    i.variantId || null,
-          productName:  i.productName,
-          barcode:      i.barcode,
-          quantity:     selected[i.id],
-          unitPrice:    i.unitPrice,
-          netUnitPrice: i.netUnitPrice,
-          discount:     i.discount || 0,
+          saleItemId:         i.id,
+          productId:          i.productId,
+          variantId:          i.variantId || null,
+          productName:        i._isBundleComponent
+                                ? `${i.productName} (Kit: ${i._bundleName})`
+                                : i.productName,
+          barcode:            i.barcode,
+          quantity:           selected[i.id],
+          unitPrice:          i.unitPrice,
+          netUnitPrice:       i.netUnitPrice,
+          discount:           i.discount || 0,
+          _isBundleComponent: i._isBundleComponent || false,
+          _bundleId:          i._bundleId || null,
+          _bundleName:        i._bundleName || null,
           totalRefund:  HALF_UP(i.netUnitPrice * selected[i.id]),
           unit:         i.unit || 'unidad',
           batchId:      firstBatch?.batchId     ?? null,
@@ -338,43 +462,67 @@ export default function Returns() {
       status: 'completada', sunatStatus: ncSunatStatus, createdAt: now,
     }
 
+    // Persistir en backend (debe ir antes de actualizar el store local)
+    if (USE_API && navigator.onLine) {
+      try {
+        // Payload limpio: solo campos que el backend acepta, nulls → ''
+        const apiPayload = {
+          saleId:          nc.saleId,
+          invoiceNumber:   nc.invoiceNumber || '',
+          tipoComprobante: nc.tipoComprobante || 'nc',
+          clientId:        nc.clientId || undefined,
+          clientName:      nc.clientName || '',
+          reason:          nc.reason,
+          reasonLabel:     nc.reasonLabel || '',
+          reasonNote:      nc.reasonNote  || '',
+          totalRefund:     nc.totalRefund,
+          igvRate:         nc.igvRate,
+          items: ncItems.map(i => ({
+            saleItemId:   i.saleItemId   || undefined,
+            productId:    i.productId,
+            productName:  i.productName  || '',
+            barcode:      i.barcode      || '',
+            quantity:     i.quantity,
+            unitPrice:    i.unitPrice    ?? 0,
+            netUnitPrice: i.netUnitPrice ?? 0,
+            discount:     i.discount     ?? 0,
+            totalRefund:  i.totalRefund  ?? 0,
+            unit:         i.unit         || 'unidad',
+            batchId:      i.batchId      || '',
+            batchNumber:  i.batchNumber  || '',
+            expiryDate:   i.expiryDate   || '',
+          })),
+        }
+        await api.post('/returns', apiPayload)
+      } catch (err) {
+        toast.error(`NC generada localmente — no pudo sincronizarse: ${err.response?.data?.message || err.message}`)
+      }
+    }
+
     addReturn(nc)
 
     ncItems.forEach(ncItem => {
       const product = products.find(p => p.id === ncItem.productId)
       if (!product) return
 
-      const isBundle = product.type === 'bundle'
+      if (ncItem._isBundleComponent) {
+        // Componente de bundle devuelto individualmente → restaurar stock del componente
+        _restoreProductStock(product, ncItem.quantity, ncItem.batchId, ncItem.batchNumber, updateProduct)
 
-      if (isBundle) {
-        // Bundle/Kit → restaurar stock de los COMPONENTES usando sus batchAllocations
+      } else if (product.type === 'bundle') {
+        // Bundle completo devuelto (ruta antigua) → restaurar todos sus componentes
         ;(product.components || []).forEach(comp => {
           const { products: freshProducts } = useStore.getState()
           const cp = freshProducts.find(p => p.id === comp.productId)
           if (!cp) return
           const compSaleItem = foundSale.items?.find(
-            si => si._fromBundle === ncItem.productId && si.productId === comp.productId
+            si => (si._fromBundle === ncItem.productId || si.fromBundle === ncItem.productId) && si.productId === comp.productId
           )
           const compBatchId  = compSaleItem?.batchAllocations?.[0]?.batchId     ?? null
           const compBatchNum = compSaleItem?.batchAllocations?.[0]?.batchNumber  ?? null
           const restoreQty   = comp.quantity * ncItem.quantity
           _restoreProductStock(cp, restoreQty, compBatchId, compBatchNum, updateProduct)
         })
-
-        // Recalcular stock del bundle como mínimo de sus componentes ya restaurados
-        const { products: freshProds } = useStore.getState()
-        const freshBundle = freshProds.find(p => p.id === ncItem.productId)
-        if (freshBundle?.components?.length) {
-          const newBundleStock = Math.floor(
-            Math.min(...freshBundle.components.map(comp => {
-              const cp = freshProds.find(p => p.id === comp.productId)
-              return cp && comp.quantity > 0
-                ? Math.floor(calcStockDisponible(cp) / comp.quantity)
-                : 0
-            }))
-          )
-          updateProduct(freshBundle.id, { stock: newBundleStock })
-        }
 
       } else if (ncItem.variantId) {
         // Producto con variante → restaurar stock en la variante (updateVariant sincroniza el padre)
@@ -405,17 +553,39 @@ export default function Returns() {
       }
     })
 
-    // Excluir componentes expandidos de bundles — son internos del motor de inventario,
-    // no líneas facturables. Solo contar los ítems facturables (padres).
-    const billableItems    = foundSale.items.filter(i => !i._fromBundle)
-    const totalOriginalQty = billableItems.reduce((a, i) => a + i.quantity, 0)
-    const totalReturnedQty = [
+    // Recalcular stock de cada bundle afectado por la devolución de componentes
+    const affectedBundleIds = [...new Set(ncItems.filter(i => i._isBundleComponent).map(i => i._bundleId).filter(Boolean))]
+    affectedBundleIds.forEach(bundleId => {
+      const { products: freshProds } = useStore.getState()
+      const freshBundle = freshProds.find(p => p.id === bundleId)
+      if (!freshBundle?.components?.length) return
+      const newBundleStock = Math.floor(
+        Math.min(...freshBundle.components.map(comp => {
+          const cp = freshProds.find(p => p.id === comp.productId)
+          return cp && comp.quantity > 0
+            ? Math.floor(calcStockDisponible(cp) / comp.quantity)
+            : 0
+        }))
+      )
+      updateProduct(bundleId, { stock: newBundleStock })
+    })
+
+    // Determinar si la venta quedó completamente devuelta:
+    // comparar cada ítem seleccionable (expandido) contra las devoluciones acumuladas.
+    const allNcItems = [
       ...(existingReturns || []).filter(r => r.saleId === foundSale.id && r.status !== 'anulada'),
-      nc
-    ].flatMap(r => r.items).reduce((a, i) => a + i.quantity, 0)
+      nc,
+    ].flatMap(r => r.items)
+
+    const isFullyReturned = selectedItems.every(item => {
+      const returned = allNcItems
+        .filter(ri => ri.saleItemId === item.id || ri.productId === item.productId)
+        .reduce((acc, ri) => acc + (ri.quantity || 0), 0)
+      return returned >= item.quantity
+    })
 
     updateSale(foundSale.id, {
-      status: totalReturnedQty >= totalOriginalQty ? 'devolucion' : 'dev-parcial'
+      status: isFullyReturned ? 'devolucion' : 'dev-parcial',
     })
 
     addAuditLog({
@@ -593,7 +763,7 @@ export default function Returns() {
                     </div>
                     {/* Mini productos */}
                     <div className="border-t border-violet-200/60 dark:border-violet-800/60 px-5 py-3 bg-white/50 dark:bg-slate-900/20 flex flex-wrap gap-2">
-                      {foundSale.items?.filter(i => !i._fromBundle).map((item, idx) => (
+                      {foundSale.items?.filter(i => !i._fromBundle && !i.fromBundle).map((item, idx) => (
                         <span key={idx} className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 text-gray-600 dark:text-slate-400">
                           {item.quantity}× {item.productName}
                         </span>
@@ -618,105 +788,171 @@ export default function Returns() {
                 </div>
 
                 <div className="p-6">
-                  {/* Aviso bundles */}
-                  {selectedItems.some(i => products.find(p => p.id === i.productId)?.type === 'bundle') && (
+                  {/* Aviso bundles con prorrateo */}
+                  {selectedItems.some(i => i._isBundleComponent) && (
                     <div className="mb-4 flex items-start gap-3 p-3.5 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl text-xs text-orange-700 dark:text-orange-300">
                       <span className="text-base shrink-0">🎁</span>
                       <div>
-                        <p className="font-semibold mb-0.5">Producto tipo Bundle / Kit detectado</p>
-                        <p>La devolución se procesa sobre el bundle completo. El sistema restaura el stock del bundle (no de sus componentes individuales). Si los componentes deben volver al almacén por separado, registra cada uno manualmente en <strong>Merma</strong> o <strong>Inventario</strong>.</p>
+                        <p className="font-semibold mb-1">Kit detectado — devolución por componente con prorrateo</p>
+                        <p className="mb-1">El monto a reembolsar por cada componente se calcula según su <strong>peso relativo</strong> dentro del precio del kit:</p>
+                        <p className="font-mono bg-orange-100/60 dark:bg-orange-900/40 rounded px-2 py-1 text-[10px] leading-relaxed">
+                          Precio/u = Precio kit × (PVP_comp × cant_comp ÷ Σ PVP×cant de todos) ÷ cant_comp
+                        </p>
+                        <p className="mt-1">El stock de cada componente devuelto se restaura individualmente. Si está dañado y no puede reingresarse, regístralo en <strong>Merma</strong> después.</p>
                       </div>
                     </div>
                   )}
 
-                  {/* Cabecera */}
+                  {/* Cabecera columnas */}
                   <div className="grid gap-4 px-4 py-2.5 mb-3 rounded-xl bg-gray-50 dark:bg-slate-700/40 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide"
-                    style={{ gridTemplateColumns: '1fr 90px 70px 70px 100px' }}>
+                    style={{ gridTemplateColumns: '1fr 100px 70px 70px 100px' }}>
                     <span>Producto</span>
-                    <span className="text-right">Precio neto</span>
+                    <span className="text-right">Precio / ud.</span>
                     <span className="text-center">Comprado</span>
                     <span className="text-center">Disponible</span>
                     <span className="text-center">A devolver</span>
                   </div>
 
-                  <div className="space-y-2">
-                    {selectedItems.map(item => {
-                      const qty = selected[item.id] || 0
-                      const isSelected = qty > 0
-                      const isFullyReturned = item.returnableQty === 0
-                      const hasDiscount = (item.discount || item.campaignDiscount || item.totalDiscount) > 0
+                  <div className="space-y-3">
+                    {groupedItems.map(group => {
+                      if (group.type === 'item') {
+                        const item            = group.item
+                        const qty             = selected[item.id] || 0
+                        const isSelected      = qty > 0
+                        const isFullyReturned = item.returnableQty === 0
+                        const hasDiscount     = (item.discount || item.campaignDiscount || item.totalDiscount) > 0
+                        return (
+                          <div key={item.id}
+                            className={`grid gap-4 items-center px-4 py-3.5 rounded-xl border transition-all ${
+                              isFullyReturned ? 'border-gray-100 dark:border-slate-700/50 bg-gray-50/50 dark:bg-slate-700/10 opacity-60' :
+                              isSelected      ? 'border-violet-200 dark:border-violet-700 bg-violet-50/50 dark:bg-violet-900/10 shadow-sm' :
+                                                'border-gray-100 dark:border-slate-700 hover:border-gray-200 dark:hover:border-slate-600 bg-gray-50/40 dark:bg-slate-700/20'
+                            }`}
+                            style={{ gridTemplateColumns: '1fr 100px 70px 70px 100px' }}>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{item.productName}</p>
+                              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{item.barcode} · {item.unit}</p>
+                              {hasDiscount && <span className="inline-flex items-center gap-1 mt-1 text-[10px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md font-medium">🏷️ Con descuento</span>}
+                              {isFullyReturned && <span className="inline-flex items-center gap-1 mt-1 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md font-medium">✓ Ya devuelto</span>}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-gray-700 dark:text-slate-200">{formatCurrency(item.netUnitPrice)}</p>
+                              {hasDiscount && <p className="text-xs text-gray-400 line-through">{formatCurrency(item.unitPrice)}</p>}
+                            </div>
+                            <div className="text-center"><span className="text-sm font-semibold text-gray-600 dark:text-slate-300">{item.quantity}</span></div>
+                            <div className="text-center">
+                              <span className={`text-sm font-bold ${item.returnableQty === 0 ? 'text-gray-300 dark:text-slate-600' : item.returnableQty < item.quantity ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-slate-300'}`}>{item.returnableQty}</span>
+                            </div>
+                            <div className="flex items-center justify-center gap-1">
+                              {item.returnableQty > 0 ? (
+                                <>
+                                  <button onClick={() => handleQtyChange(item.id, qty - 1, item.returnableQty)} className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${qty > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200' : 'bg-gray-100 dark:bg-slate-600 text-gray-400 dark:text-slate-500'}`}>−</button>
+                                  <span className={`w-8 text-center text-sm font-black select-none ${qty > 0 ? 'text-violet-700 dark:text-violet-300' : 'text-gray-400 dark:text-slate-500'}`}>{qty}</span>
+                                  <button onClick={() => handleQtyChange(item.id, qty + 1, item.returnableQty)} disabled={qty >= item.returnableQty} className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${qty < item.returnableQty ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200' : 'bg-gray-100 dark:bg-slate-600 text-gray-300 dark:text-slate-600 cursor-not-allowed'}`}>+</button>
+                                </>
+                              ) : (
+                                <span className="text-xs text-gray-300 dark:text-slate-600 italic font-medium">N/D</span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // ── Grupo Bundle ─────────────────────────────────────────────
+                      const { bundleId, bundleName, bundleUnitPrice, bundleQty, components } = group
+                      const allAvailable    = components.some(c => c.returnableQty > 0)
+                      const kitSelected     = components.every(c => c.returnableQty === 0 || (selected[c.id] || 0) >= c.returnableQty)
+                      const anyCompSelected = components.some(c => (selected[c.id] || 0) > 0)
 
                       return (
-                        <div key={item.id}
-                          className={`grid gap-4 items-center px-4 py-3.5 rounded-xl border transition-all ${
-                            isFullyReturned ? 'border-gray-100 dark:border-slate-700/50 bg-gray-50/50 dark:bg-slate-700/10 opacity-60' :
-                            isSelected      ? 'border-violet-200 dark:border-violet-700 bg-violet-50/50 dark:bg-violet-900/10 shadow-sm' :
-                                              'border-gray-100 dark:border-slate-700 hover:border-gray-200 dark:hover:border-slate-600 bg-gray-50/40 dark:bg-slate-700/20'
-                          }`}
-                          style={{ gridTemplateColumns: '1fr 90px 70px 70px 100px' }}>
-
-                          {/* Producto */}
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight">{item.productName}</p>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{item.barcode} · {item.unit}</p>
-                            {hasDiscount && (
-                              <span className="inline-flex items-center gap-1 mt-1 text-[10px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md font-medium">
-                                🏷️ Con descuento
-                              </span>
-                            )}
-                            {isFullyReturned && (
-                              <span className="inline-flex items-center gap-1 mt-1 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md font-medium">
-                                ✓ Ya devuelto
-                              </span>
+                        <div key={bundleId} className="rounded-xl border border-orange-200 dark:border-orange-800 overflow-hidden">
+                          {/* Cabecera del bundle */}
+                          <div className="flex items-center justify-between px-4 py-2.5 bg-orange-50 dark:bg-orange-900/20 border-b border-orange-100 dark:border-orange-800/60">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-base shrink-0">🎁</span>
+                              <div className="min-w-0">
+                                <span className="text-sm font-bold text-orange-800 dark:text-orange-300 truncate">{bundleName}</span>
+                                <span className="ml-2 text-xs text-orange-500 dark:text-orange-400">
+                                  {bundleQty > 1 ? `${bundleQty}× ` : ''}{formatCurrency(bundleUnitPrice)} c/u
+                                </span>
+                              </div>
+                            </div>
+                            {allAvailable && (
+                              <div className="flex gap-2 shrink-0">
+                                {anyCompSelected && (
+                                  <button onClick={() => handleClearKit(components)}
+                                    className="text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                    Limpiar
+                                  </button>
+                                )}
+                                <button onClick={() => handleSelectWholeKit(components)}
+                                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                                    kitSelected
+                                      ? 'bg-orange-200 dark:bg-orange-800 text-orange-700 dark:text-orange-200'
+                                      : 'bg-orange-600 text-white hover:bg-orange-700'
+                                  }`}>
+                                  {kitSelected ? '✓ Kit completo' : 'Devolver kit completo'}
+                                </button>
+                              </div>
                             )}
                           </div>
 
-                          {/* Precio neto */}
-                          <div className="text-right">
-                            <p className="text-sm font-bold text-gray-700 dark:text-slate-200">{formatCurrency(item.netUnitPrice)}</p>
-                            {hasDiscount && (
-                              <p className="text-xs text-gray-400 line-through">{formatCurrency(item.unitPrice)}</p>
-                            )}
-                          </div>
+                          {/* Componentes */}
+                          <div className="divide-y divide-orange-50 dark:divide-orange-900/20">
+                            {components.map(item => {
+                              const qty             = selected[item.id] || 0
+                              const isSelected      = qty > 0
+                              const isFullyReturned = item.returnableQty === 0
+                              const pct = item._totalWeight > 0
+                                ? ((item._compWeight / item._totalWeight) * 100).toFixed(1)
+                                : (100 / Math.max(components.length, 1)).toFixed(1)
+                              const formula = item._totalWeight > 0
+                                ? `${formatCurrency(item._bundleUnitPrice)} × (${formatCurrency(item._priceSell)} × ${item._qtyPerBundle}u = ${formatCurrency(item._compWeight)} ÷ total ${formatCurrency(item._totalWeight)}) = ${pct}% → ${formatCurrency(item.netUnitPrice)}/u`
+                                : `Distribución equitativa (${pct}%) → ${formatCurrency(item.netUnitPrice)}/u`
 
-                          {/* Comprado */}
-                          <div className="text-center">
-                            <span className="text-sm font-semibold text-gray-600 dark:text-slate-300">{item.quantity}</span>
-                          </div>
-
-                          {/* Disponible */}
-                          <div className="text-center">
-                            <span className={`text-sm font-bold ${
-                              item.returnableQty === 0 ? 'text-gray-300 dark:text-slate-600' :
-                              item.returnableQty < item.quantity ? 'text-amber-600 dark:text-amber-400' :
-                              'text-gray-700 dark:text-slate-300'
-                            }`}>{item.returnableQty}</span>
-                          </div>
-
-                          {/* Cantidad a devolver */}
-                          <div className="flex items-center justify-center gap-1">
-                            {item.returnableQty > 0 ? (
-                              <>
-                                <button onClick={() => handleQtyChange(item.id, qty - 1, item.returnableQty)}
-                                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${
-                                    qty > 0
-                                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200'
-                                      : 'bg-gray-100 dark:bg-slate-600 text-gray-400 dark:text-slate-500'
-                                  }`}>−</button>
-                                <span className={`w-8 text-center text-sm font-black select-none ${
-                                  qty > 0 ? 'text-violet-700 dark:text-violet-300' : 'text-gray-400 dark:text-slate-500'
-                                }`}>{qty}</span>
-                                <button onClick={() => handleQtyChange(item.id, qty + 1, item.returnableQty)}
-                                  disabled={qty >= item.returnableQty}
-                                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${
-                                    qty < item.returnableQty
-                                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200'
-                                      : 'bg-gray-100 dark:bg-slate-600 text-gray-300 dark:text-slate-600 cursor-not-allowed'
-                                  }`}>+</button>
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-300 dark:text-slate-600 italic font-medium">N/D</span>
-                            )}
+                              return (
+                                <div key={item.id}
+                                  className={`grid gap-4 items-start px-4 py-3 transition-all ${
+                                    isFullyReturned ? 'opacity-50 bg-gray-50/30 dark:bg-slate-700/10' :
+                                    isSelected      ? 'bg-violet-50/40 dark:bg-violet-900/10' :
+                                                      'bg-white dark:bg-slate-800/60 hover:bg-orange-50/30 dark:hover:bg-orange-900/10'
+                                  }`}
+                                  style={{ gridTemplateColumns: '1fr 100px 70px 70px 100px' }}>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs text-orange-400 shrink-0">↳</span>
+                                      <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 leading-tight truncate">{item.productName}</p>
+                                    </div>
+                                    <p className="text-[10px] text-orange-500 dark:text-orange-400 mt-0.5 leading-relaxed pl-4 break-words">
+                                      Prorrateo: {formula}
+                                    </p>
+                                    {isFullyReturned && <span className="inline-flex items-center gap-1 mt-1 ml-4 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md font-medium">✓ Ya devuelto</span>}
+                                  </div>
+                                  <div className="text-right pt-0.5">
+                                    <p className="text-sm font-bold text-orange-700 dark:text-orange-300">{formatCurrency(item.netUnitPrice)}</p>
+                                    <p className="text-[10px] text-gray-400 dark:text-slate-500">prorrateado</p>
+                                  </div>
+                                  <div className="text-center pt-1">
+                                    <span className="text-sm font-semibold text-gray-600 dark:text-slate-300">{item.quantity}</span>
+                                    <p className="text-[10px] text-gray-400">{item.unit}</p>
+                                  </div>
+                                  <div className="text-center pt-1">
+                                    <span className={`text-sm font-bold ${item.returnableQty === 0 ? 'text-gray-300 dark:text-slate-600' : item.returnableQty < item.quantity ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-slate-300'}`}>{item.returnableQty}</span>
+                                  </div>
+                                  <div className="flex items-center justify-center gap-1 pt-0.5">
+                                    {item.returnableQty > 0 ? (
+                                      <>
+                                        <button onClick={() => handleQtyChange(item.id, qty - 1, item.returnableQty)} className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${qty > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200' : 'bg-gray-100 dark:bg-slate-600 text-gray-400 dark:text-slate-500'}`}>−</button>
+                                        <span className={`w-8 text-center text-sm font-black select-none ${qty > 0 ? 'text-violet-700 dark:text-violet-300' : 'text-gray-400 dark:text-slate-500'}`}>{qty}</span>
+                                        <button onClick={() => handleQtyChange(item.id, qty + 1, item.returnableQty)} disabled={qty >= item.returnableQty} className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm font-bold transition-all ${qty < item.returnableQty ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200' : 'bg-gray-100 dark:bg-slate-600 text-gray-300 dark:text-slate-600 cursor-not-allowed'}`}>+</button>
+                                      </>
+                                    ) : (
+                                      <span className="text-xs text-gray-300 dark:text-slate-600 italic font-medium">N/D</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )

@@ -1,11 +1,17 @@
-import { api, USE_API, ok, gs, delay } from './_base'
+import { api, USE_API, ok, fail, gs, delay } from './_base'
 
 export const discountCampaignService = {
   async getAll(filters = {}) {
     await delay(150)
     if (USE_API) {
-      const { data } = await api.get('/campaigns', { params: filters })
-      return ok(data.data, data.meta?.total)
+      try {
+        const { data } = await api.get('/campaigns', { params: filters })
+        const noFilter = !filters.type && filters.isActive === undefined
+        if (noFilter) gs().setDiscountCampaigns(data.data)
+        return ok(data.data, data.meta?.total)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al obtener campañas')
+      }
     }
     let campaigns = gs().discountCampaigns || []
     if (filters.type)                campaigns = campaigns.filter(c => c.type === filters.type)
@@ -15,7 +21,16 @@ export const discountCampaignService = {
 
   async create(payload) {
     await delay()
-    if (USE_API) { const { data } = await api.post('/campaigns', payload); return ok(data.data) }
+    if (USE_API) {
+      try {
+        const { data } = await api.post('/campaigns', payload)
+        const campaign = data.data
+        gs().addDiscountCampaign(campaign)
+        return ok(campaign)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.response?.data?.details || err.message || 'Error al crear campaña')
+      }
+    }
     const campaign = {
       ...payload,
       id:        payload.id        || crypto.randomUUID(),
@@ -28,21 +43,45 @@ export const discountCampaignService = {
 
   async update(id, updates) {
     await delay()
-    if (USE_API) { const { data } = await api.put(`/campaigns/${id}`, updates); return ok(data.data) }
-    gs().updateDiscountCampaign(id, { ...updates, updatedAt: new Date().toISOString() })
-    return ok({ id, ...updates })
+    if (USE_API) {
+      try {
+        const { data } = await api.put(`/campaigns/${id}`, updates)
+        const campaign = data.data
+        gs().updateDiscountCampaign(id, campaign)
+        return ok(campaign)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al actualizar campaña')
+      }
+    }
+    const patch = { ...updates, updatedAt: new Date().toISOString() }
+    gs().updateDiscountCampaign(id, patch)
+    return ok({ id, ...patch })
   },
 
   async toggle(id, isActive) {
     await delay(150)
-    if (USE_API) { const { data } = await api.patch(`/campaigns/${id}/toggle`, { isActive }); return ok(data.data) }
+    if (USE_API) {
+      try {
+        const { data } = await api.patch(`/campaigns/${id}/toggle`, { isActive })
+        gs().updateDiscountCampaign(id, { isActive: data.data.isActive, updatedAt: new Date().toISOString() })
+        return ok(data.data)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al cambiar estado de campaña')
+      }
+    }
     gs().updateDiscountCampaign(id, { isActive, updatedAt: new Date().toISOString() })
     return ok({ id, isActive })
   },
 
   async remove(id) {
     await delay()
-    if (USE_API) { await api.delete(`/campaigns/${id}`); return ok({ id, deleted: true }) }
+    if (USE_API) {
+      try {
+        await api.delete(`/campaigns/${id}`)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al eliminar campaña')
+      }
+    }
     gs().deleteDiscountCampaign(id)
     return ok({ id, deleted: true })
   },

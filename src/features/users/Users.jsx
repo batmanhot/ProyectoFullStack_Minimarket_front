@@ -2,8 +2,10 @@
  * Users.jsx — Gestión de usuarios y permisos v2
  * Ruta: src/features/users/Users.jsx
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore }           from '../../store/index'
+import { userService }        from '../../services/index'
+import { USE_API }            from '../../services/_base'
 import { useForm }            from 'react-hook-form'
 import { zodResolver }        from '@hookform/resolvers/zod'
 import { userSchema }         from '../../shared/schemas/index'
@@ -70,18 +72,19 @@ function UserForm({ user, onClose, availableRoles }) {
   const selectedRole = watch('role')
   const rolePages    = ROLES[selectedRole]?.pages || []
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     const { confirmPassword, ...rest } = data
 
     if (user) {
       const updates = { ...rest }
       if (!changePassword || !rest.password) delete updates.password
-      updateUser(user.id, updates)
+      const res = await userService.update(user.id, updates)
+      if (!res.ok) { toast.error(res.error); return }
       toast.success('Usuario actualizado')
     } else {
       if (!rest.password) { toast.error('Debes establecer una contraseña'); return }
-      if (users.find(u => u.username === rest.username)) { toast.error('El nombre de usuario ya existe'); return }
-      addUser({ ...rest, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
+      const res = await userService.create(rest)
+      if (!res.ok) { toast.error(res.error); return }
       toast.success('Usuario creado')
     }
     onClose()
@@ -320,6 +323,8 @@ function RolesPermissionsEditor() {
 export default function Users() {
   const { users, sales, updateUser, activeCashSession } = useStore()
   const [modal,      setModal]      = useState(null)
+
+  useEffect(() => { if (USE_API) userService.getAll() }, [])
   const [confirm,    setConfirm]    = useState(null)
   const [activeTab,  setActiveTab]  = useState('usuarios')
   const [search,     setSearch]     = useState('')
@@ -366,8 +371,9 @@ export default function Users() {
     porRol:   Object.fromEntries(ROLE_ORDER.map(r => [r, users.filter(u => u.role === r).length])),
   }), [users])
 
-  const handleToggleActive = (u) => {
-    updateUser(u.id, { isActive: !u.isActive })
+  const handleToggleActive = async (u) => {
+    const res = await userService.toggleActive(u.id, !u.isActive)
+    if (!res.ok) { toast.error(res.error); return }
     toast.success(`Usuario ${u.isActive ? 'desactivado' : 'activado'}`)
     setConfirm(null)
   }

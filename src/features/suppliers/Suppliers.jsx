@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store/index'
+import { USE_API } from '../../services/_base'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { supplierSchema } from '../../shared/schemas/index'
@@ -44,6 +45,8 @@ function SupplierForm({ supplier, onClose }) {
 export default function Suppliers() {
   const { suppliers, products, purchases, businessConfig, addAuditLog } = useStore()
   const [search,      setSearch]      = useState('')
+
+  useEffect(() => { if (USE_API) supplierService.getAll() }, [])
   const [modal,       setModal]       = useState(null)
   const [importOpen,  setImportOpen]  = useState(false)
   const dq = useDebounce(search, 150)

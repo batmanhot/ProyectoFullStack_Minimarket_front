@@ -200,7 +200,7 @@ function TicketForm({ ticket, onClose }) {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400 dark:text-slate-500 pointer-events-none">S/</span>
               )}
               <input
-                type="number" min="0.01" step={discountType === 'pct' ? '1' : '0.50'}
+                type="number" min="0.01" step="1"
                 value={discountValue}
                 onChange={e => { setDiscountValue(e.target.value); setErrors(ev => ({...ev, discountValue: undefined})) }}
                 className={inputCls + ' font-mono ' + (discountType === 'pct' ? 'pr-8' : 'pl-8') + (errors.discountValue ? ' border-red-400' : '')}
@@ -217,7 +217,7 @@ function TicketForm({ ticket, onClose }) {
               <label className={labelCls}>Monto máximo a descontar (S/)</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400 dark:text-slate-500 pointer-events-none">S/</span>
-                <input type="number" min="0.01" step="0.50" value={maxAmount}
+                <input type="number" min="0.01" step="1" value={maxAmount}
                   onChange={e => setMaxAmount(e.target.value)}
                   className={inputCls + ' pl-8 font-mono'}
                   placeholder="Sin límite"/>

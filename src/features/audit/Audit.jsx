@@ -13,8 +13,10 @@
  *  8. selectTodayReturns integrado para el KPI de devoluciones del día
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStore }                    from '../../store/index'
+import { auditService }                from '../../services/index'
+import { USE_API }                     from '../../services/_base'
 import { formatDateTime, exportCSV }    from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF }   from '../../shared/utils/export'
 import { ExcelButton, PDFButton }        from '../../shared/components/ui/ExportButtons'
@@ -76,6 +78,14 @@ function ModuleBarChart({ data }) {
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function Audit() {
   const { auditLog, businessConfig, currentUser, addAuditLog, clearAuditLog, returns: returnsList = [] } = useStore()
+  const [apiLogs, setApiLogs] = useState(null)
+
+  useEffect(() => {
+    if (!USE_API) return
+    auditService.getAll({ limit: 500 }).then(res => { if (res.ok) setApiLogs(res.data) })
+  }, [])
+
+  const effectiveLog = apiLogs ?? auditLog
 
   const todayReturns = useMemo(() => {
     const today = new Date().toDateString()
@@ -98,28 +108,30 @@ export default function Audit() {
 
   // Módulos dinámicos derivados del propio log (no hardcodeados)
   const MODULES = useMemo(() => {
-    const unique = [...new Set((auditLog || []).map((e) => e.module))].sort()
+    const unique = [...new Set((effectiveLog || []).map((e) => e.module || e.entity))].filter(Boolean).sort()
     return ['Todos', ...unique]
-  }, [auditLog])
+  }, [effectiveLog])
 
   // Filtrado
   const filtered = useMemo(() => {
-    let list = auditLog || []
-    if (moduleF !== 'Todos') list = list.filter((e) => e.module === moduleF)
+    let list = effectiveLog || []
+    const mod = moduleF !== 'Todos'
+    if (mod) list = list.filter((e) => (e.module || e.entity) === moduleF)
     if (actionF !== 'Todas') list = list.filter((e) => e.action === actionF)
-    if (dateFrom) list = list.filter((e) => new Date(e.timestamp) >= new Date(dateFrom))
-    if (dateTo)   list = list.filter((e) => new Date(e.timestamp) <= new Date(dateTo + 'T23:59:59'))
+    const tsField = (e) => e.timestamp || e.createdAt || ''
+    if (dateFrom) list = list.filter((e) => new Date(tsField(e)) >= new Date(dateFrom))
+    if (dateTo)   list = list.filter((e) => new Date(tsField(e)) <= new Date(dateTo + 'T23:59:59'))
     if (dq) {
       const q = dq.toLowerCase()
       list = list.filter((e) =>
         e.detail?.toLowerCase().includes(q)   ||
         e.userName?.toLowerCase().includes(q) ||
-        e.module?.toLowerCase().includes(q)   ||
+        (e.module || e.entity)?.toLowerCase().includes(q) ||
         e.entityId?.toLowerCase().includes(q)
       )
     }
     return list
-  }, [auditLog, moduleF, actionF, dateFrom, dateTo, dq])
+  }, [effectiveLog, moduleF, actionF, dateFrom, dateTo, dq])
 
   // Paginación
   const totalPages   = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -132,14 +144,16 @@ export default function Audit() {
   // KPIs
   const kpis = useMemo(() => {
     const today = new Date().toISOString().split('T')[0]
-    const all   = auditLog || []
-    const todayEntries = all.filter((e) => e.timestamp?.startsWith(today))
+    const all   = effectiveLog || []
+    const tsOf  = (e) => e.timestamp || e.createdAt || ''
+    const todayEntries = all.filter((e) => tsOf(e).startsWith(today))
     const users = [...new Set(all.map((e) => e.userId))].length
 
     const byModule = {}
     const byAction = {}
     all.forEach((e) => {
-      byModule[e.module] = (byModule[e.module] || 0) + 1
+      const m = e.module || e.entity || 'Sistema'
+      byModule[m] = (byModule[m] || 0) + 1
       byAction[e.action] = (byAction[e.action] || 0) + 1
     })
     const topModule = Object.entries(byModule).sort((a, b) => b[1] - a[1])[0]
@@ -154,7 +168,7 @@ export default function Audit() {
       byModule,
       byAction,
     }
-  }, [auditLog])
+  }, [effectiveLog])
 
   // Chips de filtros activos
   const activeFilters = [

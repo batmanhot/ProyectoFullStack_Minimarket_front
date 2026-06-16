@@ -3,7 +3,8 @@ import { APP_CONFIG } from '../config/app'
 import { STORAGE_KEYS } from '../config/storageKeys'
 import { useStore } from '../store/index'
 
-export const USE_API = APP_CONFIG.useApi
+export const USE_API      = APP_CONFIG.useApi
+export const USE_FACTUAPI = APP_CONFIG.useFactuApi
 
 export const api = axios.create({ baseURL: APP_CONFIG.apiUrl })
 
@@ -34,6 +35,10 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem(STORAGE_KEYS.authToken)
       useStore.getState().logout()
+    }
+    // Normaliza el mensaje: el backend puede usar 'message' o 'error'
+    if (err.response?.data) {
+      err.message = err.response.data.message || err.response.data.error || err.message
     }
     return Promise.reject(err)
   }

@@ -191,7 +191,7 @@ export default function CampaignForm({ campaign, categories, products, onClose }
         <div>
           <label className={labelCls}>Porcentaje de descuento *</label>
           <div className="relative w-40">
-            <input type="number" min="0.1" max="100" step="0.5" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className={inputCls + ' pr-8'} placeholder="10"/>
+            <input type="number" min="0.1" max="100" step="1" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className={inputCls + ' pr-8'} placeholder="10"/>
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-slate-500 font-bold">%</span>
           </div>
         </div>
@@ -315,13 +315,13 @@ export default function CampaignForm({ campaign, categories, products, onClose }
                   <label className={labelCls}>Subtotal mínimo (S/) *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400 dark:text-slate-500">S/</span>
-                    <input type="number" min="1" step="10" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className={inputCls + ' pl-9 font-mono'} placeholder="300"/>
+                    <input type="number" min="1" step="1" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className={inputCls + ' pl-9 font-mono'} placeholder="300"/>
                   </div>
                 </div>
                 <div>
                   <label className={labelCls}>Porcentaje de descuento *</label>
                   <div className="relative">
-                    <input type="number" min="0.1" max="100" step="0.5" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className={inputCls + ' pr-9 font-mono'} placeholder="5"/>
+                    <input type="number" min="0.1" max="100" step="1" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} className={inputCls + ' pr-9 font-mono'} placeholder="5"/>
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400 dark:text-slate-500">%</span>
                   </div>
                 </div>
