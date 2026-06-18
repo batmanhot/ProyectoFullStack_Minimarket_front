@@ -8,6 +8,7 @@ import {
   buildRedeemTransaction,
 } from '../shared/utils/LoyaltyEngine'
 import { api, USE_API, USE_FACTUAPI, ok, fail, gs, delay } from './_base'
+import { serialService } from './serialService'
 
 export const saleService = {
   async getAll(filters = {}) {
@@ -32,9 +33,7 @@ export const saleService = {
     const invoiceNumber = payload.invoiceNumber || 'VENTA'
     const enrichedItems = []
 
-    // ── Expandir Bundles SIEMPRE (antes del API call y antes del motor local) ────
-    // CRÍTICO: debe ocurrir antes de api.post() para que el backend reciba
-    // los ítems ya expandidos (bundle padre + componentes con _fromBundle).
+    // ── Expandir Bundles ─────────────────────────────────────────────────────
     const expandedItems = []
     for (const item of payload.items) {
       const freshState = useStore.getState()
@@ -61,16 +60,24 @@ export const saleService = {
     if (USE_API) {
       if (navigator.onLine) {
         try {
-          // Enviar payload con ítems ya expandidos: el backend recibe
-          // el bundle padre (isBundle:true) + componentes (_fromBundle).
-          const expandedPayload = { ...payload, items: [...enrichedItems, ...expandedItems] }
+          const cleanItems = [...enrichedItems, ...expandedItems].map(item =>
+            item.selectedSerial ? { ...item, variantId: null } : item
+          )
+          const expandedPayload = { ...payload, items: cleanItems }
           const { data } = await api.post('/sales', expandedPayload)
           const sale = data.data
-          // Reflejar stock localmente (el backend ya lo descontó en DB)
+          // Reflejar stock localmente para productos no-serie
           for (const item of expandedItems) {
-            const st = useStore.getState()
+            if (item.selectedSerial) continue
+            const st   = useStore.getState()
             const prod = st.products.find(p => p.id === item.productId)
             if (prod) st.updateProduct(item.productId, { stock: Math.max(0, (prod.stock || 0) - item.quantity) })
+          }
+          // Marcar seriales vendidos — UNA SOLA VEZ aquí
+          for (const item of expandedItems) {
+            if (item.selectedSerial) {
+              await serialService.markSold(item.productId, item.selectedSerial, sale.id, payload.invoiceNumber)
+            }
           }
           // Recalcular stock de bundles
           for (const item of enrichedItems) {
@@ -92,17 +99,15 @@ export const saleService = {
         }
       }
       useStore.getState().enqueueOfflineOp({ type: 'sale.create', endpoint: '/sales', method: 'POST', payload: { ...payload, items: [...enrichedItems, ...expandedItems] } })
-      // Cae al bloque local para reflejar el stock en pantalla inmediatamente
     }
 
-    // ── Motor de inventario FEFO/FIFO/Serie/Simple + Variantes ──────────────────
+    // ── Motor de inventario (modo local u offline) ────────────────────────────
     for (const item of expandedItems) {
       const freshState = useStore.getState()
       const product    = freshState.products.find(p => p.id === item.productId)
       if (!product) continue
 
-      // Ítem vendido como variante con stock propio registrado
-      const hasRegisteredVariants = item.variantId &&
+      const hasRegisteredVariants = item.variantId && !item.selectedSerial &&
         freshState.productVariants.some(v => v.productId === item.productId)
 
       if (hasRegisteredVariants) {
@@ -129,8 +134,39 @@ export const saleService = {
         continue
       }
 
-      // Producto normal o con hasVariants=true pero sin variantes registradas aún
-      const result = allocateStock({ product, quantity: item.quantity, invoiceNumber, userId: payload.userId })
+      // ── SERIE: usar selectedSerial elegido en el POS ──────────────────────
+      if (product.stockControl === 'serie' && item.selectedSerial) {
+        const prevStock = product.stock
+        // markSold: actualiza el estado del serial en productSerials y recalcula stock
+        await serialService.markSold(item.productId, item.selectedSerial, null, invoiceNumber)
+        const newStock = useStore.getState().products.find(p => p.id === item.productId)?.stock ?? Math.max(0, prevStock - 1)
+        freshState.addStockMovement({
+          id: crypto.randomUUID(), productId: item.productId, productName: product.name,
+          type: 'salida', quantity: 1,
+          previousStock: prevStock, newStock,
+          serialNumber: item.selectedSerial,
+          reason: `Venta ${invoiceNumber} · Serie: ${item.selectedSerial}`,
+          userId: payload.userId, invoiceNumber,
+          unitPrice:  item.unitPrice || 0,
+          totalSale:  parseFloat(((item.unitPrice || 0) * item.quantity).toFixed(2)),
+          createdAt:  payload.createdAt || new Date().toISOString(),
+        })
+        enrichedItems.push({
+          ...item,
+          batchAllocations: [{ batchNumber: item.selectedSerial, quantity: 1 }],
+          stockControlUsed: 'serie',
+        })
+        continue
+      }
+
+      // Producto simple / lotes
+      const result = allocateStock({
+        product,
+        quantity: item.quantity,
+        invoiceNumber,
+        userId: payload.userId,
+        selectedSerial: item.selectedSerial || null,
+      })
 
       if (result.error) {
         console.warn('[inventoryEngine]', result.error)
@@ -151,7 +187,7 @@ export const saleService = {
       enrichedItems.push({ ...item, batchAllocations: result.batchAllocations, stockControlUsed: product.stockControl || 'simple' })
     }
 
-    // ── Recalcular stock de bundles al mínimo de sus componentes ──────────────
+    // Recalcular stock de bundles
     for (const enrichedItem of enrichedItems) {
       if (!enrichedItem.isBundle) continue
       const freshState    = useStore.getState()
@@ -168,7 +204,7 @@ export const saleService = {
 
     payload = { ...payload, items: enrichedItems.length > 0 ? enrichedItems : payload.items }
 
-    // ── Registrar deuda si hay pago a crédito ─────────────────────────────────
+    // Registrar deuda si hay pago a crédito
     if (payload.clientId) {
       const creditPayment = payload.payments?.find(p => p.method === 'credito')
       if (creditPayment) {
@@ -182,57 +218,39 @@ export const saleService = {
       }
     }
 
-    // Enriquecer con datos del cliente para el comprobante
     const saleClientEnrich = (() => {
       if (!payload.clientId) return {}
       const c = useStore.getState().clients.find(cl => cl.id === payload.clientId)
       if (!c) return {}
-      return {
-        clientName:     c.name,
-        clientDocument: `${c.documentType} ${c.documentNumber}`,
-      }
+      return { clientName: c.name, clientDocument: `${c.documentType} ${c.documentNumber}` }
     })()
 
     let sale = { ...payload, ...saleClientEnrich, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
 
-    // ── Programa de Puntos — delegado a LoyaltyEngine ─────────────────────────
+    // Programa de Puntos
     if (payload.clientId) {
-      const freshState = useStore.getState()
-      const client     = freshState.clients.find(c => c.id === payload.clientId)
-
+      const freshState     = useStore.getState()
+      const client         = freshState.clients.find(c => c.id === payload.clientId)
       if (client) {
         const accumulated    = client.loyaltyAccumulated || 0
         const redeemedPoints = Math.max(0, Math.floor(payload.redeemedPoints || 0))
         const loyaltyDiscount = Math.max(0, Number(payload.loyaltyDiscount || 0))
-
         let nextPoints       = client.loyaltyPoints || 0
         let nextTransactions = [...(client.loyaltyTransactions || [])]
-
-        // Canje primero (si aplica)
         if (redeemedPoints > 0) {
           const safeRedeemed = Math.min(redeemedPoints, nextPoints)
           if (safeRedeemed > 0) {
             nextPoints = Math.max(0, nextPoints - safeRedeemed)
-            nextTransactions = [
-              buildRedeemTransaction(safeRedeemed, loyaltyDiscount, sale.id, sale.invoiceNumber),
-              ...nextTransactions,
-            ]
+            nextTransactions = [buildRedeemTransaction(safeRedeemed, loyaltyDiscount, sale.id, sale.invoiceNumber), ...nextTransactions]
           }
         }
-
-        // Acumulación usando el motor (nivel y multiplicador son responsabilidad del engine)
         const earned         = calcPointsEarned(sale.total, accumulated)
         const newAccumulated = accumulated + Math.max(0, earned)
         const newLevel       = getClientLevel(newAccumulated)
-
         if (earned > 0) {
           nextPoints += earned
-          nextTransactions = [
-            buildEarnTransaction(earned, sale.id, sale.invoiceNumber, sale.total, newLevel),
-            ...nextTransactions,
-          ]
+          nextTransactions = [buildEarnTransaction(earned, sale.id, sale.invoiceNumber, sale.total, newLevel), ...nextTransactions]
         }
-
         freshState.updateClient(payload.clientId, {
           loyaltyPoints:       nextPoints,
           loyaltyAccumulated:  newAccumulated,
@@ -242,7 +260,6 @@ export const saleService = {
       }
     }
 
-    // ── Envío a backend para emisión SUNAT (boleta / factura) ────────────────
     if (USE_FACTUAPI && sale.tipoComprobante !== 'ticket') {
       try {
         const { data: apiData } = await api.post('/sales', sale)
@@ -273,6 +290,16 @@ export const saleService = {
       if (navigator.onLine) {
         try {
           const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
+          // Restaurar seriales al anular en modo API
+          const state = gs()
+          const sale  = state.sales.find(s => s.id === id)
+          if (sale?.items) {
+            for (const item of sale.items) {
+              if (item.stockControlUsed === 'serie' && item.batchAllocations?.[0]?.batchNumber) {
+                await serialService.markAvailable(item.productId, item.batchAllocations[0].batchNumber)
+              }
+            }
+          }
           useStore.getState().updateSale(id, { status: 'cancelada', cancelReason: reason, cancelledAt: new Date().toISOString() })
           return ok(data.data)
         } catch (err) {
@@ -280,8 +307,8 @@ export const saleService = {
         }
       }
       useStore.getState().enqueueOfflineOp({ type: 'sale.cancel', endpoint: `/sales/${id}/cancel`, method: 'PATCH', payload: { reason, userId } })
-      // Cae al bloque local para reflejar el cambio de estado en pantalla inmediatamente
     }
+
     const state = gs()
     const sale  = state.sales.find(s => s.id === id)
     if (!sale) return fail('Venta no encontrada')
@@ -294,7 +321,6 @@ export const saleService = {
       const product    = freshState.products.find(p => p.id === item.productId)
       if (!product) continue
 
-      // Restaurar stock de variante si la venta original fue de una variante registrada
       const hasRegisteredVariants = item.variantId &&
         freshState.productVariants.some(v => v.productId === item.productId)
 
@@ -315,29 +341,37 @@ export const saleService = {
         continue
       }
 
+      // ── SERIE: restaurar serial y recalcular stock ────────────────────────
+      if (item.stockControlUsed === 'serie' && item.batchAllocations?.[0]?.batchNumber) {
+        const serialNum  = item.batchAllocations[0].batchNumber
+        const prevStockS = product.stock
+        // markAvailable actualiza productSerials y recalcula product.stock vía recalcStock()
+        await serialService.markAvailable(item.productId, serialNum)
+        const newStock = useStore.getState().products.find(p => p.id === item.productId)?.stock ?? prevStockS + 1
+        freshState.addStockMovement({
+          id: crypto.randomUUID(), productId: item.productId, productName: product.name,
+          type: 'entrada', quantity: 1,
+          previousStock: prevStockS, newStock,
+          serialNumber: serialNum,
+          reason: `Anulación ${sale.invoiceNumber} · Serie: ${serialNum}`, userId,
+          createdAt: new Date().toISOString(),
+        })
+        continue
+      }
+
       const prevStock = product.stock
       let stockUpdate
       let newStock
 
-      if (
-        item.batchAllocations?.length > 0 &&
-        (item.stockControlUsed === 'lote_fefo' || item.stockControlUsed === 'lote_fifo')
-      ) {
+      if (item.batchAllocations?.length > 0 && (item.stockControlUsed === 'lote_fefo' || item.stockControlUsed === 'lote_fifo')) {
         const updatedBatches = (product.batches || []).map(batch => {
           const alloc = item.batchAllocations.find(a => a.batchId === batch.id)
           if (!alloc) return batch
           const restoredQty = (batch.quantity || 0) + alloc.quantity
-          return {
-            ...batch,
-            quantity: restoredQty,
-            status: batch.status === 'agotado' && restoredQty > 0 ? 'activo' : batch.status,
-          }
+          return { ...batch, quantity: restoredQty, status: batch.status === 'agotado' && restoredQty > 0 ? 'activo' : batch.status }
         })
         newStock    = updatedBatches.filter(b => b.status !== 'agotado' && b.status !== 'merma').reduce((sum, b) => sum + (b.quantity || 0), 0)
         stockUpdate = { batches: updatedBatches, stock: newStock }
-      } else if (item.stockControlUsed === 'serie' && item.batchAllocations?.[0]?.batchNumber) {
-        newStock    = product.stock + item.quantity
-        stockUpdate = { stock: newStock, serialNumber: item.batchAllocations[0].batchNumber }
       } else {
         newStock    = product.stock + item.quantity
         stockUpdate = { stock: newStock }
@@ -382,7 +416,7 @@ export const saleService = {
       }
     }
 
-    // ── Generar NC de anulación para boletas y facturas (no tickets) ──────────
+    // Generar NC de anulación para boletas y facturas
     const tipo = sale.tipoComprobante
     if (tipo !== 'ticket') {
       const freshState  = useStore.getState()
@@ -394,16 +428,13 @@ export const saleService = {
       const baseImponible = HALF_UP(totalRefund / (1 + igvRate))
       const igv           = HALF_UP(totalRefund - baseImponible)
 
-      // Solo ítems facturables (excluir componentes internos de bundles)
       const billableItems = sale.items.filter(i => !i._fromBundle)
       const ncItems = billableItems.map(item => {
         const netUnit = item.netTotal != null && item.quantity > 0
           ? HALF_UP(item.netTotal / item.quantity)
           : (() => {
               const gross    = item.quantity * (item.unitPrice || 0)
-              const discount = item.totalDiscount != null
-                ? item.totalDiscount
-                : (item.discount || 0) + (item.campaignDiscount || 0)
+              const discount = item.totalDiscount != null ? item.totalDiscount : (item.discount || 0) + (item.campaignDiscount || 0)
               return HALF_UP(Math.max(0, gross - discount) / item.quantity)
             })()
         const firstBatch = item.batchAllocations?.[0] ?? null
@@ -413,6 +444,8 @@ export const saleService = {
           variantId:    item.variantId    || null,
           productName:  item.productName,
           barcode:      item.barcode      || '',
+          // Para SERIE: mostrar el serial en el campo batchNumber de la NC
+          serialNumber: item.stockControlUsed === 'serie' ? (firstBatch?.batchNumber || '') : null,
           quantity:     item.quantity,
           unitPrice:    item.unitPrice    || 0,
           netUnitPrice: netUnit,

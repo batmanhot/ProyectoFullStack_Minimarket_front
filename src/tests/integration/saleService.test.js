@@ -13,7 +13,8 @@ vi.mock('../../store/index', () => ({
 }))
 
 vi.mock('../../services/_base', () => ({
-  USE_API:  false,
+  USE_API:     false,
+  USE_FACTUAPI: false,
   ok:    (data, total) => ({ data, meta: { total: total ?? (Array.isArray(data) ? data.length : 1) }, error: null }),
   fail:  (msg)         => ({ data: null, meta: null, error: msg }),
   gs:    ()            => storeState,

@@ -1,4 +1,5 @@
 import { api, USE_API, ok, fail, gs, delay } from './_base'
+import { INVENTORY, STOCK_CONTROL } from '../config/businessRules'
 
 // Normaliza un producto del backend al formato que espera el frontend/Zod
 const toFrontend = (p) => {
@@ -14,9 +15,7 @@ const toFrontend = (p) => {
     supplierId:  p.supplierId || '',
     stockMax:    p.stockMax   ?? 0,
     stockControl: sc,
-    // useBatches se deriva de stockControl (no existe como campo en la BD)
-    useBatches: sc === 'lote_fefo' || sc === 'lote_fifo',
-    // Mapear bundleParents (POST/PUT) → components (formulario)
+    useBatches: sc === STOCK_CONTROL.BATCH_FEFO || sc === STOCK_CONTROL.BATCH_FIFO,
     components: p.components ?? (p.bundleParents || []).map(bc => ({
       productId:  bc.productId,
       quantity:   bc.quantity,
@@ -35,8 +34,6 @@ export const productService = {
       try {
         const { data } = await api.get('/products', { params: filters })
         const normalized = data.data.map(toFrontend)
-        // Sincroniza el store con datos del backend para que Inventario y otros
-        // componentes que leen gs().products vean los datos reales de la API.
         const noRestrictiveFilter = !filters.lowStock && !filters.nearExpiry && !filters.noMovement && !filters.search && !filters.categoryId
         if (noRestrictiveFilter) gs().setProducts(normalized)
         return ok(normalized, data.meta?.total)
@@ -56,11 +53,11 @@ export const productService = {
     if (filters.lowStock)   products = products.filter(p => p.stock <= p.stockMin)
     if (filters.nearExpiry) products = products.filter(p => {
       if (!p.expiryDate) return false
-      return Math.ceil((new Date(p.expiryDate) - new Date()) / 86400000) <= 30
+      return Math.ceil((new Date(p.expiryDate) - new Date()) / 86400000) <= INVENTORY.EXPIRY_WARNING_DAYS
     })
     if (filters.noMovement) products = products.filter(p => {
       const cutoff = new Date()
-      cutoff.setDate(cutoff.getDate() - (filters.noMovementDays || 30))
+      cutoff.setDate(cutoff.getDate() - (filters.noMovementDays || INVENTORY.NO_MOVEMENT_DAYS))
       return gs().stockMovements.filter(m => m.productId === p.id && new Date(m.createdAt) >= cutoff).length === 0
     })
     return ok(products, products.length)
@@ -114,7 +111,6 @@ export const productService = {
         if (err.response?.status !== 404) {
           return fail(err.response?.data?.message || err.message || 'Error al actualizar el producto')
         }
-        // 404 = producto no existe en el backend stub, actualizar localmente
       }
     }
     gs().updateProduct(id, payload)
@@ -134,6 +130,7 @@ export const productService = {
     return ok({ id, deleted: true })
   },
 
+  // FIX: ya no silencia errores de API — propaga el fallo al componente
   async adjustStock(id, quantity, type, reason, userId) {
     await delay()
     const state   = gs()
@@ -146,9 +143,18 @@ export const productService = {
 
     if (USE_API) {
       try {
-        await api.post(`/products/${id}/stock`, { quantity, type, reason })
-      } catch (_) {
-        // Si el producto no existe en el backend, continuar con el ajuste local
+        const { data } = await api.post(`/products/${id}/stock`, { quantity, type, reason })
+        // Usar el stock real devuelto por el backend (puede diferir si hay lotes FEFO/FIFO)
+        const backendStock = data?.data?.newStock
+        state.updateProduct(id, { stock: backendStock ?? newStock })
+        state.addStockMovement({
+          id: crypto.randomUUID(), productId: id, productName: product.name,
+          type, quantity, previousStock: prevStock, newStock: backendStock ?? newStock,
+          reason, userId, createdAt: new Date().toISOString(),
+        })
+        return ok({ id, newStock: backendStock ?? newStock })
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al ajustar stock')
       }
     }
 

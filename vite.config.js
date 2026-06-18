@@ -3,6 +3,31 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/tests/setup.js'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'node_modules/',
+        'src/tests/',
+        '**/*.config.*',
+        'src/main.jsx',
+        'src/features/**',
+        'src/shared/components/**',
+        'src/store/**',
+        'src/services/**',
+      ],
+      thresholds: {
+        'src/shared/utils/**': { lines: 100, functions: 100, branches: 90 },
+      },
+    },
+  },
+
   server: {
     port: 3000,
     open: true,

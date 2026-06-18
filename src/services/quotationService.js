@@ -1,4 +1,24 @@
 import { api, USE_API, ok, fail, delay } from './_base'
+import { QUOTATION } from '../config/businessRules'
+
+// Limpia el payload antes de enviarlo al API: convierte null→'' en strings
+// y garantiza tipos numéricos correctos que Zod requiere
+const sanitizeQuotation = (q) => ({
+  clientId:   q.clientId   || '',
+  clientName: q.clientName || 'Sin cliente',
+  note:       q.note       || '',
+  validDays:  parseInt(q.validDays) || QUOTATION.DEFAULT_VALID_DAYS,
+  total:      parseFloat(q.total)   || 0,
+  items: (q.items || []).map(i => ({
+    productId:   i.productId,
+    productName: i.productName || '',
+    barcode:     i.barcode     || '',
+    unit:        i.unit        || 'unidad',
+    quantity:    Number(i.quantity)  || 1,
+    unitPrice:   Number(i.unitPrice) || 0,
+    discount:    Number(i.discount)  || 0,
+  })),
+})
 
 const LS_KEY = 'pos_quotations'
 const lsGet  = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] } }
@@ -11,7 +31,7 @@ export const quotationService = {
       try {
         const { data } = await api.get('/quotations', { params: filters })
         return ok(data.data, data.meta?.total)
-      } catch (err) { return fail(err.message) }
+      } catch (err) { return fail(err.response?.data?.message || err.message || 'Error al cargar cotizaciones') }
     }
     let list = lsGet()
     if (filters.status) list = list.filter(q => q.status === filters.status)
@@ -26,9 +46,9 @@ export const quotationService = {
     await delay()
     if (USE_API) {
       try {
-        const { data } = await api.post('/quotations', payload)
+        const { data } = await api.post('/quotations', sanitizeQuotation(payload))
         return ok(data.data)
-      } catch (err) { return fail(err.message || 'Error al crear cotización') }
+      } catch (err) { return fail(err.response?.data?.message || err.message || 'Error al crear cotización') }
     }
     const q = { ...payload, id: crypto.randomUUID(), status: payload.status || 'borrador', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
     lsSet([q, ...lsGet()])
@@ -39,9 +59,9 @@ export const quotationService = {
     await delay()
     if (USE_API) {
       try {
-        const { data } = await api.put(`/quotations/${id}`, updates)
+        const { data } = await api.put(`/quotations/${id}`, sanitizeQuotation(updates))
         return ok(data.data)
-      } catch (err) { return fail(err.message || 'Error al actualizar cotización') }
+      } catch (err) { return fail(err.response?.data?.message || err.message || 'Error al actualizar cotización') }
     }
     const list = lsGet()
     const updated = list.map(q => q.id === id ? { ...q, ...updates, updatedAt: new Date().toISOString() } : q)
@@ -55,7 +75,7 @@ export const quotationService = {
       try {
         const { data } = await api.patch(`/quotations/${id}/status`, { status })
         return ok(data.data)
-      } catch (err) { return fail(err.message || 'Error al cambiar estado') }
+      } catch (err) { return fail(err.response?.data?.message || err.message || 'Error al cambiar estado') }
     }
     return this.update(id, { status })
   },
@@ -66,7 +86,7 @@ export const quotationService = {
       try {
         await api.delete(`/quotations/${id}`)
         return ok({ id, deleted: true })
-      } catch (err) { return fail(err.message || 'Error al eliminar cotización') }
+      } catch (err) { return fail(err.response?.data?.message || err.message || 'Error al eliminar cotización') }
     }
     lsSet(lsGet().filter(q => q.id !== id))
     return ok({ id, deleted: true })

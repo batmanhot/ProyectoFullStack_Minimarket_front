@@ -22,10 +22,10 @@ export const createSalesSlice = (set, get) => ({
    * IMPORTANTE: la _key siempre usa variantId cuando se proporciona, garantizando
    * que dos variantes distintas del mismo producto sean líneas independientes.
    */
-  addToCart: (product, quantity = 1, variantId = null) => {
+  addToCart: (product, quantity = 1, variantId = null, extra = {}) => {
     // _key es la identidad única de la línea en el carrito:
-    //   - Con variante : "productId_variantId"  → líneas separadas por variante
-    //   - Sin variante : "productId"             → una sola línea por producto
+    //   - Con variante/serial : "productId_variantId"  → líneas separadas
+    //   - Sin variante        : "productId"            → una sola línea por producto
     const key      = variantId ? `${product.id}_${variantId}` : `${product.id}`
     const existing = get().cart.find((i) => i._key === key)
 
@@ -61,6 +61,7 @@ export const createSalesSlice = (set, get) => ({
             unit:        product.unit || 'unidad',
             type:        product.type || 'simple',
             components:  product.components || [],
+            ...extra,
           },
         ],
       }))

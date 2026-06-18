@@ -15,6 +15,10 @@ vi.mock('../../config/app', () => ({
 
 import {
   formatNumber,
+  formatDate,
+  formatDateTime,
+  formatTime,
+  getHour,
   formatInvoice,
   calcChange,
   calcBilletes,
@@ -24,11 +28,15 @@ import {
   isNearExpiry,
   daysUntil,
   isToday,
+  isThisWeek,
   isThisMonth,
   fuzzySearch,
   getUnitCost,
   stockDaysLeft,
   calcCartTotals,
+  exportCSV,
+  calcDashboardKPIs,
+  subtractDays,
 } from '../../shared/utils/helpers'
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -391,5 +399,208 @@ describe('calcCartTotals', () => {
     expect(r.subtotal).toBe(0)
     expect(r.total).toBe(0)
     expect(r.tax).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// formatDate / formatDateTime / formatTime / getHour
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('formatDate', () => {
+  it('retorna "—" para null/undefined/string vacío', () => {
+    expect(formatDate(null)).toBe('—')
+    expect(formatDate(undefined)).toBe('—')
+    expect(formatDate('')).toBe('—')
+  })
+  it('formatea ISO a cadena de fecha legible (contiene el año)', () => {
+    const result = formatDate('2026-03-15T00:00:00.000Z')
+    expect(typeof result).toBe('string')
+    expect(result).toMatch(/2026/)
+  })
+})
+
+describe('formatDateTime', () => {
+  it('retorna "—" para null', () => {
+    expect(formatDateTime(null)).toBe('—')
+  })
+  it('retorna string que contiene el año para ISO válido', () => {
+    const result = formatDateTime('2026-03-15T10:30:00.000Z')
+    expect(typeof result).toBe('string')
+    expect(result).toMatch(/2026/)
+  })
+})
+
+describe('formatTime', () => {
+  it('retorna "—" para null', () => {
+    expect(formatTime(null)).toBe('—')
+  })
+  it('retorna string para ISO válido', () => {
+    const result = formatTime('2026-03-15T10:30:00.000Z')
+    expect(typeof result).toBe('string')
+    expect(result.length).toBeGreaterThan(0)
+  })
+})
+
+describe('getHour', () => {
+  it('retorna un número entre 0 y 23', () => {
+    const h = getHour('2026-03-15T15:30:00.000Z')
+    expect(typeof h).toBe('number')
+    expect(h).toBeGreaterThanOrEqual(0)
+    expect(h).toBeLessThanOrEqual(23)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// isThisWeek
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('isThisWeek', () => {
+  it('fecha actual → true', () => {
+    expect(isThisWeek(new Date().toISOString())).toBe(true)
+  })
+  it('fecha de hace 8 días → false', () => {
+    const d = new Date()
+    d.setDate(d.getDate() - 8)
+    expect(isThisWeek(d.toISOString())).toBe(false)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// subtractDays
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('subtractDays', () => {
+  it('retorna un ISO string bien formateado', () => {
+    const result = subtractDays(7)
+    expect(typeof result).toBe('string')
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+  it('la fecha resultante es anterior a ahora', () => {
+    expect(new Date(subtractDays(1)) < new Date()).toBe(true)
+  })
+  it('resta correctamente la cantidad de días', () => {
+    const result = new Date(subtractDays(3))
+    const expected = new Date()
+    expected.setDate(expected.getDate() - 3)
+    expect(result.getDate()).toBe(expected.getDate())
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// exportCSV
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('exportCSV', () => {
+  it('no hace nada con data vacía o nula', () => {
+    vi.clearAllMocks()
+    exportCSV([], 'test')
+    exportCSV(null, 'test')
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('crea y revoca un blob URL para data válida', () => {
+    vi.clearAllMocks()
+    exportCSV([{ col1: 'valor1', col2: 'valor2' }], 'reporte')
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+  })
+
+  it('no lanza error con valores que contienen comillas', () => {
+    expect(() => exportCSV([{ col: 'valor "con comillas"' }], 'test')).not.toThrow()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// calcDashboardKPIs
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('calcDashboardKPIs', () => {
+  const now = new Date().toISOString()
+
+  const products = [
+    { id: 'p1', name: 'Leche',  isActive: true, stock: 3,  stockMin: 10, priceBuy: 2, priceSell: 3 },
+    { id: 'p2', name: 'Pan',    isActive: true, stock: 0,  stockMin: 5,  priceBuy: 1, priceSell: 2 },
+    { id: 'p3', name: 'Arroz',  isActive: true, stock: 50, stockMin: 5,  priceBuy: 3, priceSell: 5 },
+    { id: 'p4', name: 'Inactivo', isActive: false, stock: 0, stockMin: 0, priceBuy: 0, priceSell: 0 },
+  ]
+
+  const sales = [
+    {
+      id: 's1', status: 'completada', total: 60, createdAt: now,
+      items: [{ productId: 'p1', quantity: 3, unitPrice: 3 }, { productId: 'p3', quantity: 3, unitPrice: 5 }],
+      payments: [{ method: 'efectivo', amount: 60 }],
+    },
+    {
+      id: 's2', status: 'completada', total: 20, createdAt: now,
+      items: [{ productId: 'p2', quantity: 10, unitPrice: 2 }],
+      payments: [{ method: 'yape', amount: 20 }],
+    },
+    {
+      id: 's3', status: 'pendiente', total: 999, createdAt: now,
+      items: [], payments: [],
+    },
+  ]
+
+  it('retorna todas las propiedades esperadas', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis).toHaveProperty('ventasHoy')
+    expect(kpis).toHaveProperty('ventasAyer')
+    expect(kpis).toHaveProperty('transaccionesHoy')
+    expect(kpis).toHaveProperty('ticketPromedio')
+    expect(kpis).toHaveProperty('ventasSemana')
+    expect(kpis).toHaveProperty('ventasMes')
+    expect(kpis).toHaveProperty('utilidadMes')
+    expect(kpis).toHaveProperty('valorInventarioCosto')
+    expect(kpis).toHaveProperty('valorInventarioVenta')
+    expect(kpis).toHaveProperty('productosAlerta')
+    expect(kpis).toHaveProperty('productosPorVencer')
+    expect(kpis).toHaveProperty('top5')
+    expect(kpis).toHaveProperty('paymentTotals')
+    expect(kpis).toHaveProperty('ventasPorHora')
+    expect(kpis).toHaveProperty('ventasUltimos7')
+  })
+
+  it('excluye ventas no-completadas del cómputo', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.ventasHoy).toBe(80)       // 60 + 20, no 999
+    expect(kpis.transaccionesHoy).toBe(2)
+  })
+
+  it('ticketPromedio = ventasHoy / transaccionesHoy', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.ticketPromedio).toBe(40)
+  })
+
+  it('productosAlerta incluye productos con stock bajo y sin stock (solo activos)', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.productosAlerta).toBe(2) // p1 (bajo) + p2 (sin stock); p4 inactivo no cuenta
+  })
+
+  it('ventasPorHora tiene exactamente 14 slots', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.ventasPorHora).toHaveLength(14)
+  })
+
+  it('ventasUltimos7 tiene exactamente 7 entradas', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.ventasUltimos7).toHaveLength(7)
+  })
+
+  it('paymentTotals agrupa correctamente por método de pago', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.paymentTotals.efectivo).toBe(60)
+    expect(kpis.paymentTotals.yape).toBe(20)
+  })
+
+  it('top5 incluye los productos más vendidos', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(Array.isArray(kpis.top5)).toBe(true)
+    expect(kpis.top5.length).toBeLessThanOrEqual(5)
+  })
+
+  it('tendenciaHoy es null cuando no hay ventas de ayer', () => {
+    const kpis = calcDashboardKPIs(sales, products, [])
+    expect(kpis.tendenciaHoy).toBeNull()
+  })
+
+  it('ticketPromedio = 0 si no hay transacciones', () => {
+    const kpis = calcDashboardKPIs([], products, [])
+    expect(kpis.ticketPromedio).toBe(0)
+    expect(kpis.transaccionesHoy).toBe(0)
   })
 })

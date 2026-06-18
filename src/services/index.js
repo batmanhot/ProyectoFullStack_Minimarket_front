@@ -23,3 +23,7 @@ export { auditService }             from './auditService'
 export { quotationService }         from './quotationService'
 export { reportService }            from './reportService'
 export { dashboardService }         from './dashboardService'
+// Servicios nuevos
+export { serialService }            from './serialService'
+export { locationService }          from './locationService'
+export { notificationService }      from './notificationService'

@@ -34,11 +34,10 @@ const Q_STATUS = {
   vencida:    { label: 'Vencida',     color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',      step: 0 },
 }
 
-let QN = parseInt(localStorage.getItem('pos_quote_num') || '1', 10)
 const nextQN = () => {
-  QN++
-  localStorage.setItem('pos_quote_num', String(QN))
-  return `COT-${String(QN).padStart(6, '0')}`
+  const next = parseInt(localStorage.getItem('pos_quote_num') || '0', 10) + 1
+  localStorage.setItem('pos_quote_num', String(next))
+  return `COT-${String(next).padStart(6, '0')}`
 }
 
 const isExpiredQ = (q) =>

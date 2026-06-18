@@ -2,8 +2,12 @@
  * catalogSlice.js — Slice de Catálogo e Inventario
  * Ruta: src/store/slices/catalogSlice.js
  *
- * Agrupa: productos, variantes de producto, movimientos de stock.
- * stockMovements tiene límite de 1000 registros para controlar el tamaño en localStorage.
+ * Agrupa: productos, variantes, seriales (SERIE), movimientos de stock.
+ *
+ * productSerials: array plano independiente de productos.
+ *   Cada entrada: { id, productId, serialNumber, status, saleId, invoiceNumber, soldAt, notes, createdAt }
+ *   El stock del producto tipo SERIE = productSerials.filter(disponible).length
+ *   Los seriales NO viven dentro de product.serials[] — ese campo no existe.
  */
 
 import { formatInvoice } from '../../shared/utils/helpers'
@@ -48,11 +52,20 @@ export const createCatalogSlice = (set, get) => ({
       detail:   `Producto desactivado: ${product?.name || id}`,
       entityId: id,
     })
-    // Soft-delete: marcar como inactivo, nunca eliminar físicamente
     set((s) => ({
       products: s.products.map((p) => (p.id === id ? { ...p, isActive: false } : p)),
     }))
   },
+
+  // ─── Números de serie (stockControl = 'serie') ────────────────────────────
+  // Array plano independiente — NO anidado dentro de cada producto.
+  // El stock del producto = productSerials.filter(s => s.productId===id && s.status==='disponible').length
+  productSerials: [],
+
+  setProductSerials: (serials) => set({ productSerials: serials }),
+
+  addProductSerials: (newSerials) =>
+    set((s) => ({ productSerials: [...s.productSerials, ...newSerials] })),
 
   // ─── Variantes de producto ─────────────────────────────────────────────────
   productVariants: [],
@@ -66,7 +79,6 @@ export const createCatalogSlice = (set, get) => ({
 
       if (!('stock' in updates)) return { productVariants: updatedVariants }
 
-      // Sincronizar stock del producto padre = suma de stocks de todas sus variantes
       const variant = s.productVariants.find((v) => v.id === id)
       if (!variant) return { productVariants: updatedVariants }
 
@@ -90,8 +102,6 @@ export const createCatalogSlice = (set, get) => ({
     })),
 
   // ─── Movimientos de stock ──────────────────────────────────────────────────
-  // Límite de 1000 registros — protege contra crecimiento ilimitado en localStorage.
-  // Los más recientes siempre se conservan (inserción al frente + slice).
   addStockMovement: (movement) =>
     set((s) => ({
       stockMovements: [movement, ...s.stockMovements].slice(0, 1000),
@@ -177,8 +187,6 @@ export const createCatalogSlice = (set, get) => ({
   },
 
   // ─── Contador de facturas por prefijo ─────────────────────────────────────
-  // invoiceCounters = { T001: n, B001: n, F001: n, NC001: n }
-  // Migración: si invoiceCounters[prefix] no existe, cae al legacy nextInvoice.
   getNextInvoice: (prefix = 'B001') => {
     const counters = get().invoiceCounters || {}
     const n = counters[prefix] != null ? counters[prefix] : (get().nextInvoice || 1)
@@ -188,7 +196,6 @@ export const createCatalogSlice = (set, get) => ({
     return formatInvoice(n, prefix)
   },
 
-  // Permite configurar el número de inicio de un correlativo desde Ajustes
   setInvoiceCounter: (prefix, value) => {
     const n = Math.max(1, parseInt(value) || 1)
     set(s => ({

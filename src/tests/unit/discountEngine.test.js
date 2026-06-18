@@ -440,6 +440,42 @@ describe('checkActivationCondition', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Scope: brand
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('evaluateDiscounts — scope brand (N2)', () => {
+  it('aplica descuento solo a productos de la marca especificada', () => {
+    const cart = makeCart([
+      { productId: 'prd-001', quantity: 1, unitPrice: 19.90 }, // marca: Costeño
+      { productId: 'prd-011', quantity: 1, unitPrice: 2.50 },  // marca: InkaKola
+    ])
+    const camp = makeCampaign({
+      id: 'brand-camp', scope: 'brand', brands: ['Costeño'], discountPct: 10,
+    })
+    const result = evaluateDiscounts(cart, PRODUCTS, [camp])
+
+    const item001 = result.itemDiscounts.find(i => i.productId === 'prd-001')
+    const item011 = result.itemDiscounts.find(i => i.productId === 'prd-011')
+    expect(item001.campaignDiscount).toBe(1.99)
+    expect(item011.campaignDiscount).toBe(0)
+  })
+
+  it('comparación de marca es case-insensitive', () => {
+    const cart = makeCart([{ productId: 'prd-001', quantity: 1, unitPrice: 10.00 }])
+    const camp = makeCampaign({ scope: 'brand', brands: ['COSTEÑO'], discountPct: 20 })
+    const result = evaluateDiscounts(cart, PRODUCTS, [camp])
+    expect(result.totalCampaignSaving).toBeGreaterThan(0)
+  })
+
+  it('producto sin brand no coincide con ninguna campaña de marca', () => {
+    const productsSinMarca = [{ id: 'prd-999', categoryId: 'cat-001', brand: null, isActive: true }]
+    const cart = makeCart([{ productId: 'prd-999', quantity: 1, unitPrice: 10.00 }])
+    const camp = makeCampaign({ scope: 'brand', brands: ['Gloria'], discountPct: 10 })
+    const result = evaluateDiscounts(cart, productsSinMarca, [camp])
+    expect(result.totalCampaignSaving).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Aritmética HALF_UP
 // ═══════════════════════════════════════════════════════════════════════════════
 describe('aritmética HALF_UP — redondeo contable', () => {

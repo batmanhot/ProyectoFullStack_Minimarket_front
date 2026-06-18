@@ -44,7 +44,9 @@ api.interceptors.response.use(
   }
 )
 
-export const ok    = (data, total) => ({ data, meta: { total: total ?? (Array.isArray(data) ? data.length : 1) }, error: null })
-export const fail  = (msg)         => ({ data: null, meta: null, error: msg })
+export const ok    = (data, total) => ({ ok: true,  data, meta: { total: total ?? (Array.isArray(data) ? data.length : 1) }, error: null })
+export const fail  = (msg)         => ({ ok: false, data: null, meta: null, error: msg || 'Error desconocido' })
 export const gs    = ()            => useStore.getState()
-export const delay = (ms = 260)   => new Promise(r => setTimeout(r, ms))
+// En modo API no hay delay real — el tiempo lo gestiona la red.
+// Solo se activa en modo localStorage para simular latencia y dar feedback visual.
+export const delay = (ms = 260) => USE_API ? Promise.resolve() : new Promise(r => setTimeout(r, ms))
