@@ -11,6 +11,7 @@ export function VariantManager({ productId }) {
   const variants   = productVariants.filter(v => v.productId === productId)
   const blankForm  = () => ({ id: null, barcode: '', sku: '', stock: 0, stockMin: 2, priceSell: '', attrs: [{ key: 'Talla', value: '' }] })
   const [form, setForm]           = useState(null)
+  const [saving, setSaving]       = useState(false)
   const [lastFocusIdx, setLastFocusIdx] = useState(null)
   const valueInputsRef = useRef([])
 
@@ -26,7 +27,9 @@ export function VariantManager({ productId }) {
   const setAttr  = (idx, field, value) => setForm(f => { const attrs = [...f.attrs]; attrs[idx] = { ...attrs[idx], [field]: value }; return { ...f, attrs } })
 
   const handleSave = async () => {
+    if (saving) return
     if (!form.barcode.trim()) { toast.error('El código de barras es requerido'); return }
+    if (!form.id && (parseInt(form.stock) || 0) < 1) { toast.error('El stock inicial debe ser mayor a 0'); return }
     const incomplete = form.attrs.filter(a => a.key.trim() && !a.value.trim())
     if (incomplete.length > 0) {
       toast.error(`Completa el valor de: ${incomplete.map(a => a.key).join(', ')}`, { duration: 3500 })
@@ -36,17 +39,22 @@ export function VariantManager({ productId }) {
     }
     const attributes = Object.fromEntries(form.attrs.filter(a => a.key.trim() && a.value.trim()).map(a => [a.key.trim(), a.value.trim()]))
     const payload = { productId, barcode: form.barcode.trim(), sku: form.sku.trim(), stock: parseInt(form.stock)||0, stockMin: parseInt(form.stockMin)||2, priceSell: form.priceSell !== '' ? parseFloat(form.priceSell) : null, attributes }
-    if (USE_API) {
-      try {
+    setSaving(true)
+    try {
+      if (USE_API) {
         if (form.id) { const { data } = await api.put(`/products/${productId}/variants/${form.id}`, payload); updateVariant(form.id, data.data) }
         else         { const { data } = await api.post(`/products/${productId}/variants`, payload); addVariant(data.data) }
-      } catch (err) { toast.error(err.response?.data?.error || 'Error al guardar variante'); return }
-    } else {
-      if (form.id) updateVariant(form.id, payload)
-      else addVariant({ id: createSafeId(), ...payload, createdAt: new Date().toISOString() })
+      } else {
+        if (form.id) updateVariant(form.id, payload)
+        else addVariant({ id: createSafeId(), ...payload, createdAt: new Date().toISOString() })
+      }
+      toast.success(form.id ? 'Variante actualizada' : 'Variante agregada')
+      setForm(null)
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al guardar variante')
+    } finally {
+      setSaving(false)
     }
-    toast.success(form.id ? 'Variante actualizada' : 'Variante agregada')
-    setForm(null)
   }
 
   const inCls = 'w-full px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-400'
@@ -133,8 +141,8 @@ export function VariantManager({ productId }) {
             <div><label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block font-medium">Precio venta (S/)</label><input type="number" min="0" step="0.01" value={form.priceSell} onChange={e => setField('priceSell', e.target.value)} placeholder="Del producto padre" className={inCls}/></div>
           </div>
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={() => setForm(null)} className="flex-1 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-xs hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-            <button type="button" onClick={handleSave} className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700">{form.id ? 'Guardar cambios' : 'Agregar variante'}</button>
+            <button type="button" onClick={() => setForm(null)} disabled={saving} className="flex-1 py-2 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-xs hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50">Cancelar</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed">{saving ? 'Guardando…' : form.id ? 'Guardar cambios' : 'Agregar variante'}</button>
           </div>
         </div>
       )}

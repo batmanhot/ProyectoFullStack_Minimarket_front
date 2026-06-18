@@ -40,6 +40,7 @@ export function SerialesView({ products }) {
     setLoadingList(true)
     const r = await serialService.getByProduct(selectedProd.id)
     if (r.ok) setSeriales(r.data)
+    else toast.error(`Error al recargar seriales: ${r.error}`)
     setLoadingList(false)
   }
 
@@ -55,7 +56,7 @@ export function SerialesView({ products }) {
     setSavingBulk(false)
     if (r.error) { toast.error(r.error); return }
     toast.success(`${r.data.created} serial(es) registrado(s)`)
-    setBulkInput(''); setShowAddModal(false); await reloadSeriales()
+    setBulkInput(''); setShowAddModal(false); setFilterStatus('todos'); await reloadSeriales()
   }
 
   const handlePatchStatus = async (serial, newStatus) => {

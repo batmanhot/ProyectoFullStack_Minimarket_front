@@ -30,7 +30,7 @@ async function generateTicketPDF(element, { invoiceNumber, businessName }) {
 }
 
 // ─── HTML para impresión 80mm (térmico) ─────────────────────────────────────
-function buildTicketHTML(sale, businessConfig) {
+function buildTicketHTML(sale, businessConfig, storeProducts = []) {
   const isTicket      = sale.tipoComprobante === 'ticket'
   const isFactura     = sale.tipoComprobante === 'factura'
   const igvRate       = sale.igvRate || businessConfig?.igvRate || DEFAULT_IGV_RATE
@@ -265,13 +265,13 @@ export default function SaleTicket({ sale, onClose }) {
 
   // ── Imprimir ───────────────────────────────────────────────────────────────
   const handlePrint = useCallback(() => {
-    const html = buildTicketHTML(sale, businessConfig)
+    const html = buildTicketHTML(sale, businessConfig, storeProducts)
     const win  = window.open('', '_blank', 'width=380,height=700,left=100,top=50')
     if (!win) { alert('Activa las ventanas emergentes para imprimir'); return }
     win.document.write(html)
     win.document.close()
     setTimeout(() => { win.focus(); win.print() }, 400)
-  }, [sale, businessConfig])
+  }, [sale, businessConfig, storeProducts])
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (

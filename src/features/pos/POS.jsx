@@ -444,6 +444,11 @@ export default function POS({ onNavigate }) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="text-base font-semibold text-gray-900 leading-tight truncate">{item.productName}</p>
+                          {item.selectedSerial && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 border border-violet-200 rounded-full leading-none shrink-0">
+                              🔑 {item.selectedSerial}
+                            </span>
+                          )}
                           {hasConflict && (
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded-full leading-none shrink-0">
                               ⚠ Sin stock disponible

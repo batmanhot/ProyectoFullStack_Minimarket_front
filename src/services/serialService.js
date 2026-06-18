@@ -201,6 +201,8 @@ export const serialService = {
   },
 
   // ── Restaurar serial al cancelar una venta ────────────────────────────────
+  // El backend (PATCH /api/sales/:id/cancel → restoreStock) actualiza la BD.
+  // Aquí solo sincronizamos el store local para reflejar el cambio en UI.
   async markAvailable(productId, serialNumber) {
     await delay(50)
     const st = getStore()
@@ -210,15 +212,6 @@ export const serialService = {
         : s
     )
     st.setProductSerials?.(updated)
-    // Recalcular stock al restaurar
     recalcStock(productId)
-
-    if (USE_API) {
-      try {
-        await api.patch(`/products/serial/${encodeURIComponent(serialNumber)}/available`, { productId })
-      } catch (_) {
-        // Ignorar error de red en anulación — el store ya fue actualizado
-      }
-    }
   },
 }
