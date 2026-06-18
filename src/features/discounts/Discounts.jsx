@@ -53,13 +53,15 @@ export default function Discounts() {
     return list
   }, [discountCampaigns, filterType, filterStatus])
 
-  const handleToggle = (campaign) => {
-    updateDiscountCampaign(campaign.id, { isActive: !campaign.isActive })
+  const handleToggle = async (campaign) => {
+    const r = await discountCampaignService.toggle(campaign.id, !campaign.isActive)
+    if (!r.ok) { toast.error(r.error); return }
     toast.success(campaign.isActive ? 'Campaña desactivada' : 'Campaña activada')
   }
 
-  const handleDelete = (campaign) => {
-    deleteDiscountCampaign(campaign.id)
+  const handleDelete = async (campaign) => {
+    const r = await discountCampaignService.remove(campaign.id)
+    if (!r.ok) { toast.error(r.error); return }
     toast.success('Campaña eliminada')
     setDeleteTarget(null)
   }

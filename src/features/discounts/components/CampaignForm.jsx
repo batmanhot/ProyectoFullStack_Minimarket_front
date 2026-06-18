@@ -8,6 +8,7 @@
 
 import { useState, useMemo } from 'react'
 import { useStore }         from '../../../store/index'
+import { discountCampaignService } from '../../../services/index'
 import { formatCurrency }   from '../../../shared/utils/helpers'
 import {
   CAMPAIGN_TYPES, SCOPE_OPTIONS, DAYS_OF_WEEK,
@@ -20,6 +21,7 @@ const labelCls = 'block text-xs font-medium text-gray-600 dark:text-slate-300 mb
 export default function CampaignForm({ campaign, categories, products, onClose }) {
   const { addDiscountCampaign, updateDiscountCampaign } = useStore()
   const editing = !!campaign?.id
+  const [saving, setSaving] = useState(false)
 
   const [type,           setType]           = useState(campaign?.type           || 'campaign')
   const [name,           setName]           = useState(campaign?.name           || '')
@@ -55,7 +57,8 @@ export default function CampaignForm({ campaign, categories, products, onClose }
     return list.includes(b) ? list.filter((x) => x !== b).join(', ') : [...list, b].join(', ')
   })
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return
     if (!name.trim()) { toast.error('Ingresa un nombre para la campaña'); return }
     if (!dateFrom)    { toast.error('Selecciona la fecha de inicio'); return }
     if (!dateTo)      { toast.error('Selecciona la fecha de término'); return }
@@ -80,7 +83,6 @@ export default function CampaignForm({ campaign, categories, products, onClose }
     }
 
     const data = {
-      id:          campaign?.id || crypto.randomUUID(),
       type, name: name.trim(), icon, description: description.trim(), isActive,
       dateFrom, dateTo,
       daysOfWeek:    daysOfWeek.length > 0 ? daysOfWeek : [],
@@ -92,16 +94,26 @@ export default function CampaignForm({ campaign, categories, products, onClose }
       minAmount:     type === 'volume'    ? parseFloat(minAmount)   : 0,
       buyQty:        type === 'promotion' ? parseInt(buyQty)        : 0,
       payQty:        type === 'promotion' ? parseInt(payQty)        : 0,
-      maxPerPurchase: type === 'promotion' ? parseInt(maxPerPurchase) || 0 : 0,
+      maxPerPurchase:type === 'promotion' ? parseInt(maxPerPurchase) || 0 : 0,
       minQty:        type === 'line'      ? parseInt(minQty)        : 0,
       discountOnNth: type === 'line'      ? parseInt(discountOnNth) : 0,
-      createdAt:     campaign?.createdAt  || new Date().toISOString(),
-      updatedAt:     new Date().toISOString(),
     }
 
-    if (editing) { updateDiscountCampaign(campaign.id, data); toast.success('Campaña actualizada') }
-    else         { addDiscountCampaign(data);                 toast.success('Campaña creada') }
-    onClose()
+    setSaving(true)
+    try {
+      if (editing) {
+        const r = await discountCampaignService.update(campaign.id, data)
+        if (!r.ok) { toast.error(r.error); return }
+        toast.success('Campaña actualizada')
+      } else {
+        const r = await discountCampaignService.create(data)
+        if (!r.ok) { toast.error(r.error); return }
+        toast.success('Campaña creada')
+      }
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── Selector de categorías (reutilizado en varios tipos) ──────────────────
@@ -539,13 +551,13 @@ export default function CampaignForm({ campaign, categories, products, onClose }
 
       {/* Acciones */}
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onClose}
-          className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700">
+        <button type="button" onClick={onClose} disabled={saving}
+          className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50">
           Cancelar
         </button>
-        <button type="button" onClick={handleSave}
-          className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
-          {editing ? 'Guardar cambios' : 'Crear campaña'}
+        <button type="button" onClick={handleSave} disabled={saving}
+          className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed">
+          {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear campaña'}
         </button>
       </div>
     </div>

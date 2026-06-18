@@ -27,9 +27,23 @@ export const purchaseService = {
     if (USE_API) {
       if (navigator.onLine) {
         try {
-          await api.post('/purchases', payload)
+          // Enviar solo los campos que el backend espera, con tipos numéricos explícitos.
+          // priceBuy/quantity pueden llegar como strings desde Prisma (tipo Decimal en JSON).
+          const apiPayload = {
+            supplierId:   payload.supplierId   || undefined,
+            supplierName: payload.supplierName || '',
+            notes:        payload.notes        || '',
+            items:        payload.items.map(i => ({
+              productId:   i.productId,
+              quantity:    Number(i.quantity),
+              priceBuy:    Number(i.priceBuy),
+              ...(i.batchNumber && { batchNumber: i.batchNumber }),
+              ...(i.expiryDate  && { expiryDate:  i.expiryDate  }),
+            })),
+          }
+          await api.post('/purchases', apiPayload)
         } catch (err) {
-          return fail(err.response?.data?.message || err.message || 'Error al registrar la compra')
+          return fail(err.message || 'Error al registrar la compra')
         }
       } else {
         useStore.getState().enqueueOfflineOp({ type: 'purchase.create', endpoint: '/purchases', method: 'POST', payload })

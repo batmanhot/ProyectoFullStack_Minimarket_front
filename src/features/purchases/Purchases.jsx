@@ -116,6 +116,7 @@ function NewPurchaseForm({ onClose }) {
   const [notes, setNotes] = useState('')
   const [invoiceRef, setInvoiceRef] = useState('')
   const [showReplenishment, setShowReplenishment] = useState(false)
+  const [saving, setSaving] = useState(false)
   const dq = useDebounce(search, 150)
 
   // Método de valorización configurado (PEPS por defecto)
@@ -186,23 +187,29 @@ function NewPurchaseForm({ onClose }) {
   }
 
   const handleConfirm = async () => {
+    if (saving) return
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
-    if (items.some(i => i.quantity <= 0 || i.priceBuy <= 0)) { toast.error('Verifica cantidades y precios'); return }
+    if (items.some(i => Number(i.quantity) <= 0 || Number(i.priceBuy) <= 0)) { toast.error('Verifica cantidades y precios'); return }
     const supplier = suppliers.find(s => s.id === supplierId)
-    const result = await purchaseService.create({
-      supplierId,
-      supplierName:  supplier?.name || '',
-      invoiceRef:    invoiceRef.trim() || null,
-      items:         items.map(i => ({ ...i, costMethod })), // incluir método en cada ítem
-      notes,
-      costMethod,
-      userId:        currentUser?.id,
-      userName:      currentUser?.fullName,
-    })
-    if (result.error) { toast.error(result.error); return }
-    toast.success(`Compra registrada · ${items.length} producto(s) actualizados`)
-    onClose()
+    setSaving(true)
+    try {
+      const result = await purchaseService.create({
+        supplierId,
+        supplierName: supplier?.name || '',
+        invoiceRef:   invoiceRef.trim() || null,
+        items,
+        notes,
+        costMethod,
+        userId:   currentUser?.id,
+        userName: currentUser?.fullName,
+      })
+      if (result.error) { toast.error(result.error); return }
+      toast.success(`Compra registrada · ${items.length} producto(s) actualizados`)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -334,9 +341,9 @@ function NewPurchaseForm({ onClose }) {
       </div>
       <div className="flex gap-3 pt-2">
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-        <button onClick={handleConfirm} disabled={items.length === 0 || !supplierId}
+        <button onClick={handleConfirm} disabled={items.length === 0 || !supplierId || saving}
           className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40">
-          Confirmar entrada ({items.length} producto{items.length !== 1 ? 's' : ''})
+          {saving ? 'Registrando...' : `Confirmar entrada (${items.length} producto${items.length !== 1 ? 's' : ''})`}
         </button>
       </div>
     </div>

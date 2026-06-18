@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../../store/index'
 import { discountTicketService } from '../../services/index'
 import { USE_API } from '../../services/_base'
@@ -96,9 +96,10 @@ function printTicket(ticket, businessConfig) {
 }
 
 // ─── Formulario de creación de ticket ────────────────────────────────────────
-function TicketForm({ ticket, onClose }) {
+function TicketForm({ ticket, onClose, onSaved }) {
   const { addDiscountTicket, updateDiscountTicket, businessConfig } = useStore()
   const editing = !!ticket?.id
+  const [saving, setSaving] = useState(false)
 
   const [holderType,    setHolderType]    = useState(ticket?.holderType    || 'persona')
   const [holderName,    setHolderName]    = useState(ticket?.holderName    || '')
@@ -120,7 +121,8 @@ function TicketForm({ ticket, onClose }) {
 
   const previewCode = autoCode ? generateCode(prefix) : customCode
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return
     if (!holderName.trim())   { toast.error('Ingresa el nombre del titular'); return }
     if (!discountValue)        { toast.error('Ingresa el valor del descuento'); return }
     if (parseFloat(discountValue) <= 0) { toast.error('El descuento debe ser mayor a 0'); return }
@@ -135,29 +137,41 @@ function TicketForm({ ticket, onClose }) {
       holderPhone: holderPhone.trim(), holderEmail: holderEmail.trim(),
       discountType, discountValue: parseFloat(discountValue),
       maxAmount: maxAmount ? parseFloat(maxAmount) : null,
+      minAmount: 0,
       validFrom, validTo, campaignName: campaignName.trim(), notes: notes.trim(),
-      isActive: true, used: false, usedAt: null, usedInSale: null,
-      usedByUserId: null, discountApplied: null,
-      createdAt: new Date().toISOString(),
+      isActive: true,
     }
 
-    if (editing) {
-      updateDiscountTicket(ticket.id, { ...base, code: customCode })
-      toast.success('Ticket actualizado')
-      onClose()
-      return
-    }
+    setSaving(true)
+    try {
+      if (editing) {
+        const r = await discountTicketService.update(ticket.id, { ...base, code: customCode })
+        if (!r.ok) { toast.error(r.error); return }
+        toast.success('Ticket actualizado')
+        onClose()
+        onSaved?.()
+        return
+      }
 
-    // Generar 1 o más tickets en batch
-    const count = Math.max(1, Math.min(parseInt(quantity) || 1, 50))
-    const generated = []
-    for (let i = 0; i < count; i++) {
-      const t = { ...base, id: crypto.randomUUID(), code: count === 1 && !autoCode ? customCode : generateCode(prefix) }
-      generated.push(t)
+      // Generar 1 o más tickets en batch
+      const count = Math.max(1, Math.min(parseInt(quantity) || 1, 50))
+      let created = 0
+      let lastError = null
+      for (let i = 0; i < count; i++) {
+        const code = count === 1 && !autoCode ? customCode : generateCode(prefix)
+        const r = await discountTicketService.create({ ...base, code })
+        if (r.ok) created++
+        else lastError = r.error
+      }
+      if (created > 0) {
+        toast.success(USE_API ? `${created} ticket(s) guardado(s) en BD` : `${created} ticket(s) creado(s) – modo LOCAL (sin BD)`)
+        onClose()
+        onSaved?.()
+      }
+      if (lastError) toast.error(`Error al crear ticket: ${lastError}`)
+    } finally {
+      setSaving(false)
     }
-    generated.forEach(t => addDiscountTicket(t))
-    toast.success(`${count} ticket(s) generado(s)`)
-    onClose()
   }
 
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -307,9 +321,9 @@ function TicketForm({ ticket, onClose }) {
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">Cancelar</button>
-        <button onClick={handleSave} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
-          {editing ? 'Guardar cambios' : `Generar ${parseInt(quantity)>1?quantity+' tickets':'ticket'}`}
+        <button onClick={onClose} disabled={saving} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+        <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed">
+          {saving ? 'Guardando…' : editing ? 'Guardar cambios' : `Generar ${parseInt(quantity)>1?quantity+' tickets':'ticket'}`}
         </button>
       </div>
     </div>
@@ -318,10 +332,16 @@ function TicketForm({ ticket, onClose }) {
 
 // ─── Panel de gestión de tickets ─────────────────────────────────────────────
 export default function DiscountTickets() {
-  const { discountTickets = [], updateDiscountTicket, businessConfig, addAuditLog } = useStore()
+  const { discountTickets = [], updateDiscountTicket, deleteDiscountTicket, businessConfig, addAuditLog } = useStore()
   const [modal, setModal]           = useState(null)
 
-  useEffect(() => { if (USE_API) discountTicketService.getAll() }, [])
+  const reloadFromApi = useCallback(async () => {
+    if (!USE_API) return
+    const r = await discountTicketService.getAll()
+    if (!r.ok) toast.error('Error de sincronización con el servidor: ' + r.error, { id: 'tickets-sync', duration: 5000 })
+  }, [])
+
+  useEffect(() => { reloadFromApi() }, [reloadFromApi])
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [search, setSearch]         = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -485,12 +505,24 @@ export default function DiscountTickets() {
                       )}
                       {/* Activar / Desactivar */}
                       {!t.used && (
-                        <button onClick={() => { updateDiscountTicket(t.id, { isActive: !t.isActive }); toast.success(t.isActive?'Ticket desactivado':'Ticket activado') }}
+                        <button onClick={async () => {
+                          const r = await discountTicketService.update(t.id, { isActive: !t.isActive })
+                          if (!r.ok) { toast.error(r.error); return }
+                          toast.success(t.isActive ? 'Ticket desactivado' : 'Ticket activado')
+                        }}
                           className={`p-1.5 rounded-lg ${t.isActive?'text-gray-400 hover:text-red-500 hover:bg-red-50':'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
                           title={t.isActive?'Desactivar':'Activar'}>
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.isActive?'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636':'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'}/>
                           </svg>
+                        </button>
+                      )}
+                      {/* Eliminar — solo si no está canjeado */}
+                      {!t.used && (
+                        <button onClick={() => setDeleteTarget(t)}
+                          className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                          title="Eliminar ticket">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                       )}
                     </div>
@@ -505,8 +537,25 @@ export default function DiscountTickets() {
       {/* Modal form */}
       {modal?.type === 'form' && (
         <Modal title={modal.data?.id ? 'Editar ticket' : 'Nuevo ticket de descuento'} size="lg" onClose={() => setModal(null)}>
-          <TicketForm ticket={modal.data?.id ? modal.data : null} onClose={() => setModal(null)}/>
+          <TicketForm ticket={modal.data?.id ? modal.data : null} onClose={() => setModal(null)} onSaved={reloadFromApi}/>
         </Modal>
+      )}
+
+      {/* Confirmar eliminar */}
+      {deleteTarget && (
+        <ConfirmModal
+          title="¿Eliminar ticket?"
+          message={`Se eliminará el ticket ${deleteTarget.code} de ${deleteTarget.holderName}. Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          variant="danger"
+          onConfirm={async () => {
+            const r = await discountTicketService.remove(deleteTarget.id)
+            if (!r.ok) { toast.error(r.error); return }
+            toast.success('Ticket eliminado')
+            setDeleteTarget(null)
+          }}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

@@ -34,6 +34,14 @@ export const createAuditSlice = (set, get) => ({
     set((s) => ({
       auditLog: [entry, ...s.auditLog].slice(0, 2000),
     }))
+
+    // Fire-and-forget hacia la BD. Dynamic import evita la dependencia circular
+    // auditSlice → _base.js → store/index.js → auditSlice
+    if (import.meta.env.VITE_USE_API === 'true') {
+      import('../../services/auditService')
+        .then(({ auditService }) => auditService.log(action, module, String(entityId ?? ''), detail))
+        .catch(() => {})
+    }
   },
 
   /** Elimina todos los registros de auditoría (acción de admin, requiere confirmación en UI) */

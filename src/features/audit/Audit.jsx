@@ -360,7 +360,7 @@ export default function Audit() {
                   >
                     {/* Fecha */}
                     <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap align-top">
-                      {formatDateTime(entry.timestamp)}
+                      {formatDateTime(entry.timestamp || entry.createdAt)}
                     </td>
 
                     {/* Usuario + Rol */}
@@ -369,7 +369,7 @@ export default function Audit() {
                         {entry.userName || 'Sistema'}
                       </div>
                       <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
-                        {entry.userRole}
+                        {entry.userRole || '—'}
                       </span>
                     </td>
 
@@ -381,7 +381,7 @@ export default function Audit() {
                     {/* Módulo */}
                     <td className="px-4 py-3 align-top">
                       <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-medium">
-                        {entry.module}
+                        {entry.module || entry.entity || '—'}
                       </span>
                     </td>
 

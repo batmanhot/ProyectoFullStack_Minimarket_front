@@ -1,6 +1,6 @@
 // Service Worker para POS Minimarket PWA
-const CACHE_NAME = 'pos-minimarket-v1.0.0'
-const RUNTIME_CACHE = 'pos-runtime-v1'
+const CACHE_NAME = 'pos-minimarket-v1.1.0'
+const RUNTIME_CACHE = 'pos-runtime-v2'
 
 // Archivos esenciales para cachear (App Shell)
 const PRECACHE_URLS = [
@@ -88,13 +88,13 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Estrategia: Cache First para assets estáticos (JS, CSS, imágenes)
-  if (
-    request.destination === 'script' ||
-    request.destination === 'style' ||
-    request.destination === 'image' ||
-    request.destination === 'font'
-  ) {
+  // Estrategia: Network First para JS/CSS (recibe actualizaciones del código inmediato)
+  // Cache First solo para imágenes y fuentes (no cambian con el código)
+  if (request.destination === 'script' || request.destination === 'style') {
+    event.respondWith(networkFirst(request))
+    return
+  }
+  if (request.destination === 'image' || request.destination === 'font') {
     event.respondWith(cacheFirst(request))
     return
   }

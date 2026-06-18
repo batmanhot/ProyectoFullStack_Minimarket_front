@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStore } from '../../store/index'
-import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
+import { discountTicketService } from '../../services/index'
+import { USE_API } from '../../services/_base'
+import { formatDate } from '../../shared/utils/helpers'
 import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import { EmptyState } from '../../shared/components/ui/Skeleton'
@@ -33,9 +35,9 @@ function genCode(prefix = 'DSC') {
 // ══════════════════════════════════════════════════════════════════════════════
 // FORMULARIO DE TICKET
 // ══════════════════════════════════════════════════════════════════════════════
-function TicketForm({ ticket, onClose }) {
-  const { addDiscountTicket, updateDiscountTicket } = useStore()
+function TicketForm({ ticket, onClose, onSaved }) {
   const editing = !!ticket
+  const [saving, setSaving] = useState(false)
 
   const [code,          setCode]         = useState(ticket?.code         || genCode())
   const [holderName,    setHolderName]   = useState(ticket?.holderName   || '')
@@ -66,10 +68,9 @@ function TicketForm({ ticket, onClose }) {
     return Object.keys(e).length === 0
   }
 
-  const handleSave = () => {
-    if (!validate()) return
-    const data = {
-      id:            ticket?.id || crypto.randomUUID(),
+  const handleSave = async () => {
+    if (saving || !validate()) return
+    const base = {
       code:          code.trim().toUpperCase(),
       holderName:    holderName.trim(),
       holderDoc:     holderDoc.trim(),
@@ -77,26 +78,29 @@ function TicketForm({ ticket, onClose }) {
       discountType,
       discountValue: parseFloat(discountValue),
       maxAmount:     maxAmount ? parseFloat(maxAmount) : null,
+      minAmount:     0,
       validFrom,
       validTo,
       notes:         notes.trim(),
       isActive,
-      used:          ticket?.used || false,
-      usedAt:        ticket?.usedAt || null,
-      usedInSale:    ticket?.usedInSale || null,
-      usedByUser:    ticket?.usedByUser || null,
-      createdAt:     ticket?.createdAt || new Date().toISOString(),
-      updatedAt:     new Date().toISOString(),
     }
 
-    if (editing) {
-      updateDiscountTicket(ticket.id, data)
-      toast.success('Ticket actualizado')
-    } else {
-      addDiscountTicket(data)
-      toast.success(`Ticket ${data.code} creado`)
+    setSaving(true)
+    try {
+      if (editing) {
+        const r = await discountTicketService.update(ticket.id, base)
+        if (!r.ok) { toast.error(r.error); return }
+        toast.success('Ticket actualizado')
+      } else {
+        const r = await discountTicketService.create(base)
+        if (!r.ok) { toast.error(r.error); return }
+        toast.success(`Ticket ${base.code} creado`)
+      }
+      onSaved?.()
+      onClose()
+    } finally {
+      setSaving(false)
     }
-    onClose()
   }
 
   const pctVal   = discountType === 'pct'   ? parseFloat(discountValue) || 0 : 0
@@ -167,7 +171,6 @@ function TicketForm({ ticket, onClose }) {
       <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
         <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Configuración del descuento</p>
 
-        {/* Selector tipo */}
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(TYPE_CFG).map(([val, cfg]) => (
             <button key={val} type="button" onClick={() => setDiscountType(val)}
@@ -189,7 +192,6 @@ function TicketForm({ ticket, onClose }) {
           ))}
         </div>
 
-        {/* Valor del descuento */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>
@@ -227,10 +229,9 @@ function TicketForm({ ticket, onClose }) {
           )}
         </div>
 
-        {/* Preview */}
         {parseFloat(discountValue) > 0 && (
           <div className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-blue-200 rounded-xl p-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 ${TYPE_CFG[discountType].color}`}>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 ${TYPE_CFG[discountType]?.color || 'bg-blue-600'}`}>
               {discountType === 'pct' ? `${discountValue}%` : `S/${discountValue}`}
             </div>
             <div className="text-xs text-gray-600 dark:text-slate-300 space-y-0.5">
@@ -282,15 +283,14 @@ function TicketForm({ ticket, onClose }) {
           placeholder="Observaciones para uso interno del equipo..."/>
       </div>
 
-      {/* Botones */}
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onClose}
-          className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700">
+        <button type="button" onClick={onClose} disabled={saving}
+          className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50">
           Cancelar
         </button>
-        <button type="button" onClick={handleSave}
-          className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
-          {editing ? 'Guardar cambios' : 'Crear ticket'}
+        <button type="button" onClick={handleSave} disabled={saving}
+          className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed">
+          {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear ticket'}
         </button>
       </div>
     </div>
@@ -305,12 +305,8 @@ function TicketCard({ ticket, onEdit, onToggle, onDelete }) {
 
   return (
     <div className={`bg-white dark:bg-slate-800 rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition-shadow ${ticket.used ? 'border-gray-200 opacity-75' : ticket.isActive ? 'border-green-200' : 'border-gray-200'}`}>
-
-      {/* Franja superior de color */}
       <div className={`h-1.5 ${ticket.used ? 'bg-red-400' : ticket.isActive ? 'bg-green-400' : 'bg-gray-300'}`}/>
-
       <div className="p-4 space-y-3">
-        {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0 ${cfg.color}`}>
@@ -326,7 +322,6 @@ function TicketCard({ ticket, onEdit, onToggle, onDelete }) {
           <TicketStatusBadge ticket={ticket}/>
         </div>
 
-        {/* Descuento destacado */}
         <div className={`rounded-xl px-3 py-2 border text-center ${cfg.light}`}>
           <p className="text-lg font-black">
             {ticket.discountType === 'pct'
@@ -338,7 +333,6 @@ function TicketCard({ ticket, onEdit, onToggle, onDelete }) {
           )}
         </div>
 
-        {/* Detalles */}
         <div className="space-y-1 text-xs text-gray-500 dark:text-slate-400">
           {ticket.holderDoc && (
             <div className="flex justify-between">
@@ -367,7 +361,6 @@ function TicketCard({ ticket, onEdit, onToggle, onDelete }) {
           )}
         </div>
 
-        {/* Acciones */}
         <div className="flex gap-2 pt-1 border-t border-gray-100 dark:border-slate-700">
           {!ticket.used && (
             <button onClick={() => onToggle(ticket)}
@@ -399,37 +392,36 @@ function TicketCard({ ticket, onEdit, onToggle, onDelete }) {
 // PÁGINA PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Tickets() {
-  const { discountTickets = [], deleteDiscountTicket, updateDiscountTicket, addAuditLog } = useStore()
+  const { discountTickets = [], addAuditLog } = useStore()
   const [modal, setModal]               = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [search, setSearch]             = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')   // all | active | used | expired
-  const [filterType, setFilterType]     = useState('all')   // all | pct | fixed
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterType, setFilterType]     = useState('all')
 
-  // ── KPIs ──
+  const reloadFromApi = useCallback(async () => {
+    if (!USE_API) return
+    const r = await discountTicketService.getAll()
+    if (!r.ok) toast.error('Error al sincronizar tickets: ' + r.error, { id: 'tickets-sync', duration: 5000 })
+  }, [])
+
+  useEffect(() => { reloadFromApi() }, [reloadFromApi])
+
   const now = new Date()
   const kpis = useMemo(() => {
     const vigentes  = discountTickets.filter(t => t.isActive && !t.used && (!t.validTo || now <= new Date(t.validTo + 'T23:59:59')))
     const canjeados = discountTickets.filter(t => t.used)
     const vencidos  = discountTickets.filter(t => !t.used && t.validTo && now > new Date(t.validTo + 'T23:59:59'))
-    const totalSaved = canjeados.reduce((a, t) => {
-      // Estimamos ahorro promedio sobre S/ 200 base para pct, o el valor fijo
-      return a + (t.discountType === 'fixed' ? t.discountValue : 0)
-    }, 0)
-    return { total: discountTickets.length, vigentes: vigentes.length, canjeados: canjeados.length, vencidos: vencidos.length, totalSaved }
+    return { total: discountTickets.length, vigentes: vigentes.length, canjeados: canjeados.length, vencidos: vencidos.length }
   }, [discountTickets])
 
-  // ── Filtrado ──
   const filtered = useMemo(() => {
     let list = [...discountTickets].sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
-
     if (filterType !== 'all') list = list.filter(t => t.discountType === filterType)
-
     if (filterStatus === 'active')  list = list.filter(t => t.isActive && !t.used && (!t.validTo || now <= new Date(t.validTo+'T23:59:59')))
     if (filterStatus === 'used')    list = list.filter(t => t.used)
     if (filterStatus === 'expired') list = list.filter(t => !t.used && t.validTo && now > new Date(t.validTo+'T23:59:59'))
     if (filterStatus === 'inactive')list = list.filter(t => !t.isActive && !t.used)
-
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(t =>
@@ -442,12 +434,15 @@ export default function Tickets() {
     return list
   }, [discountTickets, filterStatus, filterType, search])
 
-  const handleToggle = (t) => {
-    updateDiscountTicket(t.id, { isActive: !t.isActive })
+  const handleToggle = async (t) => {
+    const r = await discountTicketService.update(t.id, { isActive: !t.isActive })
+    if (!r.ok) { toast.error(r.error); return }
     toast.success(t.isActive ? 'Ticket desactivado' : 'Ticket activado')
   }
-  const handleDelete = (t) => {
-    deleteDiscountTicket(t.id)
+
+  const handleDelete = async (t) => {
+    const r = await discountTicketService.remove(t.id)
+    if (!r.ok) { toast.error(r.error); return }
     addAuditLog({ action:'DELETE', module:'Tickets', detail:`Ticket eliminado: ${t.code}`, entityId:t.id })
     toast.success('Ticket eliminado')
     setDeleteTarget(null)
@@ -456,7 +451,6 @@ export default function Tickets() {
   return (
     <div className="p-6 space-y-5">
 
-      {/* Encabezado */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-medium text-gray-800 dark:text-slate-100">Tickets de Descuento</h1>
@@ -469,7 +463,6 @@ export default function Tickets() {
         </button>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 sm:p-4 overflow-hidden min-w-0">
           <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Total tickets</p>
@@ -489,7 +482,6 @@ export default function Tickets() {
         </div>
       </div>
 
-      {/* Banner informativo */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-start gap-3">
         <span className="text-xl flex-shrink-0">🎟️</span>
         <div>
@@ -501,20 +493,13 @@ export default function Tickets() {
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="flex gap-3 flex-wrap items-center">
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por código, nombre, DNI o campaña..."
           className="flex-1 min-w-52 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
 
         <div className="flex gap-1 bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
-          {[
-            {k:'all',     l:'Todos'},
-            {k:'active',  l:'Vigentes'},
-            {k:'used',    l:'Canjeados'},
-            {k:'expired', l:'Vencidos'},
-            {k:'inactive',l:'Inactivos'},
-          ].map(f => (
+          {[{k:'all',l:'Todos'},{k:'active',l:'Vigentes'},{k:'used',l:'Canjeados'},{k:'expired',l:'Vencidos'},{k:'inactive',l:'Inactivos'}].map(f => (
             <button key={f.k} onClick={() => setFilterStatus(f.k)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterStatus===f.k ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-gray-500 dark:text-slate-400'}`}>
               {f.l}
@@ -532,7 +517,6 @@ export default function Tickets() {
         </div>
       </div>
 
-      {/* Grid de tickets */}
       {filtered.length === 0 ? (
         discountTickets.length === 0
           ? <EmptyState icon="🎟️" title="Sin tickets de descuento"
@@ -550,17 +534,15 @@ export default function Tickets() {
         </div>
       )}
 
-      {/* Modal formulario */}
       {modal !== null && (
         <Modal
           title={modal.data ? 'Editar ticket' : 'Nuevo ticket de descuento'}
           size="md"
           onClose={() => setModal(null)}>
-          <TicketForm ticket={modal.data} onClose={() => setModal(null)}/>
+          <TicketForm ticket={modal.data} onClose={() => setModal(null)} onSaved={reloadFromApi}/>
         </Modal>
       )}
 
-      {/* Confirm eliminar */}
       {deleteTarget && (
         <ConfirmModal
           title="¿Eliminar ticket?"

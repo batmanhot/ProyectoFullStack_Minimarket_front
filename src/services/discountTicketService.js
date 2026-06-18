@@ -1,15 +1,28 @@
 import { api, USE_API, ok, fail, gs, delay } from './_base'
 
+// La BD devuelve validFrom/validTo como ISO DateTime; el componente espera "YYYY-MM-DD"
+function normalizeTicket(t) {
+  if (!t) return t
+  return {
+    ...t,
+    validFrom: t.validFrom ? String(t.validFrom).slice(0, 10) : '',
+    validTo:   t.validTo   ? String(t.validTo).slice(0, 10)   : '',
+  }
+}
+
 export const discountTicketService = {
   async getAll(filters = {}) {
     await delay(150)
     if (USE_API) {
+      const noFilter = filters.used === undefined && filters.isActive === undefined
       try {
         const { data } = await api.get('/tickets', { params: filters })
-        const noFilter = filters.used === undefined && filters.isActive === undefined
-        if (noFilter) gs().setDiscountTickets(data.data)
-        return ok(data.data, data.meta?.total)
+        const tickets = (data.data || []).map(normalizeTicket)
+        if (noFilter) gs().setDiscountTickets(tickets)
+        return ok(tickets, data.meta?.total)
       } catch (err) {
+        // En modo API, limpiar datos obsoletos del localStorage aunque falle la petición
+        if (noFilter) gs().setDiscountTickets([])
         return fail(err.response?.data?.error || err.message || 'Error al obtener tickets')
       }
     }
@@ -24,7 +37,7 @@ export const discountTicketService = {
     if (USE_API) {
       try {
         const { data } = await api.post('/tickets', payload)
-        const ticket = data.data
+        const ticket = normalizeTicket(data.data)
         gs().addDiscountTicket(ticket)
         return ok(ticket)
       } catch (err) {
@@ -41,7 +54,7 @@ export const discountTicketService = {
     if (USE_API) {
       try {
         const { data } = await api.put(`/tickets/${id}`, updates)
-        const ticket = data.data
+        const ticket = normalizeTicket(data.data)
         gs().updateDiscountTicket(id, ticket)
         return ok(ticket)
       } catch (err) {
