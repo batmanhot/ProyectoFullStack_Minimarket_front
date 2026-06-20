@@ -14,7 +14,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStore } from '../../store/index'
-import { returnService, clientService, productService } from '../../services/index'
+import { returnService, clientService, productService, serialService } from '../../services/index'
 import { api, USE_API } from '../../services/_base'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { calcStockDisponible } from '../../shared/utils/inventoryEngine'
@@ -98,8 +98,8 @@ function _restoreProductStock(product, qty, batchId, batchNum, updateProduct) {
     updateProduct(product.id, { batches: updatedBatches, stock: newStock })
 
   } else if (ctrl === 'serie' && batchNum) {
-    // Restaurar el número de serie al producto
-    updateProduct(product.id, { stock: product.stock + qty, serialNumber: batchNum })
+    // Restaurar el serial en la tabla de seriales (lo marca como disponible y recalcula stock)
+    await serialService.markAvailable(product.id, batchNum)
 
   } else {
     // Simple (o lote sin batchId conocido): incrementar stock directo

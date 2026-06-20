@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { tenantService } from '../services/tenantService'
 import { isPlanActive, trialDaysLeft, getAccessStatus } from '../config/plans'
+import { useStore } from '../store/index'
 
 const TenantContext = createContext(null)
 
@@ -24,6 +25,7 @@ export function TenantProvider({ children }) {
   const [tenant, setTenant]   = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
+  const updateBusinessConfig  = useStore(s => s.updateBusinessConfig)
 
   useEffect(() => {
     if (!tenantSlug) { setLoading(false); return }
@@ -34,14 +36,26 @@ export function TenantProvider({ children }) {
 
     tenantService.getBySlug(tenantSlug).then((result) => {
       if (cancelled) return
-      if (result.data) setTenant(result.data)
-      else setError(result.error ?? 'Negocio no encontrado')
+      if (result.data) {
+        setTenant(result.data)
+        // Propagar nombre real del negocio a todo el store (Sidebar, tickets, etiquetas, recibos)
+        const t = result.data
+        updateBusinessConfig({
+          name:    t.businessName ?? '',
+          ruc:     t.ruc         ?? '',
+          phone:   t.phone       ?? '',
+          email:   t.ownerEmail  ?? '',
+          sector:  t.sector      ?? 'bodega',
+        })
+      } else {
+        setError(result.error ?? 'Negocio no encontrado')
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
 
     return () => { cancelled = true }
-  }, [tenantSlug])
+  }, [tenantSlug, updateBusinessConfig])
 
   const plan         = tenant?.plan ?? 'trial'
   const planActive   = isPlanActive(plan, tenant?.accessExpiresAt)

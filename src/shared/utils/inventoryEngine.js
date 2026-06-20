@@ -150,7 +150,7 @@ export function allocateStock({ product, quantity, invoiceNumber, userId, select
     return {
       error: null,
       batchAllocations: [{ batchNumber: serialNumber, quantity: 1 }],
-      stockUpdate: { stock: newStock },
+      stockUpdate: { stock: newStock, serialNumber: '' },
       movement: {
         type:          'salida',
         quantity:      1,

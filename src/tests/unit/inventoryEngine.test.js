@@ -199,13 +199,13 @@ describe('allocateStock — SIMPLE', () => {
 // allocateStock — estrategia SERIE
 // ═══════════════════════════════════════════════════════════════════════════════
 describe('allocateStock — SERIE', () => {
+  // El POS siempre pasa selectedSerial al vender un producto de tipo SERIE.
+  // El serial viene de la tabla de seriales (SerialesView), no del campo product.serialNumber.
   it('libera el serial y descuenta stock', () => {
-    const product = makeProduct({
-      stock: 1,
-      stockControl: STOCK_CONTROL.SERIE,
-      serialNumber: 'SN-ABC-123',
+    const product = makeProduct({ stock: 1, stockControl: STOCK_CONTROL.SERIE })
+    const result = allocateStock({
+      product, quantity: 1, invoiceNumber: 'B001-000001', selectedSerial: 'SN-ABC-123',
     })
-    const result = allocateStock({ product, quantity: 1, invoiceNumber: 'B001-000001' })
 
     expect(result.error).toBeNull()
     expect(result.stockUpdate.stock).toBe(0)
@@ -214,12 +214,20 @@ describe('allocateStock — SERIE', () => {
   })
 
   it('movement incluye el número de serie en el reason', () => {
-    const product = makeProduct({
-      stock: 1, stockControl: STOCK_CONTROL.SERIE, serialNumber: 'SN-XYZ',
+    const product = makeProduct({ stock: 1, stockControl: STOCK_CONTROL.SERIE })
+    const result = allocateStock({
+      product, quantity: 1, invoiceNumber: 'B001-000001', selectedSerial: 'SN-XYZ',
     })
-    const result = allocateStock({ product, quantity: 1, invoiceNumber: 'B001-000001' })
     expect(result.movement.reason).toContain('SN-XYZ')
     expect(result.movement.serialNumber).toBe('SN-XYZ')
+  })
+
+  it('sin selectedSerial → serial vacío (no usa product.serialNumber)', () => {
+    const product = makeProduct({ stock: 1, stockControl: STOCK_CONTROL.SERIE })
+    const result = allocateStock({ product, quantity: 1, invoiceNumber: 'B001-000001' })
+    expect(result.error).toBeNull()
+    expect(result.batchAllocations[0].batchNumber).toBe('')
+    expect(result.movement.serialNumber).toBe('')
   })
 })
 

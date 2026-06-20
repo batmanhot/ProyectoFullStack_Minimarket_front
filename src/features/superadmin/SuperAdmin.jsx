@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import {
   tenantService, DEFAULT_PLAN_LIMITS, DEFAULT_ALERT_THRESHOLDS,
 } from '../../services/tenantService'
+import { api } from '../../services/_base'
+import { STORAGE_KEYS } from '../../config/storageKeys'
 import {
   PLANS, PLAN_ORDER, BILLING_CYCLES, CYCLE_ORDER,
   getAccessExpiry, daysUntilExpiry, getAccessStatus, ACCESS_STATUS_CONFIG,
@@ -243,19 +245,34 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 function LoginFormV2({ onLogin }) {
   const D = useD()
   const inp = makeInp(D)
-  const [email, setEmail]   = useState(SA_EMAIL)
+  const [email, setEmail]   = useState('')
   const [pass, setPass]     = useState('')
   const [showPass, setShow] = useState(false)
   const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
-    setTimeout(() => {
-      if (email.trim() === SA_EMAIL && pass === SA_PASS) { onLogin() }
-      else { setError('Credenciales incorrectas'); setLoading(false) }
-    }, 600)
+    try {
+      // Llamar al backend — valida contra config.superadminUser / superadminPass
+      const { data } = await api.post('/auth/login', {
+        username:   email.trim(),
+        password:   pass,
+        tenantSlug: 'superadmin',   // tenantSlug requerido por schema; ignorado para superadmin
+      })
+      if (data?.user?.role !== 'superadmin') {
+        setError('Acceso restringido a superadmin'); setLoading(false); return
+      }
+      // Guardar JWT para que _base.js lo incluya en todas las llamadas /api/admin/*
+      localStorage.setItem(STORAGE_KEYS.authToken, data.token)
+      onLogin()
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Credenciales incorrectas'
+      setError(msg)
+      setLoading(false)
+    }
   }
 
   const FEATURES = [
@@ -336,9 +353,10 @@ function LoginFormV2({ onLogin }) {
         {/* ── Formulario ── */}
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label style={{ fontSize: '11px', fontWeight: 700, color: D.t3, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>EMAIL</label>
+            <label style={{ fontSize: '11px', fontWeight: 700, color: D.t3, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>USUARIO</label>
             <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username"
+              type="text" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username"
+              placeholder="superadmin"
               style={{ ...inp, background: 'rgba(13,23,41,0.9)', color: '#e2e8f0' }}
             />
           </div>
@@ -369,12 +387,12 @@ function LoginFormV2({ onLogin }) {
 
         {/* ── Demo credentials ── */}
         <div style={{ marginTop: '18px', padding: '11px 14px', borderRadius: '8px', background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.1)', fontSize: '12px', color: D.t3 }}>
-          <span style={{ color: D.t2, fontWeight: 600 }}>Demo:</span> {SA_EMAIL} / {SA_PASS}
+          <span style={{ color: D.t2, fontWeight: 600 }}>Credenciales:</span> configuradas en <code style={{ color: D.accent }}>SUPERADMIN_USER</code> / <code style={{ color: D.accent }}>SUPERADMIN_PASS</code> del backend
         </div>
 
         {/* ── Footer ── */}
         <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '11px', color: '#1e3a5f' }}>
-          StockPro v2.0 · Maqueta — localStorage
+          MiniMarket POS v2.0 · Conectado al backend
         </p>
       </div>
     </div>
@@ -401,6 +419,7 @@ function SASidebar({ activeTab, onTabChange, onLogout, theme, onThemeToggle, onT
     { id: 'tenants',   icon: Building2,  label: 'Negocios' },
     { id: 'plans',     icon: CreditCard, label: 'Planes y Precios' },
     { id: 'renewals',  icon: History,    label: 'Historial Renovaciones' },
+    { id: 'accesses',  icon: Shield,     label: 'Historial Accesos' },
     { id: 'limits',    icon: Sliders,    label: 'Límites del Plan' },
     { id: 'alerts',    icon: Bell,       label: 'Alertas de Vencimiento' },
     { id: 'landing',   icon: Globe,      label: 'Landing Page' },
@@ -504,18 +523,19 @@ function TenantFormModal({ tenant, onClose, onDone }) {
   const readOnlyInp = { ...inp, background: D.card2, color: D.t2, cursor: 'default' }
   const isEdit = !!tenant
   const [form, setForm] = useState({
-    businessName: tenant?.businessName ?? '',
-    ruc:          tenant?.ruc ?? '',
-    sector:       tenant?.sector ?? 'bodega',
-    ownerName:    tenant?.ownerName ?? '',
-    ownerEmail:   tenant?.ownerEmail ?? '',
-    phone:        tenant?.phone ?? '',
-    plan:         tenant?.plan ?? 'trial',
-    billingCycle: tenant?.billingCycle ?? 'monthly',
+    businessName:  tenant?.businessName ?? '',
+    ruc:           tenant?.ruc ?? '',
+    sector:        tenant?.sector ?? 'bodega',
+    ownerName:     tenant?.ownerName ?? '',
+    ownerEmail:    tenant?.ownerEmail ?? '',
+    phone:         tenant?.phone ?? '',
+    ownerPassword: '',
+    plan:          tenant?.plan ?? 'trial',
+    billingCycle:  tenant?.billingCycle ?? 'monthly',
     accessStartDate: isoToInput(tenant?.accessStartDate),
     accessExpiresAt: isoToInput(tenant?.accessExpiresAt ?? getAccessExpiry(new Date().toISOString(), tenant?.billingCycle ?? 'monthly')),
     createdAt:     isoToInput(tenant?.createdAt),
-    isActive:     tenant?.isActive ?? true,
+    isActive:      tenant?.isActive ?? true,
     internalNotes: tenant?.internalNotes ?? '',
   })
   const [loading, setLoading] = useState(false)
@@ -575,6 +595,11 @@ function TenantFormModal({ tenant, onClose, onDone }) {
             </select>
           </FRow>
         </div>
+        {!isEdit && (
+          <FRow label="Contraseña inicial *">
+            <input type="password" value={form.ownerPassword} onChange={set('ownerPassword')} required style={inp} placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+          </FRow>
+        )}
         {tenant?.slug && (
           <FRow label="Link de acceso">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: `1px solid ${D.green}55`, background: D.greenB, color: D.green, fontSize: '12px', overflow: 'hidden' }}>
@@ -1882,6 +1907,370 @@ const LANDING_SUBTABS = [
   { id: 'seo',      label: 'SEO & Footer',      icon: FileText },
 ]
 
+// ─── TAB: HISTORIAL DE ACCESOS ────────────────────────────────────────────────
+// ── Roles para badge de color ─────────────────────────────────────────────────
+const ROLE_COLORS = { admin: '#3b82f6', cajero: '#10b981', superadmin: '#8b5cf6' }
+const RoleBadge = ({ role }) => (
+  <span style={{
+    display: 'inline-block', padding: '2px 8px', borderRadius: '99px', fontSize: '10px',
+    fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+    background: `${ROLE_COLORS[role] ?? '#6b7280'}22`,
+    color: ROLE_COLORS[role] ?? '#6b7280',
+  }}>{role}</span>
+)
+
+function LoginEventsView({ tenants, D, inp }) {
+  const [events,    setEvents]    = useState([])
+  const [loading,   setLoading]   = useState(false)
+  const [search,    setSearch]    = useState('')
+  const [filterBiz, setFilterBiz] = useState('')
+  const [deleting,  setDeleting]  = useState(null)
+
+  const load = async () => {
+    setLoading(true)
+    const r = await tenantService.listLoginEvents({ limit: 200 })
+    if (r.data) setEvents(r.data)
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const filtered = events.filter(ev => {
+    if (filterBiz && ev.tenantId !== filterBiz) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const name = (ev.tenant?.businessName ?? '').toLowerCase()
+      if (!name.includes(q) && !ev.fullName.toLowerCase().includes(q) && !ev.username.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const handleDelete = async (id) => {
+    await tenantService.deleteLoginEvent(id)
+    setDeleting(null)
+    load()
+  }
+
+  const thS = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: `1px solid ${D.border}`, background: D.card2, whiteSpace: 'nowrap' }
+  const tdS = { padding: '12px 14px', borderBottom: `1px solid ${D.border}`, verticalAlign: 'middle' }
+
+  const today   = filtered.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString()).length
+  const tenantSet = new Set(filtered.map(e => e.tenantId))
+
+  return (
+    <>
+      {deleting && (
+        <SAModal title="Eliminar registro" onClose={() => setDeleting(null)} width={380}>
+          <p style={{ color: D.t2, marginBottom: '20px', fontSize: '13px' }}>¿Eliminar este registro de inicio de sesión? La acción no se puede deshacer.</p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <SABtn variant="ghost" onClick={() => setDeleting(null)}>Cancelar</SABtn>
+            <SABtn variant="danger" icon={Trash2} onClick={() => handleDelete(deleting)}>Eliminar</SABtn>
+          </div>
+        </SAModal>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+        <StatCard icon={Shield}   label="Total registros"      value={filtered.length}    color={D.accent} />
+        <StatCard icon={Check}    label="Ingresos hoy"         value={today}              color={D.green} />
+        <StatCard icon={Building2} label="Negocios con acceso"  value={tenantSet.size}     color={D.yellow ?? '#f59e0b'} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Buscar usuario o empresa..."
+          style={{ ...inp, flex: 1, minWidth: '200px', background: D.card2 }} />
+        <select value={filterBiz} onChange={e => setFilterBiz(e.target.value)} style={{ ...inp, width: '200px', background: D.card2 }}>
+          <option value="">Todos los negocios</option>
+          {tenants.map(t => <option key={t.id} value={t.id}>{t.businessName}</option>)}
+        </select>
+        <SABtn icon={RefreshCw} variant="ghost" onClick={load} disabled={loading} style={{ padding: '9px 12px' }}>{' '}</SABtn>
+      </div>
+
+      <div style={{ fontSize: '12px', color: D.t3, marginBottom: '12px' }}>
+        {filtered.length} inicio{filtered.length !== 1 ? 's' : ''} de sesión registrado{filtered.length !== 1 ? 's' : ''}
+      </div>
+
+      <div style={{ overflowX: 'auto', borderRadius: '12px', border: `1px solid ${D.border}` }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+          <thead>
+            <tr>{['EMPRESA', 'USUARIO', 'ROL', 'FECHA / HORA', ''].map(h => <th key={h} style={thS}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: D.t3, fontSize: '13px' }}>Cargando…</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '48px', color: D.t3, fontSize: '13px' }}>
+                  <div style={{ marginBottom: '6px', fontSize: '28px', opacity: 0.4 }}>🔒</div>
+                  Aún no hay inicios de sesión registrados. Se registrarán automáticamente cuando los usuarios ingresen a sus negocios.
+                </td>
+              </tr>
+            )}
+            {filtered.map((ev, i) => (
+              <tr key={ev.id ?? i} style={{ background: D.card }}
+                onMouseEnter={e => e.currentTarget.style.background = D.card2}
+                onMouseLeave={e => e.currentTarget.style.background = D.card}>
+                <td style={tdS}>
+                  <div style={{ fontWeight: 600, color: D.t1, fontSize: '13px' }}>{ev.tenant?.businessName ?? '—'}</div>
+                  <div style={{ fontSize: '11px', color: D.t3 }}>{ev.tenant?.slug ?? ''}</div>
+                </td>
+                <td style={tdS}>
+                  <div style={{ fontWeight: 600, color: D.t1, fontSize: '13px' }}>{ev.fullName}</div>
+                  <div style={{ fontSize: '11px', color: D.t3 }}>@{ev.username}</div>
+                </td>
+                <td style={tdS}><RoleBadge role={ev.role} /></td>
+                <td style={{ ...tdS, fontSize: '12px', color: D.t2 }}>
+                  <div>{new Date(ev.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div style={{ fontSize: '11px', color: D.t3 }}>{new Date(ev.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                </td>
+                <td style={{ ...tdS, textAlign: 'right' }}>
+                  <button onClick={() => setDeleting(ev.id)}
+                    style={{ padding: '5px 7px', borderRadius: '6px', border: `1px solid ${D.red}30`, background: D.redB, color: D.red, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function AccessPeriodsView({ tenants, D, inp }) {
+  const [accesses,  setAccesses]  = useState([])
+  const [loading,   setLoading]   = useState(false)
+  const [search,    setSearch]    = useState('')
+  const [filterBiz, setFilterBiz] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [deleting,  setDeleting]  = useState(null)
+
+  const load = async () => {
+    setLoading(true)
+    const r = await tenantService.listAccesses()
+    if (r.data) setAccesses(r.data)
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const filtered = accesses.filter(a => {
+    if (filterBiz && a.tenantId !== filterBiz) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const name = (a.tenant?.businessName || a.businessName || '').toLowerCase()
+      if (!name.includes(q) && !(a.notes ?? '').toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const handleDelete = async (id) => {
+    await tenantService.deleteAccess(id)
+    setDeleting(null)
+    load()
+  }
+
+  const thS = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: `1px solid ${D.border}`, background: D.card2, whiteSpace: 'nowrap' }
+  const tdS = { padding: '12px 14px', borderBottom: `1px solid ${D.border}`, verticalAlign: 'middle' }
+
+  return (
+    <>
+      {showModal && (
+        <CreateAccessModal tenants={tenants} onClose={() => setShowModal(false)} onDone={() => { setShowModal(false); load() }} />
+      )}
+      {deleting && (
+        <SAModal title="Eliminar acceso" onClose={() => setDeleting(null)} width={380}>
+          <p style={{ color: D.t2, marginBottom: '20px', fontSize: '13px' }}>¿Seguro de eliminar este registro de acceso? Esta acción no se puede deshacer.</p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <SABtn variant="ghost" onClick={() => setDeleting(null)}>Cancelar</SABtn>
+            <SABtn variant="danger" icon={Trash2} onClick={() => handleDelete(deleting)}>Eliminar</SABtn>
+          </div>
+        </SAModal>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+        <StatCard icon={Shield}        label="Total Accesos" value={filtered.length}                                                         color={D.accent} />
+        <StatCard icon={Check}         label="Vigentes"      value={filtered.filter(a => new Date(a.accessExpiresAt) > new Date()).length}   color={D.green} />
+        <StatCard icon={AlertTriangle} label="Vencidos"      value={filtered.filter(a => new Date(a.accessExpiresAt) <= new Date()).length}  color={D.red} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Buscar empresa o notas..."
+          style={{ ...inp, flex: 1, minWidth: '200px', background: D.card2 }} />
+        <select value={filterBiz} onChange={e => setFilterBiz(e.target.value)} style={{ ...inp, width: '200px', background: D.card2 }}>
+          <option value="">Todos los negocios</option>
+          {tenants.map(t => <option key={t.id} value={t.id}>{t.businessName}</option>)}
+        </select>
+        <SABtn icon={RefreshCw} variant="ghost" onClick={load} disabled={loading} style={{ padding: '9px 12px' }}>{' '}</SABtn>
+        <SABtn icon={Plus} variant="primary" onClick={() => setShowModal(true)}>Nuevo acceso</SABtn>
+      </div>
+
+      <div style={{ fontSize: '12px', color: D.t3, marginBottom: '12px' }}>
+        {filtered.length} registro{filtered.length !== 1 ? 's' : ''} de acceso
+      </div>
+
+      <div style={{ overflowX: 'auto', borderRadius: '12px', border: `1px solid ${D.border}` }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+          <thead>
+            <tr>{['EMPRESA', 'PLAN', 'INICIO', 'VENCIMIENTO', 'NOTAS', ''].map(h => <th key={h} style={thS}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: D.t3, fontSize: '13px' }}>Cargando…</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: D.t3, fontSize: '13px' }}>No hay registros de acceso</td></tr>
+            )}
+            {filtered.map((a, i) => {
+              const expired = new Date(a.accessExpiresAt) <= new Date()
+              const bizName = a.tenant?.businessName || a.businessName || '—'
+              return (
+                <tr key={a.id ?? i} style={{ background: D.card }}
+                  onMouseEnter={e => e.currentTarget.style.background = D.card2}
+                  onMouseLeave={e => e.currentTarget.style.background = D.card}>
+                  <td style={tdS}>
+                    <div style={{ fontWeight: 600, color: D.t1, fontSize: '13px' }}>{bizName}</div>
+                    <div style={{ fontSize: '11px', color: D.t3 }}>{fmtDate(a.createdAt)}</div>
+                  </td>
+                  <td style={tdS}><PlanBadgeDark plan={a.plan} /></td>
+                  <td style={{ ...tdS, fontSize: '12px', color: D.t2 }}>{fmtDate(a.accessStartDate)}</td>
+                  <td style={tdS}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: expired ? D.red : D.green }}>
+                      {fmtDate(a.accessExpiresAt)}
+                    </span>
+                    {expired && <div style={{ fontSize: '10px', color: D.red }}>Vencido</div>}
+                  </td>
+                  <td style={{ ...tdS, fontSize: '12px', color: D.t3, maxWidth: '200px' }}>
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes || '—'}</div>
+                  </td>
+                  <td style={{ ...tdS, textAlign: 'right' }}>
+                    <button onClick={() => setDeleting(a.id)}
+                      style={{ padding: '5px 7px', borderRadius: '6px', border: `1px solid ${D.red}30`, background: D.redB, color: D.red, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function AccesesTab() {
+  const D   = useD()
+  const inp = makeInp(D)
+  const [subView,  setSubView]  = useState('logins')   // 'logins' | 'periods'
+  const [tenants,  setTenants]  = useState([])
+
+  useEffect(() => {
+    tenantService.listAll().then(r => { if (r.data) setTenants(r.data) })
+  }, [])
+
+  const subBtnStyle = (active) => ({
+    padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+    border: `1px solid ${active ? D.accent : D.border}`,
+    background: active ? `${D.accent}18` : 'transparent',
+    color: active ? D.accent : D.t2, cursor: 'pointer',
+  })
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <button style={subBtnStyle(subView === 'logins')}  onClick={() => setSubView('logins')}>Inicios de Sesión</button>
+        <button style={subBtnStyle(subView === 'periods')} onClick={() => setSubView('periods')}>Períodos de Acceso</button>
+      </div>
+      {subView === 'logins'
+        ? <LoginEventsView  tenants={tenants} D={D} inp={inp} />
+        : <AccessPeriodsView tenants={tenants} D={D} inp={inp} />
+      }
+    </>
+  )
+}
+
+function CreateAccessModal({ tenants, onClose, onDone }) {
+  const D = useD()
+  const inp = makeInp(D)
+  const [form, setForm] = useState({
+    tenantId: '', plan: 'basic', billingCycle: 'monthly',
+    accessStartDate: new Date().toISOString().slice(0, 10),
+    bonusDays: 30, notes: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const save = async () => {
+    if (!form.tenantId) return
+    setSaving(true)
+    await tenantService.createAccess({
+      tenantId:        form.tenantId,
+      plan:            form.plan,
+      billingCycle:    form.billingCycle,
+      accessStartDate: new Date(`${form.accessStartDate}T00:00:00`).toISOString(),
+      bonusDays:       parseInt(form.bonusDays) || 30,
+      notes:           form.notes,
+    })
+    setSaving(false)
+    onDone()
+  }
+
+  return (
+    <SAModal title="Nuevo registro de acceso" onClose={onClose} width={460}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <FRow label="Negocio *">
+          <select value={form.tenantId} onChange={set('tenantId')} style={inp}>
+            <option value="">— Selecciona —</option>
+            {tenants.map(t => <option key={t.id} value={t.id}>{t.businessName}</option>)}
+          </select>
+        </FRow>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <FRow label="Plan">
+            <select value={form.plan} onChange={set('plan')} style={inp}>
+              {PLAN_ORDER.map(p => <option key={p} value={p}>{PLANS[p].label}</option>)}
+            </select>
+          </FRow>
+          <FRow label="Ciclo">
+            <select value={form.billingCycle} onChange={set('billingCycle')} style={inp}>
+              {CYCLE_ORDER.map(c => <option key={c} value={c}>{BILLING_CYCLES[c]?.label ?? c}</option>)}
+            </select>
+          </FRow>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <FRow label="Fecha inicio">
+            <input type="date" value={form.accessStartDate} onChange={set('accessStartDate')} style={inp} />
+          </FRow>
+          <FRow label="Días de acceso">
+            <input type="number" min="1" value={form.bonusDays} onChange={e => setForm(p => ({ ...p, bonusDays: e.target.value }))} style={inp} />
+          </FRow>
+        </div>
+        <FRow label="Notas">
+          <input value={form.notes} onChange={set('notes')} style={inp} placeholder="Ej: Acceso por pago MP ref. XYZ" />
+        </FRow>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+          <SABtn variant="ghost" onClick={onClose}>Cancelar</SABtn>
+          <SABtn variant="primary" icon={Save} onClick={save} disabled={!form.tenantId || saving}>
+            {saving ? 'Guardando…' : 'Crear acceso'}
+          </SABtn>
+        </div>
+      </div>
+    </SAModal>
+  )
+}
+
+// Definido FUERA de LandingTab para evitar re-montaje en cada keystroke
+function SiteField({ D, inp, value, onChange, label, placeholder, type = 'text', icon: Icon }) {
+  return (
+    <FRow label={label}>
+      <div style={{ position: 'relative' }}>
+        {Icon && <Icon size={14} color={D.t3} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />}
+        <input type={type} value={value ?? ''} onChange={onChange} placeholder={placeholder}
+          style={{ ...inp, paddingLeft: Icon ? '33px' : '12px', background: D.card2 }} />
+      </div>
+    </FRow>
+  )
+}
+
 function LandingTab({ onBrandUpdate }) {
   const D = useD()
   const inp = makeInp(D)
@@ -1894,7 +2283,7 @@ function LandingTab({ onBrandUpdate }) {
 
   useEffect(() => { tenantService.getSiteSettings().then(r => { if (r.data) setSiteForm(r.data) }) }, [])
 
-  const set = (k) => (e) => setSiteForm(f => ({ ...f, [k]: e.target.value }))
+  const set = useCallback((k) => (e) => setSiteForm(f => ({ ...f, [k]: e.target.value })), [])
 
   const saveAll = async () => {
     setLoading(true)
@@ -1903,14 +2292,10 @@ function LandingTab({ onBrandUpdate }) {
     if (onBrandUpdate && siteForm.brandName?.trim()) onBrandUpdate(siteForm.brandName.trim())
   }
 
-  const Field = ({ k, label, placeholder, type = 'text', icon: Icon }) => (
-    <FRow label={label}>
-      <div style={{ position: 'relative' }}>
-        {Icon && <Icon size={14} color={D.t3} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />}
-        <input type={type} value={siteForm[k] ?? ''} onChange={set(k)} placeholder={placeholder}
-          style={{ ...inp, paddingLeft: Icon ? '33px' : '12px', background: D.card2 }} />
-      </div>
-    </FRow>
+  // Helper que llama SiteField con las props del contexto local — NO es un componente inline
+  const F = (k, label, placeholder, opts = {}) => (
+    <SiteField D={D} inp={inp} value={siteForm[k]} onChange={set(k)}
+      label={label} placeholder={placeholder} type={opts.type} icon={opts.icon} />
   )
 
   return (
@@ -1957,7 +2342,7 @@ function LandingTab({ onBrandUpdate }) {
                     style={{ ...inp, background: D.card2 }} placeholder="#00c896" />
                 </div>
               </FRow>
-              <Field k="logoUrl" label="URL del Logo" placeholder="https://..." icon={Link2} />
+              {F('logoUrl', 'URL del Logo', 'https://...', { icon: Link2 })}
             </div>
           </div>
         )}
@@ -1966,8 +2351,7 @@ function LandingTab({ onBrandUpdate }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '4px' }}>Sección Hero (Portada Principal)</div>
 
-            <Field k="heroTitle"    label="Título principal"
-              placeholder="Controla tu negocio con precisión" />
+            {F('heroTitle', 'Título principal', 'Controla tu negocio con precisión')}
             <FRow label="Subtítulo">
               <textarea value={siteForm.heroSubtitle ?? ''} onChange={set('heroSubtitle')} rows={2}
                 style={{ ...inp, resize: 'vertical', background: D.card2 }}
@@ -1977,18 +2361,18 @@ function LandingTab({ onBrandUpdate }) {
             {/* CTA Principal */}
             <div style={{ fontSize: '11px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>CTA Principal</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <Field k="heroCtaText"  label="CTA Principal — Texto" placeholder="Comenzar prueba gratis" />
-              <Field k="heroCtaUrl"   label="CTA Principal — URL"   placeholder="#planes" icon={Link2} />
+              {F('heroCtaText', 'CTA Principal — Texto', 'Comenzar prueba gratis')}
+              {F('heroCtaUrl',  'CTA Principal — URL',   '#planes', { icon: Link2 })}
             </div>
 
             {/* CTA Secundario */}
             <div style={{ fontSize: '11px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>CTA Secundario</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <Field k="heroCtaSecText" label="CTA Secundario — Texto" placeholder="Ver demo en vivo" />
-              <Field k="heroCtaSecUrl"  label="CTA Secundario — URL"   placeholder="#demo" icon={Link2} />
+              {F('heroCtaSecText', 'CTA Secundario — Texto', 'Ver demo en vivo')}
+              {F('heroCtaSecUrl',  'CTA Secundario — URL',   '#demo', { icon: Link2 })}
             </div>
 
-            <Field k="heroImage" label="URL de imagen hero" placeholder="https://.../hero.png" icon={Link2} />
+            {F('heroImage', 'URL de imagen hero', 'https://.../hero.png', { icon: Link2 })}
           </div>
         )}
 
@@ -2081,17 +2465,17 @@ function LandingTab({ onBrandUpdate }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '4px' }}>Contacto</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <Field k="phone"    label="Teléfono de soporte" placeholder="+51 999 888 777"         icon={Phone} />
-              <Field k="whatsapp" label="WhatsApp"            placeholder="+51 999 888 777"         icon={MessageCircle} />
-              <Field k="email"    label="Correo de contacto"  placeholder="soporte@sistema.com"     icon={Mail} />
-              <Field k="address"  label="Dirección / ciudad"  placeholder="Lima, Perú"              icon={MapPin} />
+              {F('phone',    'Teléfono de soporte', '+51 999 888 777',   { icon: Phone })}
+              {F('whatsapp', 'WhatsApp',            '+51 999 888 777',   { icon: MessageCircle })}
+              {F('email',    'Correo de contacto',  'soporte@sistema.com', { icon: Mail })}
+              {F('address',  'Dirección / ciudad',  'Lima, Perú',          { icon: MapPin })}
             </div>
             <div style={{ fontSize: '11px', fontWeight: 700, color: D.t3, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '4px 0' }}>Redes Sociales</div>
             <p style={{ fontSize: '12px', color: D.t3, margin: '-8px 0 0' }}>Deja vacío para ocultar el enlace en el footer.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
-              <Field k="facebook"  label="Facebook"  placeholder="https://facebook.com/..." icon={Globe} />
-              <Field k="instagram" label="Instagram" placeholder="https://instagram.com/..." icon={Globe} />
-              <Field k="tiktok"    label="TikTok"    placeholder="https://tiktok.com/..."   icon={Globe} />
+              {F('facebook',  'Facebook',  'https://facebook.com/...',  { icon: Globe })}
+              {F('instagram', 'Instagram', 'https://instagram.com/...', { icon: Globe })}
+              {F('tiktok',    'TikTok',    'https://tiktok.com/...',    { icon: Globe })}
             </div>
           </div>
         )}
@@ -2196,22 +2580,28 @@ function LandingTab({ onBrandUpdate }) {
 // ─── SUPERADMIN PRINCIPAL ─────────────────────────────────────────────────────
 export default function SuperAdmin() {
   const navigate = useNavigate()
-  const [auth,      setAuth]      = useState(() => sessionStorage.getItem('sa_auth') === '1')
-  const [tab,       setTab]       = useState('tenants')
-  const [stats,     setStats]     = useState({ total: 0, active: 0, trial: 0, expiring: 0 })
-  const [brandName, setBrandName] = useState('StockPro')
+  const [auth,        setAuth]      = useState(() => sessionStorage.getItem('sa_auth') === '1')
+  const [tab,         setTab]       = useState('tenants')
+  const [stats,       setStats]     = useState({ total: 0, active: 0, trial: 0, expiring: 0 })
+  const [brandName,   setBrandName] = useState('StockPro')
+  const [apiStatus,   setApiStatus] = useState('unknown')   // 'ok' | 'error' | 'unknown'
   const { theme, toggle, setDirect } = useTheme()
   const D = useMemo(() => D_THEMES[theme] ?? D_THEMES.ocean, [theme])
 
   const loadStats = useCallback(async () => {
     const r = await tenantService.listAll()
-    if (!r.data) return
-    setStats({
-      total:    r.data.length,
-      active:   r.data.filter(t => getAccessStatus(t.accessExpiresAt, t.isActive) === 'active').length,
-      trial:    r.data.filter(t => getAccessStatus(t.accessExpiresAt, t.isActive) === 'trial').length,
-      expiring: r.data.filter(t => { const d = daysUntilExpiry(t.accessExpiresAt); return d !== null && d >= 0 && d <= 30 }).length,
-    })
+    // Si el API retorna datos reales, el token JWT es válido y el backend está accesible
+    if (r.data !== null) {
+      setApiStatus('ok')
+      setStats({
+        total:    r.data.length,
+        active:   r.data.filter(t => getAccessStatus(t.accessExpiresAt, t.isActive) === 'active').length,
+        trial:    r.data.filter(t => getAccessStatus(t.accessExpiresAt, t.isActive) === 'trial').length,
+        expiring: r.data.filter(t => { const d = daysUntilExpiry(t.accessExpiresAt); return d !== null && d >= 0 && d <= 30 }).length,
+      })
+    } else {
+      setApiStatus('error')
+    }
   }, [])
 
   // Carga el brandName guardado al iniciar sesión
@@ -2225,7 +2615,11 @@ export default function SuperAdmin() {
   }, [auth, loadStats])
 
   const handleLogin = () => { sessionStorage.setItem('sa_auth', '1'); setAuth(true) }
-  const handleLogout = () => { sessionStorage.removeItem('sa_auth'); setAuth(false) }
+  const handleLogout = () => {
+    sessionStorage.removeItem('sa_auth')
+    localStorage.removeItem(STORAGE_KEYS.authToken)
+    setAuth(false)
+  }
 
   if (!auth) return (
     <DContext.Provider value={D}>
@@ -2237,6 +2631,7 @@ export default function SuperAdmin() {
     tenants:  'Panel de Administración',
     plans:    'Planes y Precios',
     renewals: 'Historial de Renovaciones',
+    accesses: 'Historial de Accesos',
     limits:   'Límites del Plan',
     alerts:   'Alertas de Vencimiento',
     landing:  'Landing Page',
@@ -2259,10 +2654,12 @@ export default function SuperAdmin() {
         <div style={{ background: D.sidebar, borderBottom: `1px solid ${D.border}`, padding: '16px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 20 }}>
           <div>
             <h1 style={{ fontSize: '18px', fontWeight: 800, color: D.t1, margin: '0 0 2px' }}>{TAB_TITLES[tab]}</h1>
-            <div style={{ fontSize: '12px', color: D.t3, display: 'flex', gap: '12px' }}>
+            <div style={{ fontSize: '12px', color: D.t3, display: 'flex', gap: '12px', alignItems: 'center' }}>
               <span>🟢 {stats.active} activos</span>
               <span>🟡 {stats.trial} en trial</span>
               <span>🔴 {stats.expiring} por vencer</span>
+              {apiStatus === 'ok'      && <span style={{ color: '#10b981', fontWeight: 600 }}>● Backend conectado</span>}
+              {apiStatus === 'error'   && <span style={{ color: '#ef4444', fontWeight: 600, cursor: 'pointer' }} title="El SuperAdmin no puede comunicarse con el backend. Verifica que el servidor esté corriendo y que tu sesión no haya expirado.">● Sin conexión al backend</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -2283,6 +2680,7 @@ export default function SuperAdmin() {
           {tab === 'tenants'  && <TenantsTab onStatsRefresh={loadStats} />}
           {tab === 'plans'    && <PlansTab />}
           {tab === 'renewals' && <RenovationsTab />}
+          {tab === 'accesses' && <AccesesTab />}
           {tab === 'limits'   && <LimitsTab />}
           {tab === 'alerts'   && <AlertsTab />}
           {tab === 'landing'  && <LandingTab onBrandUpdate={setBrandName} />}

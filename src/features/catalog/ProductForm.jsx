@@ -151,13 +151,17 @@ export function ProductForm({ product, onClose }) {
                   </div>
                 </div>
               ) : (
-                <>
-                  <label className={labelCls}>Número de serie 🔢</label>
-                  <input {...register('serialNumber')} placeholder="Ej: SN-SAM55-001-2024" className={inputCls}/>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                    Para gestionar <strong>múltiples seriales</strong> de este producto, usa <strong>Catálogo → Seriales</strong> una vez guardado.
-                  </p>
-                </>
+                <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl">
+                  <span className="text-xl shrink-0">🔑</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">
+                      Sin seriales registrados
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                      Los N° de serie se gestionan desde <strong>Catálogo → Seriales</strong> una vez que el producto esté guardado.
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
           )}

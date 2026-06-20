@@ -141,37 +141,57 @@ export const DEFAULT_SITE_SETTINGS = {
 }
 
 // ─── Estado mutable persistido ────────────────────────────────────────────────
-let _tenants         = _load(KEYS.tenants)         ?? { ...DEFAULT_TENANTS }
-let _accesses        = _load(KEYS.accesses)        ?? [...DEFAULT_ACCESSES]
-let _renewals        = _load(KEYS.renewals)        ?? [...DEFAULT_RENEWALS]
+// En modo API los datos de tenants/accesses/renewals vienen del backend.
+// Solo se carga de localStorage como fallback offline.
+let _tenants         = USE_API ? {} : (_load(KEYS.tenants)  ?? { ...DEFAULT_TENANTS })
+let _accesses        = USE_API ? [] : (_load(KEYS.accesses) ?? [...DEFAULT_ACCESSES])
+let _renewals        = USE_API ? [] : (_load(KEYS.renewals) ?? [...DEFAULT_RENEWALS])
 let _prices          = _load(KEYS.prices)          ?? { ...DEFAULT_PRICES }
 let _site            = _load(KEYS.site)            ?? { ...DEFAULT_SITE_SETTINGS }
 let _limits          = _load(KEYS.limits)          ?? JSON.parse(JSON.stringify(PLAN_LIMITS))
 let _alertThresholds = _load(KEYS.alertThresholds) ?? { ...DEFAULT_ALERT_THRESHOLDS }
 
-// Migrar registros existentes con campos faltantes (retrocompat)
-Object.values(_tenants).forEach(t => {
-  if (!t.ruc)           t.ruc           = ''
-  if (!t.ownerPassword) t.ownerPassword = ''
-  if (!t.internalNotes) t.internalNotes = ''
-  if (!t.systemVersion) t.systemVersion = 'MiniMarket POS v1.0'
-  if (!t.phone)         t.phone         = ''
-  if (!t.createdAt)     t.createdAt     = t.accessStartDate ?? isoNow()
-  if (!t.accessExpiresAt) t.accessExpiresAt = getAccessExpiry(t.accessStartDate ?? t.createdAt, t.billingCycle ?? 'monthly')
-})
+// En modo API, limpiar datos mock stale que podrían interferir con el fallback
+if (USE_API) {
+  localStorage.removeItem(KEYS.tenants)
+  localStorage.removeItem(KEYS.accesses)
+  localStorage.removeItem(KEYS.renewals)
+}
+
+// Migrar registros existentes con campos faltantes (retrocompat, solo modo mock)
+if (!USE_API) {
+  Object.values(_tenants).forEach(t => {
+    if (!t.ruc)           t.ruc           = ''
+    if (!t.ownerPassword) t.ownerPassword = ''
+    if (!t.internalNotes) t.internalNotes = ''
+    if (!t.systemVersion) t.systemVersion = 'MiniMarket POS v1.0'
+    if (!t.phone)         t.phone         = ''
+    if (!t.createdAt)     t.createdAt     = t.accessStartDate ?? isoNow()
+    if (!t.accessExpiresAt) t.accessExpiresAt = getAccessExpiry(t.accessStartDate ?? t.createdAt, t.billingCycle ?? 'monthly')
+  })
+}
 
 let _accessIdx  = Math.max(0, ..._accesses.map(a => parseInt(a.id.split('_')[1]) || 0)) + 1
 let _renewalIdx = Math.max(0, ..._renewals.map(r => parseInt(r.id.split('_')[1]) || 0)) + 1
 
 const _flush = () => {
+  if (USE_API) return   // En modo API no escribir datos mock a localStorage
   _save(KEYS.tenants,  _tenants)
   _save(KEYS.accesses, _accesses)
   _save(KEYS.renewals, _renewals)
 }
 
-// Intenta la API; si falla (endpoint no implementado), retorna null para hacer fallback local
+// Intenta la API; en modo API loguea el error; siempre retorna null en fallo para que
+// cada función decida cómo manejarlo (retorno vacío vs fallback local)
 const _tryApi = async (fn) => {
-  try { return await fn() } catch (_) { return null }
+  try {
+    return await fn()
+  } catch (e) {
+    if (USE_API) {
+      console.warn('[tenantService API]', e.response?.status ?? 'network', e.message)
+    }
+    return null
+  }
 }
 
 // Lectura sincrónica para componentes que no pueden usar async
@@ -275,7 +295,7 @@ export const tenantService = {
     await delay(100)
     if (USE_API) {
       const res = await _tryApi(async () => {
-        const { data } = await api.get('/admin/tenants', { params: { search } })
+        const { data } = await api.get('/admin/tenants', { params: { search, limit: 200 } })
         return ok(data.data.items, data.data.total)
       })
       if (res) return res
@@ -302,10 +322,18 @@ export const tenantService = {
     await delay(300)
     if (USE_API) {
       const res = await _tryApi(async () => {
+        // Backend espera: businessName, sector, ownerName, ownerEmail, phone,
+        // password (no ownerPassword), plan, billingCycle, internalNotes,
+        // accessStartDate?, accessDays (número, no accessExpiresAt).
+        const start = accessStartDate ? new Date(accessStartDate) : new Date()
+        const end   = accessExpiresAt ? new Date(accessExpiresAt) : null
+        const accessDays = end ? Math.max(1, Math.ceil((end - start) / 86400_000)) : 30
         const { data } = await api.post('/admin/tenants', {
-          businessName, sector, ownerName, ownerEmail, phone, ownerPassword, ruc,
-          plan, billingCycle, accessStartDate, accessExpiresAt, createdAt,
-          internalNotes, systemVersion, isActive,
+          businessName, sector, ownerName, ownerEmail, phone,
+          password: ownerPassword,
+          plan, billingCycle, internalNotes,
+          accessStartDate: accessStartDate || undefined,
+          accessDays,
         })
         return ok(data.data)
       })
@@ -354,7 +382,9 @@ export const tenantService = {
     await delay(300)
     if (USE_API) {
       const res = await _tryApi(async () => {
-        const { data } = await api.patch(`/admin/tenants/${tenantId}`, updates)
+        // Filtrar solo campos que el backend PATCH /admin/tenants/:id acepta
+        const { createdAt: _drop, ownerPassword: _pw, ...apiPayload } = updates
+        const { data } = await api.patch(`/admin/tenants/${tenantId}`, apiPayload)
         return ok(data.data)
       })
       if (res) return res
@@ -400,7 +430,9 @@ export const tenantService = {
 
   async setActive(tenantId, isActive) {
     await delay(300)
-    if (USE_API) await _tryApi(() => api.patch(`/admin/tenants/${tenantId}/status`, { isActive }))
+    // El endpoint real es PATCH /admin/tenants/:id (acepta isActive en body)
+    // No existe /admin/tenants/:id/status
+    if (USE_API) await _tryApi(() => api.patch(`/admin/tenants/${tenantId}`, { isActive }))
     const tenant = Object.values(_tenants).find(t => t.id === tenantId)
     if (tenant) { tenant.isActive = isActive; _flush() }
     return ok({ tenantId, isActive })
@@ -412,7 +444,10 @@ export const tenantService = {
     await delay(300)
     if (USE_API) {
       const res = await _tryApi(async () => {
-        const { data } = await api.post(`/admin/tenants/${tenantId}/renew`, { plan, billingCycle, startMode, notes })
+        const apiStartMode = startMode === 'from_expiry' ? 'expiry' : 'immediate'
+        const cycleDays = { monthly: 30, quarterly: 90, semiannual: 180, annual: 365 }
+        const accessDays = cycleDays[billingCycle] ?? 30
+        const { data } = await api.post(`/admin/tenants/${tenantId}/renew`, { plan, billingCycle, startMode: apiStartMode, accessDays, notes })
         return ok(data.data)
       })
       if (res) return res
@@ -449,7 +484,15 @@ export const tenantService = {
     if (USE_API) {
       const res = await _tryApi(async () => {
         const { data } = await api.get('/admin/renewals', { params: { tenantId } })
-        return ok(data.data)
+        // Normalizar campos del backend al formato que usa el componente
+        // DB: plan, createdAt, tenant.businessName → Mock: newPlan, renewedAt, businessName
+        const normalized = (data.data ?? []).map(r => ({
+          ...r,
+          newPlan:      r.plan,
+          renewedAt:    r.createdAt,
+          businessName: r.tenant?.businessName ?? r.businessName ?? '—',
+        }))
+        return ok(normalized)
       })
       if (res) return res
     }
@@ -477,7 +520,13 @@ export const tenantService = {
     await delay(300)
     if (USE_API) {
       const res = await _tryApi(async () => {
-        const { data } = await api.post('/admin/accesses', { tenantId, plan, billingCycle, accessStartDate, bonusDays, notes })
+        // Backend espera accessDays (número de días), no bonusDays ni accessExpiresAt
+        const { data } = await api.post('/admin/accesses', {
+          tenantId, plan, billingCycle,
+          accessStartDate: accessStartDate || new Date().toISOString(),
+          accessDays: Number(bonusDays) || 30,
+          notes,
+        })
         return ok(data.data)
       })
       if (res) return res
@@ -528,6 +577,33 @@ export const tenantService = {
     return ok(null)
   },
 
+  // ── Historial de inicios de sesión (cross-tenant) ───────────────────────────
+
+  async listLoginEvents({ tenantId = null, limit = 100, offset = 0 } = {}) {
+    await delay(100)
+    if (USE_API) {
+      const res = await _tryApi(async () => {
+        const params = { limit, offset, ...(tenantId ? { tenantId } : {}) }
+        const { data } = await api.get('/admin/login-events', { params })
+        return ok(data.data?.items ?? [], data.data?.total ?? 0)
+      })
+      if (res) return res
+    }
+    return ok([], 0)
+  },
+
+  async deleteLoginEvent(eventId) {
+    await delay(200)
+    if (USE_API) {
+      const res = await _tryApi(async () => {
+        await api.delete(`/admin/login-events/${eventId}`)
+        return ok(null)
+      })
+      if (res) return res
+    }
+    return ok(null)
+  },
+
   async getTenantOptions() {
     await delay(100)
     if (USE_API) {
@@ -547,7 +623,13 @@ export const tenantService = {
     if (USE_API) {
       const res = await _tryApi(async () => {
         const { data } = await api.get('/admin/prices')
-        return ok(data.data)
+        const normalized = Object.fromEntries(
+          Object.entries(data.data ?? {}).map(([plan, cfg]) => [plan, cfg.priceMonthly ?? 0])
+        )
+        // Sincronizar al localStorage para que getStoredPrices() (Landing, Register) vea precios frescos
+        Object.assign(_prices, normalized)
+        _save(KEYS.prices, _prices)
+        return ok(normalized)
       })
       if (res) return res
     }
@@ -558,10 +640,18 @@ export const tenantService = {
     await delay(300)
     if (USE_API) {
       const res = await _tryApi(async () => {
-        const { data } = await api.put('/admin/prices', newPrices)
+        const apiPayload = Object.fromEntries(
+          Object.entries(newPrices).map(([plan, price]) => [plan, { priceMonthly: Number(price) || 0 }])
+        )
+        const { data } = await api.put('/admin/prices', apiPayload)
         return ok(data.data)
       })
-      if (res) return res
+      if (res) {
+        // Guardar en localStorage para que getStoredPrices() (Landing, Register, paymentService) refleje el cambio
+        Object.assign(_prices, newPrices)
+        _save(KEYS.prices, _prices)
+        return res
+      }
     }
     Object.assign(_prices, newPrices)
     _save(KEYS.prices, _prices)
@@ -575,7 +665,17 @@ export const tenantService = {
     if (USE_API) {
       const res = await _tryApi(async () => {
         const { data } = await api.get('/admin/plan-limits')
-        return ok(data.data)
+        const normalized = Object.fromEntries(
+          Object.entries(data.data ?? {}).map(([plan, cfg]) => {
+            const { id: _id, plan: _plan, priceMonthly: _pm, priceQuarterly: _pq,
+                    priceSemiannual: _ps, priceAnnual: _pa, updatedAt: _ua, ...limits } = cfg
+            return [plan, limits]
+          })
+        )
+        // Sincronizar para que getStoredPlanLimits() refleje los límites del backend
+        _limits = JSON.parse(JSON.stringify(normalized))
+        _save(KEYS.limits, _limits)
+        return ok(normalized)
       })
       if (res) return res
     }
@@ -589,7 +689,11 @@ export const tenantService = {
         const { data } = await api.put('/admin/plan-limits', newLimits)
         return ok(data.data)
       })
-      if (res) return res
+      if (res) {
+        _limits = JSON.parse(JSON.stringify(newLimits))
+        _save(KEYS.limits, _limits)
+        return res
+      }
     }
     _limits = JSON.parse(JSON.stringify(newLimits))
     _save(KEYS.limits, _limits)
@@ -603,6 +707,9 @@ export const tenantService = {
     if (USE_API) {
       const res = await _tryApi(async () => {
         const { data } = await api.get('/admin/site-settings')
+        // Sincronizar para que getStoredSiteSettings() (Landing) vea la config del backend
+        Object.assign(_site, data.data)
+        _save(KEYS.site, _site)
         return ok(data.data)
       })
       if (res) return res
@@ -617,7 +724,12 @@ export const tenantService = {
         const { data } = await api.put('/admin/site-settings', updates)
         return ok(data.data)
       })
-      if (res) return res
+      if (res) {
+        // Guardar en localStorage para que getStoredSiteSettings() (Landing) refleje el cambio
+        Object.assign(_site, updates)
+        _save(KEYS.site, _site)
+        return res
+      }
     }
     Object.assign(_site, updates)
     _save(KEYS.site, _site)
@@ -631,6 +743,8 @@ export const tenantService = {
     if (USE_API) {
       const res = await _tryApi(async () => {
         const { data } = await api.get('/admin/alert-thresholds')
+        Object.assign(_alertThresholds, data.data)
+        _save(KEYS.alertThresholds, _alertThresholds)
         return ok(data.data)
       })
       if (res) return res
@@ -645,7 +759,11 @@ export const tenantService = {
         const { data } = await api.put('/admin/alert-thresholds', thresholds)
         return ok(data.data)
       })
-      if (res) return res
+      if (res) {
+        Object.assign(_alertThresholds, thresholds)
+        _save(KEYS.alertThresholds, _alertThresholds)
+        return res
+      }
     }
     if (thresholds.critical < 1 || thresholds.urgent < 1 || thresholds.warning < 1)
       return fail('Todos los umbrales deben ser al menos 1 día')
