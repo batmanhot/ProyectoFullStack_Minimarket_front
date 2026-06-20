@@ -78,7 +78,7 @@ function getReturnableQty(item, existingReturns, saleId) {
  * @param {string|null} batchNum  - Número de lote / número de serie (para serie)
  * @param {Function} updateProduct - Acción del store
  */
-function _restoreProductStock(product, qty, batchId, batchNum, updateProduct) {
+async function _restoreProductStock(product, qty, batchId, batchNum, updateProduct) {
   const ctrl = product.stockControl || 'simple'
 
   if ((ctrl === 'lote_fefo' || ctrl === 'lote_fifo') && batchId) {
@@ -501,28 +501,28 @@ export default function Returns() {
 
     addReturn(nc)
 
-    ncItems.forEach(ncItem => {
+    for (const ncItem of ncItems) {
       const product = products.find(p => p.id === ncItem.productId)
-      if (!product) return
+      if (!product) continue
 
       if (ncItem._isBundleComponent) {
         // Componente de bundle devuelto individualmente → restaurar stock del componente
-        _restoreProductStock(product, ncItem.quantity, ncItem.batchId, ncItem.batchNumber, updateProduct)
+        await _restoreProductStock(product, ncItem.quantity, ncItem.batchId, ncItem.batchNumber, updateProduct)
 
       } else if (product.type === 'bundle') {
         // Bundle completo devuelto (ruta antigua) → restaurar todos sus componentes
-        ;(product.components || []).forEach(comp => {
+        for (const comp of (product.components || [])) {
           const { products: freshProducts } = useStore.getState()
           const cp = freshProducts.find(p => p.id === comp.productId)
-          if (!cp) return
+          if (!cp) continue
           const compSaleItem = foundSale.items?.find(
             si => (si._fromBundle === ncItem.productId || si.fromBundle === ncItem.productId) && si.productId === comp.productId
           )
           const compBatchId  = compSaleItem?.batchAllocations?.[0]?.batchId     ?? null
           const compBatchNum = compSaleItem?.batchAllocations?.[0]?.batchNumber  ?? null
           const restoreQty   = comp.quantity * ncItem.quantity
-          _restoreProductStock(cp, restoreQty, compBatchId, compBatchNum, updateProduct)
-        })
+          await _restoreProductStock(cp, restoreQty, compBatchId, compBatchNum, updateProduct)
+        }
 
       } else if (ncItem.variantId) {
         // Producto con variante → restaurar stock en la variante (updateVariant sincroniza el padre)
@@ -549,9 +549,9 @@ export default function Returns() {
 
       } else {
         // Producto regular → respetar la estrategia de control de inventario
-        _restoreProductStock(product, ncItem.quantity, ncItem.batchId, ncItem.batchNumber, updateProduct)
+        await _restoreProductStock(product, ncItem.quantity, ncItem.batchId, ncItem.batchNumber, updateProduct)
       }
-    })
+    }
 
     // Recalcular stock de cada bundle afectado por la devolución de componentes
     const affectedBundleIds = [...new Set(ncItems.filter(i => i._isBundleComponent).map(i => i._bundleId).filter(Boolean))]

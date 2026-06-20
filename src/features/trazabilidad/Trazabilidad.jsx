@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useStore } from '../../store/index'
 import { exportToExcel } from '../../shared/utils/export'
 import { ExcelButton } from '../../shared/components/ui/ExportButtons'
@@ -13,9 +13,10 @@ const fmtDT = (d) =>
 
 // ── Constantes UI ──────────────────────────────────────────────────────────────
 const CTRL = {
-  lote_fefo: { label: 'FEFO', cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
-  lote_fifo: { label: 'FIFO', cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' },
-  serie:     { label: 'Serie', cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+  lote_fefo: { label: 'FEFO',     cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
+  lote_fifo: { label: 'FIFO',     cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'             },
+  serie:     { label: 'Serie',    cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+  variante:  { label: 'Variante', cls: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300'         },
 }
 
 const MVT = {
@@ -27,11 +28,13 @@ const MVT = {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function Trazabilidad() {
-  const products       = useStore(s => s.products)
-  const sales          = useStore(s => s.sales)
-  const mermaRecords   = useStore(s => s.mermaRecords)   || []
-  const returns        = useStore(s => s.returns)        || []
-  const stockMovements = useStore(s => s.stockMovements) || []
+  const products        = useStore(s => s.products)
+  const sales           = useStore(s => s.sales)
+  const mermaRecords    = useStore(s => s.mermaRecords)    || []
+  const returns         = useStore(s => s.returns)         || []
+  const stockMovements  = useStore(s => s.stockMovements)  || []
+  const productSerials  = useStore(s => s.productSerials)  || []
+  const productVariants = useStore(s => s.productVariants) || []
 
   const [search,          setSearch]          = useState('')
   const [filterCtrl,      setFilterCtrl]      = useState('all')
@@ -39,11 +42,73 @@ export default function Trazabilidad() {
   const [expandedProduct, setExpandedProduct] = useState(null)
   const [expandedBatch,   setExpandedBatch]   = useState(null)
 
-  // Productos con control de lotes
-  const batchProducts = useMemo(
-    () => products.filter(p => p.isActive && (p.stockControl === 'lote_fefo' || p.stockControl === 'lote_fifo' || p.stockControl === 'serie')),
-    [products]
+  // IDs de productos que tienen variantes en el store
+  const variantProductIds = useMemo(
+    () => new Set(productVariants.map(v => v.productId)),
+    [productVariants]
   )
+
+  // Productos con control de lotes, series o variantes
+  const batchProducts = useMemo(
+    () => products.filter(p =>
+      p.isActive && (
+        p.stockControl === 'lote_fefo' ||
+        p.stockControl === 'lote_fifo' ||
+        p.stockControl === 'serie'     ||
+        variantProductIds.has(p.id)
+      )
+    ),
+    [products, variantProductIds]
+  )
+
+  // Determina el tipo de control efectivo (incluye variante aunque stockControl sea simple)
+  const getCtrlKey = useCallback((product) => {
+    if (product.stockControl === 'serie')     return 'serie'
+    if (product.stockControl === 'lote_fefo') return 'lote_fefo'
+    if (product.stockControl === 'lote_fifo') return 'lote_fifo'
+    if (variantProductIds.has(product.id))    return 'variante'
+    return product.stockControl || 'simple'
+  }, [variantProductIds])
+
+  // Construye los "items" trazables según tipo de producto
+  const getDisplayItems = (product) => {
+    const ctrl = getCtrlKey(product)
+    if (ctrl === 'serie') {
+      return productSerials
+        .filter(s => s.productId === product.id)
+        .map(s => ({
+          id:           s.id,
+          batchNumber:  s.serialNumber,
+          quantity:     s.status === 'disponible' ? 1 : 0,
+          status:       s.status === 'vendido' ? 'agotado' : s.status === 'dado_baja' ? 'merma' : 'activo',
+          expiryDate:   null,
+          createdAt:    s.createdAt,
+          priceBuy:     0,
+          _type:        'serial',
+          _serialStatus: s.status,
+          _saleId:      s.saleId,
+          _invoiceNumber: s.invoiceNumber,
+          _soldAt:      s.soldAt,
+        }))
+    }
+    if (ctrl === 'variante') {
+      return productVariants
+        .filter(v => v.productId === product.id && v.isActive !== false)
+        .map(v => ({
+          id:          v.id,
+          batchNumber: v.name || v.sku || v.id,
+          quantity:    v.stock ?? 0,
+          status:      (v.stock ?? 0) > 0 ? 'activo' : 'agotado',
+          expiryDate:  null,
+          createdAt:   v.createdAt || product.createdAt,
+          priceBuy:    v.priceBuy || 0,
+          _type:       'variante',
+          _variantId:  v.id,
+          _sku:        v.sku,
+        }))
+    }
+    return product.batches || []
+  }
 
   // ── Índice de movimientos por lote ──────────────────────────────────────────
   // Clave primaria: batchId (UUID). Clave secundaria: batchNumber (fallback).
@@ -191,6 +256,61 @@ export default function Trazabilidad() {
     return events.sort((a, b) => new Date(a.date) - new Date(b.date))
   }
 
+  // Timeline de un serial (SERIE)
+  const getSerialTimeline = (item) => {
+    const events = [{
+      type: 'ingreso', date: item.createdAt, quantity: 1,
+      ref: 'Registro de serial', user: '—', unitCost: 0,
+    }]
+    if (item._serialStatus === 'vendido' && item._soldAt) {
+      const sale = sales.find(s => s.id === item._saleId)
+      events.push({
+        type: 'venta', date: item._soldAt, quantity: 1,
+        ref: item._invoiceNumber || '—',
+        clientName: sale?.clientName,
+        unitPrice: sale?.items?.find(i =>
+          i.batchAllocations?.some(ba => ba.batchNumber === item.batchNumber)
+        )?.unitPrice,
+      })
+    }
+    for (const nc of returns) {
+      if (nc.status === 'anulada') continue
+      for (const ncItem of (nc.items || [])) {
+        if (ncItem.batchNumber === item.batchNumber || ncItem.serialNumber === item.batchNumber) {
+          events.push({
+            type: 'devolucion', date: nc.createdAt, quantity: 1,
+            ref: nc.ncNumber, saleRef: nc.invoiceNumber, reason: nc.reasonLabel,
+          })
+        }
+      }
+    }
+    return events.sort((a, b) => new Date(a.date) - new Date(b.date))
+  }
+
+  // Timeline de una variante (VARIANTE)
+  const getVariantTimeline = (item) => {
+    const mvtMap = { entrada: 'ingreso', salida: 'venta', merma: 'merma', devolucion: 'devolucion' }
+    return stockMovements
+      .filter(sm => sm.variantId === item._variantId)
+      .map(sm => ({
+        type:      mvtMap[sm.type] || sm.type,
+        date:      sm.createdAt,
+        quantity:  sm.quantity,
+        ref:       sm.invoiceNumber || sm.reason || '—',
+        user:      sm.userName || '—',
+        unitCost:  sm.unitCost || 0,
+        unitPrice: sm.unitPrice || 0,
+      }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+  }
+
+  // Despacha al helper correcto según tipo de item
+  const getItemTimeline = (item) => {
+    if (item._type === 'serial')   return getSerialTimeline(item)
+    if (item._type === 'variante') return getVariantTimeline(item)
+    return getBatchTimeline(item)
+  }
+
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const today = new Date()
@@ -215,11 +335,11 @@ export default function Trazabilidad() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return batchProducts.filter(p => {
-      if (filterCtrl !== 'all' && p.stockControl !== filterCtrl) return false
+      if (filterCtrl !== 'all' && getCtrlKey(p) !== filterCtrl) return false
       if (q && !p.name.toLowerCase().includes(q) && !(p.barcode || '').toLowerCase().includes(q)) return false
       return true
     })
-  }, [batchProducts, search, filterCtrl])
+  }, [batchProducts, search, filterCtrl, getCtrlKey])
 
   // ── Lista plana de lotes (tab "Por Lote") ──────────────────────────────────
   const allBatches = useMemo(() => {
@@ -360,6 +480,7 @@ export default function Trazabilidad() {
           <option value="lote_fefo">FEFO (por vencimiento)</option>
           <option value="lote_fifo">FIFO (por entrada)</option>
           <option value="serie">Series</option>
+          <option value="variante">Variantes</option>
         </select>
         {(search || filterCtrl !== 'all') && (
           <button
@@ -402,10 +523,18 @@ export default function Trazabilidad() {
             </div>
           ) : (
             filtered.map(product => {
-              const isExpanded = expandedProduct === product.id
-              const batches    = product.batches || []
-              const today      = new Date()
-              const ctrl       = CTRL[product.stockControl]
+              const isExpanded   = expandedProduct === product.id
+              const displayItems = getDisplayItems(product)
+              const batches      = displayItems   // alias para no romper código posterior
+              const today        = new Date()
+              const ctrlKey      = getCtrlKey(product)
+              const ctrl         = CTRL[ctrlKey]
+
+              const itemLabel = ctrlKey === 'serie'
+                ? `${displayItems.length} serial${displayItems.length !== 1 ? 'es' : ''}`
+                : ctrlKey === 'variante'
+                  ? `${displayItems.length} variante${displayItems.length !== 1 ? 's' : ''}`
+                  : `${displayItems.length} lote${displayItems.length !== 1 ? 's' : ''}`
 
               return (
                 <div key={product.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -427,7 +556,7 @@ export default function Trazabilidad() {
                         </div>
                         <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
                           {product.barcode && <span className="font-mono">{product.barcode}</span>}
-                          <span>{batches.length} lote{batches.length !== 1 ? 's' : ''}</span>
+                          <span>{itemLabel}</span>
                           <span>Stock: <strong className="text-gray-600 dark:text-slate-300">{product.stock}</strong> {product.unit || ''}</span>
                         </div>
                       </div>
@@ -451,18 +580,25 @@ export default function Trazabilidad() {
                     </div>
                   </button>
 
-                  {/* Batch list */}
+                  {/* Batch / Serial / Variant list */}
                   {isExpanded && (
                     <div className="border-t border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
                       {batches.length === 0 ? (
                         <div className="px-5 py-8 text-center text-sm text-gray-400">
-                          No hay lotes registrados para este producto
+                          {ctrlKey === 'serie'
+                            ? 'No hay seriales registrados para este producto'
+                            : ctrlKey === 'variante'
+                              ? 'No hay variantes activas para este producto'
+                              : 'No hay lotes registrados para este producto'}
                         </div>
                       ) : batches.map(batch => {
                         const bKey       = `${product.id}:${batch.id}`
                         const isBatchExp = expandedBatch === bKey
-                        const data       = getBatchData(batch.id, batch.batchNumber)
-                        const timeline   = getBatchTimeline(batch)
+                        // Para lotes: usar batchIndex. Para serie/variante: datos vacíos (timeline cubre todo)
+                        const data       = (batch._type === 'serial' || batch._type === 'variante')
+                          ? { ventas: [], devoluciones: [], merma: [] }
+                          : getBatchData(batch.id, batch.batchNumber)
+                        const timeline   = getItemTimeline(batch)
                         const isExp      = batch.expiryDate && new Date(batch.expiryDate) < today
                         const daysLeft   = batch.expiryDate
                           ? Math.ceil((new Date(batch.expiryDate) - today) / 86400000)
@@ -499,8 +635,13 @@ export default function Trazabilidad() {
                                   </div>
                                   <div className="flex flex-wrap items-center gap-3 mt-0.5 text-xs text-gray-400">
                                     {batch.expiryDate && <span>Vence: <strong className="text-gray-600 dark:text-slate-300">{fmt(batch.expiryDate)}</strong></span>}
-                                    <span>Qty: <strong className="text-gray-600 dark:text-slate-300">{batch.quantity}</strong> {product.unit || ''}</span>
-                                    {batch.priceBuy != null && <span>Costo: S/{parseFloat(batch.priceBuy).toFixed(2)}</span>}
+                                    {batch._type === 'serial' ? (
+                                      <span>Estado: <strong className="text-gray-600 dark:text-slate-300 capitalize">{batch._serialStatus}</strong></span>
+                                    ) : (
+                                      <span>Qty: <strong className="text-gray-600 dark:text-slate-300">{batch.quantity}</strong> {product.unit || ''}</span>
+                                    )}
+                                    {batch._type === 'variante' && batch._sku && <span className="font-mono">SKU: {batch._sku}</span>}
+                                    {batch.priceBuy > 0 && <span>Costo: S/{parseFloat(batch.priceBuy).toFixed(2)}</span>}
                                     <span>{fmt(batch.createdAt)}</span>
                                   </div>
                                 </div>
