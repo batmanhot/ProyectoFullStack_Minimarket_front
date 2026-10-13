@@ -12,16 +12,10 @@ export default defineConfig({
   retries:     1,        // 1 reintento en CI antes de marcar como fallado
   reporter:    [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
 
-  // Playwright levanta el servidor automáticamente en CI (cuando no hay uno corriendo)
-  webServer: {
-    command:             'npm run dev',
-    url:                 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout:             30_000,
-  },
+  // run-playwright.mjs starts and stops Vite explicitly on Windows.
 
   use: {
-    baseURL:        'http://localhost:3000',
+    baseURL:        'http://localhost:5174',
     headless:       true,
     viewport:       { width: 1280, height: 800 },
     actionTimeout:  12_000,

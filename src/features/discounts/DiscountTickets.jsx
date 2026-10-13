@@ -1,9 +1,10 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useStore } from '../../store/index'
 import { discountTicketService } from '../../services/index'
 import { USE_API } from '../../services/_base'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel } from '../../shared/utils/export'
+import { writePrintDocument } from '../../shared/utils/print'
 import { ExcelButton } from '../../shared/components/ui/ExportButtons'
 import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
@@ -33,9 +34,7 @@ function TicketStatusBadge({ ticket }) {
 
 // ─── Impresión del ticket físico ──────────────────────────────────────────────
 function printTicket(ticket, businessConfig) {
-  const discLabel = ticket.discountType === 'pct'
-    ? `${ticket.discountValue}% de descuento${ticket.maxAmount ? ` (máx. ${formatCurrency(ticket.maxAmount)})` : ''}`
-    : `Vale por ${formatCurrency(ticket.discountValue)}`
+
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket ${ticket.code}</title>
 <style>
@@ -86,18 +85,16 @@ function printTicket(ticket, businessConfig) {
   <hr class="hr">
   <div class="footer">Presentar este ticket al cajero antes de pagar<br>${businessConfig?.address || ''}<br>Tel: ${businessConfig?.phone || ''}</div>
 </div>
-<script>window.onload=()=>{window.print();}<\/script>
 </body></html>`
 
   const win = window.open('', '_blank', 'width=380,height=650,left=100,top=50')
   if (!win) { toast.error('Activa las ventanas emergentes para imprimir'); return }
-  win.document.write(html)
-  win.document.close()
+  writePrintDocument(win, html, { autoPrint: true })
 }
 
 // ─── Formulario de creación de ticket ────────────────────────────────────────
 function TicketForm({ ticket, onClose, onSaved }) {
-  const { addDiscountTicket, updateDiscountTicket, businessConfig } = useStore()
+
   const editing = !!ticket?.id
   const [saving, setSaving] = useState(false)
 
@@ -118,8 +115,6 @@ function TicketForm({ ticket, onClose, onSaved }) {
   const [customCode,    setCustomCode]    = useState(ticket?.code          || '')
   const [autoCode,      setAutoCode]      = useState(!ticket?.id)
   const [prefix,        setPrefix]        = useState('TKT')
-
-  const previewCode = autoCode ? generateCode(prefix) : customCode
 
   const handleSave = async () => {
     if (saving) return
@@ -332,7 +327,7 @@ function TicketForm({ ticket, onClose, onSaved }) {
 
 // ─── Panel de gestión de tickets ─────────────────────────────────────────────
 export default function DiscountTickets() {
-  const { discountTickets = [], updateDiscountTicket, deleteDiscountTicket, businessConfig, addAuditLog } = useStore()
+  const { discountTickets = [], businessConfig, addAuditLog } = useStore()
   const [modal, setModal]           = useState(null)
 
   const reloadFromApi = useCallback(async () => {

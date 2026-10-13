@@ -407,13 +407,13 @@ export default function Tickets() {
 
   useEffect(() => { reloadFromApi() }, [reloadFromApi])
 
-  const now = new Date()
+  const [now] = useState(() => new Date())
   const kpis = useMemo(() => {
     const vigentes  = discountTickets.filter(t => t.isActive && !t.used && (!t.validTo || now <= new Date(t.validTo + 'T23:59:59')))
     const canjeados = discountTickets.filter(t => t.used)
     const vencidos  = discountTickets.filter(t => !t.used && t.validTo && now > new Date(t.validTo + 'T23:59:59'))
     return { total: discountTickets.length, vigentes: vigentes.length, canjeados: canjeados.length, vencidos: vencidos.length }
-  }, [discountTickets])
+  }, [discountTickets, now])
 
   const filtered = useMemo(() => {
     let list = [...discountTickets].sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0))
@@ -432,7 +432,7 @@ export default function Tickets() {
       )
     }
     return list
-  }, [discountTickets, filterStatus, filterType, search])
+  }, [discountTickets, filterStatus, filterType, search, now])
 
   const handleToggle = async (t) => {
     const r = await discountTicketService.update(t.id, { isActive: !t.isActive })

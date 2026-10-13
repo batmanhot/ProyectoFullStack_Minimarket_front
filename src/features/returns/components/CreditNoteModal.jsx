@@ -16,7 +16,8 @@
  */
 
 import { useState } from 'react'
-import { formatCurrency, formatDateTime } from '../../../shared/utils/helpers'
+import {  formatDateTime } from '../../../shared/utils/helpers'
+import { writePrintDocument } from '../../../shared/utils/print'
 
 const RETURN_REASONS = [
   { value: 'defectuoso',   label: 'Producto defectuoso / dañado',     icon: '⚠️' },
@@ -124,15 +125,15 @@ function buildA4HTML(nc, businessConfig) {
 <body>
 <div class="page">
   <div class="actions-bar">
-    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir A4</button>
-    <button class="btn btn-pdf"   onclick="window.print()">📄 Guardar PDF</button>
-    <button class="btn btn-wa"    onclick="sendWA()">📱 WhatsApp</button>
+    <button class="btn btn-print" data-print-document>🖨️ Imprimir A4</button>
+    <button class="btn btn-pdf"   data-print-document>📄 Guardar PDF</button>
+    <button class="btn btn-wa"    data-whatsapp-document>📱 WhatsApp</button>
   </div>
 
   <!-- HEADER -->
   <div class="header">
     <div>
-      ${biz.logoUrl ? `<img src="${biz.logoUrl}" class="biz-logo" onerror="this.style.display='none'">` : ''}
+      ${biz.logoUrl ? `<img src="${biz.logoUrl}" class="biz-logo">` : ''}
       <div class="biz-name">${biz.name || 'MI NEGOCIO'}</div>
       ${biz.ruc     ? `<div class="biz-sub">R.U.C.: ${biz.ruc}</div>` : ''}
       ${biz.address ? `<div class="biz-sub">${biz.address}</div>` : ''}
@@ -229,7 +230,7 @@ function buildA4HTML(nc, businessConfig) {
   </div>
 </div>
 
-<script>
+<template>
 var NC = ${JSON.stringify({ ncNumber: nc.ncNumber, refInvoice: nc._refInvoice || nc.invoiceNumber, clientName: nc.clientName, totalRefund: nc.totalRefund, items: nc.items, reasonNote: nc.reasonNote })};
 var BIZ = ${JSON.stringify({ name: biz.name, ruc: biz.ruc })};
 var REASON = "${reasonLabel.replace(/"/g, '\\"')}";
@@ -257,7 +258,7 @@ function sendWA() {
   var phone = prompt('Número WhatsApp (con código de país, ej: 51987654321):');
   if (phone) window.open('https://wa.me/' + phone.replace(/[^0-9]/g,'') + '?text=' + encodeURIComponent(lines.join('\n')), '_blank');
 }
-</script>
+</template>
 </body></html>`
 }
 
@@ -292,7 +293,7 @@ function buildTicketHTML(nc, businessConfig) {
   @media print{ html,body{ width:80mm; } .fab{display:none} }
 </style></head>
 <body>
-  ${biz.logoUrl ? `<div class="center" style="margin-bottom:3mm"><img src="${biz.logoUrl}" style="max-width:50mm;max-height:20mm;object-fit:contain" onerror="this.style.display='none'"></div>` : ''}
+  ${biz.logoUrl ? `<div class="center" style="margin-bottom:3mm"><img src="${biz.logoUrl}" style="max-width:50mm;max-height:20mm;object-fit:contain"></div>` : ''}
   <div class="center bold" style="font-size:13px;letter-spacing:1.5px;color:#000">${(biz.name||'MI NEGOCIO').toUpperCase()}</div>
   ${biz.ruc     ? `<div class="center" style="color:#000">R.U.C.: ${biz.ruc}</div>` : ''}
   ${biz.address ? `<div class="center" style="font-size:9px;color:#333">${biz.address}</div>` : ''}
@@ -321,7 +322,7 @@ function buildTicketHTML(nc, businessConfig) {
   <div class="center" style="font-size:8px;color:#333">Consulte en: www.sunat.gob.pe</div>
   <hr class="hr">
   <div class="center bold" style="color:#000">${biz.ticketFooter || '¡Gracias por su preferencia!'}</div>
-  <button class="fab" onclick="window.print()">🖨️ Imprimir 80mm</button>
+  <button class="fab" data-print-document>🖨️ Imprimir 80mm</button>
 </body></html>`
 }
 
@@ -341,8 +342,14 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
     const html = buildA4HTML(nc, businessConfig)
     const win  = window.open('', '_blank', 'width=900,height=750,menubar=yes,scrollbars=yes')
     if (!win) { alert('Activa las ventanas emergentes'); return }
-    win.document.write(html)
-    win.document.close()
+    writePrintDocument(win, html, {
+      onReady: (printWindow) => {
+        printWindow.document.querySelectorAll('[data-print-document]')
+          .forEach(button => button.addEventListener('click', () => printWindow.print()))
+        printWindow.document.querySelector('[data-whatsapp-document]')
+          ?.addEventListener('click', () => setShowPhone(true))
+      },
+    })
   }
 
   // Abrir ticket 80mm en nueva ventana
@@ -350,9 +357,13 @@ export default function CreditNoteModal({ creditNote: nc, businessConfig, onClos
     const html = buildTicketHTML(nc, businessConfig)
     const win  = window.open('', '_blank', 'width=380,height=700,left=100,top=50')
     if (!win) { alert('Activa las ventanas emergentes'); return }
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => { win.focus(); win.print() }, 400)
+    writePrintDocument(win, html, {
+      autoPrint: true,
+      onReady: (printWindow) => {
+        printWindow.document.querySelector('[data-print-document]')
+          ?.addEventListener('click', () => printWindow.print())
+      },
+    })
   }
 
   const handleWhatsApp = () => {

@@ -331,7 +331,7 @@ describe('getUnitCost', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 describe('stockDaysLeft', () => {
   const makeMovements = (productId, qty, daysAgo) =>
-    Array.from({ length: qty }, (_, i) => ({
+    Array.from({ length: qty }, () => ({
       productId,
       type: 'salida',
       quantity: 1,

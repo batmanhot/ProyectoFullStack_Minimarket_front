@@ -1,6 +1,7 @@
 import { useStore } from '../store/index'
 import { formatNumber } from '../shared/utils/helpers'
 import { api, USE_API, ok, fail, gs, delay } from './_base'
+import { productService } from './productService'
 
 export const purchaseService = {
   async getAll() {
@@ -41,7 +42,12 @@ export const purchaseService = {
               ...(i.expiryDate  && { expiryDate:  i.expiryDate  }),
             })),
           }
-          await api.post('/purchases', apiPayload)
+          const { data } = await api.post('/purchases', apiPayload)
+          // El backend aplica el stock dentro de una transacción. Recargamos su
+          // resultado en vez de volver a calcularlo con datos potencialmente viejos.
+          await productService.getAll()
+          useStore.getState().addPurchase(data.data)
+          return ok(data.data)
         } catch (err) {
           return fail(err.message || 'Error al registrar la compra')
         }

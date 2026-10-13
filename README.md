@@ -24,7 +24,6 @@ Aplicación web de **Punto de Venta (POS)** para minimarkets y comercios retail 
 
 ### Reportería y documentos
 - **Recharts** (gráficos)
-- **xlsx** (importación/exportación Excel)
 - **jsPDF** + **html2canvas** (generación de PDF)
 
 ### Tooling de desarrollo
@@ -123,6 +122,19 @@ La app corre con Vite en:
 
 - **http://localhost:3000**
 
+### 6) Preparar pruebas E2E
+
+```bash
+npm run e2e:install
+```
+
+Este comando instala Chromium de Playwright dentro del proyecto, sin depender
+de la caché global del usuario. Luego ejecuta las pruebas con:
+
+```bash
+npm run test:e2e
+```
+
 ---
 
 ## 📜 Scripts Disponibles
@@ -133,7 +145,9 @@ La app corre con Vite en:
 | `build` | `npm run build` | Genera el build de producción. |
 | `preview` | `npm run preview` | Levanta una vista previa del build generado. |
 | `lint` | `npm run lint` | Ejecuta análisis estático con ESLint. |
-| `build:pwa` | `npm run build:pwa` | Build de producción + post-proceso PWA (`scripts/post-build.js`). |
+| `test` | `npm run test` | Ejecuta las pruebas unitarias. |
+| `test:e2e` | `npm run test:e2e` | Ejecuta pruebas E2E con Chromium local. |
+| `e2e:install` | `npm run e2e:install` | Descarga Chromium local requerido por Playwright. |
 
 ---
 

@@ -4,6 +4,8 @@ import { exportToExcel } from '../../shared/utils/export'
 import { ExcelButton } from '../../shared/components/ui/ExportButtons'
 import toast from 'react-hot-toast'
 
+const EMPTY_LIST = []
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
@@ -30,11 +32,11 @@ const MVT = {
 export default function Trazabilidad() {
   const products        = useStore(s => s.products)
   const sales           = useStore(s => s.sales)
-  const mermaRecords    = useStore(s => s.mermaRecords)    || []
-  const returns         = useStore(s => s.returns)         || []
-  const stockMovements  = useStore(s => s.stockMovements)  || []
-  const productSerials  = useStore(s => s.productSerials)  || []
-  const productVariants = useStore(s => s.productVariants) || []
+  const mermaRecords    = useStore(s => s.mermaRecords)    ?? EMPTY_LIST
+  const returns         = useStore(s => s.returns)         ?? EMPTY_LIST
+  const stockMovements  = useStore(s => s.stockMovements)  ?? EMPTY_LIST
+  const productSerials  = useStore(s => s.productSerials)  ?? EMPTY_LIST
+  const productVariants = useStore(s => s.productVariants) ?? EMPTY_LIST
 
   const [search,          setSearch]          = useState('')
   const [filterCtrl,      setFilterCtrl]      = useState('all')
@@ -213,7 +215,7 @@ export default function Trazabilidad() {
   }, [sales, returns, mermaRecords, stockMovements])
 
   // Obtener movimientos de un lote (fusionando byId y byNum)
-  const getBatchData = (batchId, batchNumber) => {
+  const getBatchData = useCallback((batchId, batchNumber) => {
     const a = batchIndex.byId[batchId]   || { ingresos: [], ventas: [], devoluciones: [], merma: [] }
     const b = batchIndex.byNum[batchNumber] || { ingresos: [], ventas: [], devoluciones: [], merma: [] }
     return {
@@ -222,7 +224,7 @@ export default function Trazabilidad() {
       devoluciones:[...a.devoluciones,...b.devoluciones],
       merma:       [...a.merma,       ...b.merma],
     }
-  }
+  }, [batchIndex])
 
   // Timeline de un lote ordenado cronológicamente
   const getBatchTimeline = (batch) => {
@@ -329,7 +331,7 @@ export default function Trazabilidad() {
       }
     }
     return { products: batchProducts.length, totalBatches, activeBatches, expiredBatches, totalMovements }
-  }, [batchProducts, batchIndex]) // eslint-disable-line
+  }, [batchProducts, getBatchData])
 
   // ── Productos filtrados ────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -382,7 +384,7 @@ export default function Trazabilidad() {
       if (b.expiryDate) return 1
       return a.productName.localeCompare(b.productName)
     })
-  }, [batchProducts, batchIndex]) // eslint-disable-line
+  }, [batchProducts, getBatchData])
 
   // ── Export Excel ───────────────────────────────────────────────────────────
   const handleExport = () => {

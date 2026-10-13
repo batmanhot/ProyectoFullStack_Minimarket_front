@@ -17,7 +17,9 @@ export const cashService = {
         const state = useStore.getState()
         if (state.activeCashSession) state.closeCashSession({ ...state.activeCashSession, status: 'cerrada' })
       }
-    } catch (_) {}
+    } catch {
+      // El estado de caja se resolverá con la siguiente sincronización.
+    }
   },
 
   async open(payload) {
@@ -33,8 +35,10 @@ export const cashService = {
           return fail(err.response?.data?.message || err.message || 'Error al aperturar caja')
         }
       }
-      useStore.getState().enqueueOfflineOp({ type: 'cash.open', endpoint: '/cash/open', method: 'POST', payload })
-      return ok(null)
+      const session = { ...payload, id: crypto.randomUUID(), status: 'abierta', openedAt: new Date().toISOString() }
+      useStore.getState().enqueueOfflineOp({ type: 'cash.open', endpoint: '/cash/open', method: 'POST', payload: session })
+      useStore.getState().openCashSession(session)
+      return ok(session)
     }
     const state = gs()
     if (state.activeCashSession) return fail('Ya existe una caja abierta')
@@ -56,7 +60,7 @@ export const cashService = {
           return fail(err.response?.data?.message || err.message || 'Error al cerrar caja')
         }
       }
-      useStore.getState().enqueueOfflineOp({ type: 'cash.close', endpoint: `/cash/${id}/close`, method: 'POST', payload })
+      useStore.getState().enqueueOfflineOp({ type: 'cash.close', endpoint: `/cash/${id}/close`, method: 'POST', payload: { ...payload, sessionId: id } })
       return ok(null)
     }
     const state = gs()

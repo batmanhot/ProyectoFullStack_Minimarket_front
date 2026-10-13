@@ -1,17 +1,16 @@
 import { api, USE_API, ok, fail, gs, delay } from './_base'
 
-const _try = async (fn) => { try { return await fn() } catch (_) { return null } }
-
 export const categoryService = {
   async getAll(search = '') {
     await delay(100)
     if (USE_API) {
-      const res = await _try(async () => {
+      try {
         const { data } = await api.get('/categories', { params: search ? { search } : {} })
         if (!search) gs().setCategories(data.data)
         return ok(data.data, data.meta?.total)
-      })
-      if (res) return res
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al obtener categorías')
+      }
     }
     let cats = (gs().categories || []).filter(c => c.isActive !== false)
     if (search) cats = cats.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))

@@ -1,21 +1,3 @@
-/**
- * locationSlice.js — Maestro de Ubicaciones físicas
- *
- * Gestiona las ubicaciones donde se almacenan los productos
- * (Almacén, Góndola, Mostrador, Bodega, etc.).
- *
- * El campo `product.location` almacena el NOMBRE de la ubicación
- * (no el ID) para mantener compatibilidad con datos existentes y
- * facilitar la lectura directa sin lookups.
- *
- * ── Pendiente backend ────────────────────────────────────────────────
- * Cuando se integre el backend, este slice se reemplaza por llamadas
- * REST. El campo product.location pasará a ser product.locationId (FK).
- * La migración crea registros Location desde los nombres únicos
- * almacenados en product.location del frontend.
- * ────────────────────────────────────────────────────────────────────
- */
-
 /** @param {Function} set @param {Function} get @returns {Object} */
 export const createLocationSlice = (set, get) => ({
 

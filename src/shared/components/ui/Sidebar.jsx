@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore, selectLowStockProducts, selectNearExpiryProducts, selectUnreadNotifications } from '../../../store/index'
 import { ROLES, canAccess } from '../../../config/app'
 import { canUsePlan, PLANS } from '../../../config/plans'
-import { useTenantSafe } from '../../../context/TenantContext'
+import { useTenantSafe } from '../../../context/tenantContext.shared'
 import { getStoredAlertThresholds } from '../../../services/tenantService'
 import toast from 'react-hot-toast'
 
@@ -105,8 +105,6 @@ export default function Sidebar({ currentPage, onNavigate, theme, onThemeToggle,
   const role       = ROLES[currentUser?.role]
   const tenantCtx  = useTenantSafe()
   const plan       = tenantCtx?.plan ?? 'trial'
-  const planCfg    = PLANS[plan]
-  const planLabel  = planCfg?.label ?? 'Trial'
   const daysLeft   = tenantCtx?.daysLeft ?? null
   const alertLevel = getAlertLevel(daysLeft, alertThresholds)
 

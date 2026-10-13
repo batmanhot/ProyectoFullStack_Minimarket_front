@@ -1,4 +1,3 @@
-import { useStore } from '../store/index'
 import { api, USE_API, ok, fail, gs, delay } from './_base'
 
 export const clientService = {
@@ -34,8 +33,7 @@ export const clientService = {
           return fail(err.response?.data?.message || err.message || 'Error al crear el cliente')
         }
       }
-      useStore.getState().enqueueOfflineOp({ type: 'client.create', endpoint: '/clients', method: 'POST', payload })
-      return ok(null)
+      return fail('La creación de clientes requiere conexión. No se guardó ningún cambio.')
     }
     const client = { ...payload, id: crypto.randomUUID(), currentDebt: 0, isActive: true, createdAt: new Date().toISOString() }
     gs().addClient(client)
@@ -51,14 +49,10 @@ export const clientService = {
           gs().updateClient(id, data.data)
           return ok(data.data)
         } catch (err) {
-          if (err.response?.status !== 404) {
-            return fail(err.response?.data?.message || err.message || 'Error al actualizar el cliente')
-          }
-          // 404 = cliente no existe en backend stub, actualizar localmente
+          return fail(err.response?.data?.message || err.message || 'Error al actualizar el cliente')
         }
       } else {
-        useStore.getState().enqueueOfflineOp({ type: 'client.update', endpoint: `/clients/${id}`, method: 'PUT', payload })
-        return ok(null)
+        return fail('La edición de clientes requiere conexión. No se guardó ningún cambio.')
       }
     }
     gs().updateClient(id, payload)

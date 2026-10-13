@@ -7,7 +7,6 @@
  */
 
 import { useState, useMemo } from 'react'
-import { useStore }         from '../../../store/index'
 import { discountCampaignService } from '../../../services/index'
 import { formatCurrency }   from '../../../shared/utils/helpers'
 import {
@@ -19,7 +18,7 @@ const inputCls = 'w-full px-3 py-2 border border-gray-200 dark:border-slate-600 
 const labelCls = 'block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1'
 
 export default function CampaignForm({ campaign, categories, products, onClose }) {
-  const { addDiscountCampaign, updateDiscountCampaign } = useStore()
+
   const editing = !!campaign?.id
   const [saving, setSaving] = useState(false)
 

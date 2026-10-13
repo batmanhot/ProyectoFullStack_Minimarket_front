@@ -195,7 +195,7 @@ function TrackingForm({ alert, tracking, onSave, onClose }) {
 
 // ─── Página principal de Alertas ──────────────────────────────────────────────
 export default function Alerts() {
-  const { products, clients, sales, cashSessions, systemConfig, activeCashSession } = useStore()
+  const { products, clients, sales, cashSessions, systemConfig } = useStore()
   const [tracking, setTracking]   = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_alert_tracking') || '{}') } catch { return {} }
   })

@@ -9,8 +9,6 @@ import { BatchesView } from './BatchesView'
 import { VariantesView } from './VariantesView'
 import { SerialesView } from './SerialesView'
 
-export { printPriceLabels } from './PriceLabels'
-
 export default function Catalog() {
   const { products, categories, brands, suppliers, businessConfig, addAuditLog, productVariants } = useStore()
   const [tab, setTab] = useState('products')

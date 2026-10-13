@@ -6,8 +6,8 @@ import { inputCls, labelCls, btnSecondary, btnPrimary, createSafeId } from './ca
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import toast from 'react-hot-toast'
 
-export function BatchesView({ products, suppliers }) {
-  const { updateBatch } = useStore()
+export function BatchesView({ products }) {
+
   const [search,       setSearch]       = useState('')
   const [selectedProd, setSelectedProd] = useState(null)
   const [modal,        setModal]        = useState(null)

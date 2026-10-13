@@ -63,7 +63,7 @@ export function usePOSBroadcast({ cartSnapshotRef, businessConfigRef } = {}) {
             businessConfig: bizRef.current?.current  ?? {},
             ts:             Date.now(),
           })
-        } catch {}
+        } catch { /* El canal de difusión puede no estar disponible. */ }
       }
     } catch {
       channelRef.current = null

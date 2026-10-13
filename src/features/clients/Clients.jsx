@@ -7,6 +7,7 @@ import { clientSchema } from '../../shared/schemas/index'
 import { clientService } from '../../services/index'
 import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
+import { writePrintDocument } from '../../shared/utils/print'
 import { ExcelButton, PDFButton, ImportButton } from '../../shared/components/ui/ExportButtons'
 import ExcelImportModal from '../../shared/components/ui/ExcelImportModal'
 import { useDebounce } from '../../shared/hooks/useDebounce'
@@ -41,10 +42,9 @@ ${receipt.reference ? `<div class="row"><span>Referencia:</span><span>${receipt.
 ${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ DEUDA SALDADA COMPLETAMENTE</div>' : ''}
 <div class="divider"></div>
 <div class="center" style="font-size:10px">Reimpresión · ${now}</div>
-<script>window.onload=()=>{window.print();}<\/script></body></html>`
+</body></html>`
   const win = window.open('','_blank','width=320,height=600')
-  win.document.write(html)
-  win.document.close()
+  writePrintDocument(win, html, { autoPrint: true })
 }
 
 function ClientForm({ client, onClose }) {
@@ -146,10 +146,9 @@ ${receipt.reference ? `<div class="row"><span>Referencia:</span><span>${receipt.
 ${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ DEUDA SALDADA COMPLETAMENTE</div>' : ''}
 <div class="divider"></div>
 <div class="center" style="font-size:10px">Comprobante de pago · Consérvelo</div>
-<script>window.onload=()=>{window.print();}<\/script></body></html>`
+</body></html>`
       const win = window.open('','_blank','width=320,height=600')
-      win.document.write(html)
-      win.document.close()
+      writePrintDocument(win, html, { autoPrint: true })
     }
 
     return (
@@ -216,7 +215,7 @@ ${receipt.newDebt === 0 ? '<div class="center bold" style="margin-top:2mm">✓ D
   )
 }
 
-function ClientDetail({ client, sales, onClose }) {
+function ClientDetail({ client, sales }) {
   const clientSales = useMemo(() => sales.filter(s => s.clientId === client.id && s.status === 'completada').sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)), [sales, client.id])
   const totalComprado   = clientSales.reduce((a,s) => a+s.total, 0)
   const creditAvailable = (client.creditLimit||0) - (client.currentDebt||0)
@@ -249,6 +248,7 @@ function ClientDetail({ client, sales, onClose }) {
 }
 
 export default function Clients() {
+  const [currentTime] = useState(Date.now)
   const { clients, sales, debtPayments, businessConfig, addAuditLog } = useStore()
   const [search,      setSearch]      = useState('')
 
@@ -280,7 +280,7 @@ export default function Clients() {
 
         const oldestSale  = creditSales[0]
         const diasVencido = oldestSale
-          ? Math.floor((Date.now() - new Date(oldestSale.createdAt)) / (1000*60*60*24))
+          ? Math.floor((currentTime - new Date(oldestSale.createdAt)) / (1000*60*60*24))
           : 0
 
         // Historial de pagos del cliente
@@ -301,7 +301,7 @@ export default function Clients() {
         }
       })
       .sort((a,b) => b.currentDebt - a.currentDebt)
-  }, [clients, sales, debtPayments])
+  }, [clients, sales, debtPayments, currentTime])
 
   const cxcStats = useMemo(() => ({
     corriente:  cxcList.filter(c => c.categoria === 'corriente').reduce((a,c) => a+(c.currentDebt||0), 0),

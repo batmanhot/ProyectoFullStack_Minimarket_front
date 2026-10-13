@@ -17,7 +17,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStore }                    from '../../store/index'
 import { auditService }                from '../../services/index'
 import { USE_API }                     from '../../services/_base'
-import { formatDateTime, exportCSV }    from '../../shared/utils/helpers'
+import { formatDateTime }    from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF }   from '../../shared/utils/export'
 import { ExcelButton, PDFButton }        from '../../shared/components/ui/ExportButtons'
 import { AUDIT_ACTIONS }                from '../../config/app'
@@ -272,7 +272,7 @@ export default function Audit() {
             <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-3">Eventos por tipo de acción</p>
             <div className="space-y-2">
               {Object.entries(kpis.byAction).sort((a, b) => b[1] - a[1]).map(([action, count]) => {
-                const cfg  = AUDIT_ACTIONS[action] || { label: action, color: 'bg-gray-100 text-gray-600' }
+
                 const max  = Math.max(...Object.values(kpis.byAction), 1)
                 return (
                   <div key={action} className="flex items-center gap-3">

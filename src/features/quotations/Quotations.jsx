@@ -19,7 +19,8 @@ import { useState, useMemo, useEffect } from 'react'
 import { useStore }           from '../../store/index'
 import { quotationService }   from '../../services/index'
 import { USE_API }            from '../../services/_base'
-import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
+import { formatCurrency, formatDate } from '../../shared/utils/helpers'
+import { writePrintDocument } from '../../shared/utils/print'
 import { useDebounce }        from '../../shared/hooks/useDebounce'
 import toast                  from 'react-hot-toast'
 import ConfirmModal           from '../../shared/components/ui/ConfirmModal'
@@ -43,6 +44,8 @@ const nextQN = () => {
 const isExpiredQ = (q) =>
   q.expiresAt && new Date(q.expiresAt) < new Date() &&
   !['convertida','rechazada','vencida'].includes(q.status)
+
+const expirationDateFor = (validDays) => new Date(Date.now() + validDays * 86400000).toISOString()
 
 // ─── Modal de documento de cotización — estilo idéntico a CreditNoteModal ─────
 function QuotationDocModal({ q, businessConfig, onClose }) {
@@ -99,12 +102,12 @@ tbody tr:nth-child(even){background:#eff6ff;}
 </style></head><body>
 <div class="page">
   <div class="actions-bar">
-    <button class="btn btn-p" onclick="window.print()">🖨️ Imprimir / PDF A4</button>
-    <button class="btn btn-w" onclick="sendWA()">📱 WhatsApp</button>
+    <button class="btn btn-p" data-print-document>🖨️ Imprimir / PDF A4</button>
+    <button class="btn btn-w" data-whatsapp-document>📱 WhatsApp</button>
   </div>
   <div class="header">
     <div>
-      ${biz.logoUrl ? `<img src="${biz.logoUrl}" style="max-height:52px;max-width:155px;object-fit:contain;margin-bottom:5px;display:block" onerror="this.style.display='none'">` : ''}
+      ${biz.logoUrl ? `<img src="${biz.logoUrl}" style="max-height:52px;max-width:155px;object-fit:contain;margin-bottom:5px;display:block">` : ''}
       <div style="font-size:16px;font-weight:800;color:#111">${biz.name||'MI NEGOCIO'}</div>
       ${biz.ruc     ? `<div style="font-size:10px;color:#6b7280">R.U.C.: ${biz.ruc}</div>` : ''}
       ${biz.address ? `<div style="font-size:10px;color:#6b7280">${biz.address}</div>` : ''}
@@ -155,7 +158,7 @@ tbody tr:nth-child(even){background:#eff6ff;}
     <div class="sig-box"><div style="margin-bottom:28px">Aprobado por</div><div>${q.clientName||'Cliente'}</div></div>
   </div>
 </div>
-<script>
+<template>
 var Q=${JSON.stringify({number:q.number,clientName:q.clientName,total:q.total,items:q.items,userName:q.userName,note:q.note})};
 var BIZ=${JSON.stringify({name:biz.name,ruc:biz.ruc})};
 function sendWA(){
@@ -175,11 +178,17 @@ function sendWA(){
   var ph=prompt('Número WhatsApp (ej: 51987654321):');
   if(ph) window.open('https://wa.me/'+ph.replace(/[^0-9]/g,'')+'?text='+encodeURIComponent(lines.join('\n')),'_blank');
 }
-</script></body></html>`
+</template></body></html>`
     const win = window.open('', '_blank', 'width=900,height=750,menubar=yes,scrollbars=yes')
     if (!win) { toast.error('Activa las ventanas emergentes'); return }
-    win.document.write(html)
-    win.document.close()
+    writePrintDocument(win, html, {
+      onReady: (printWindow) => {
+        printWindow.document.querySelector('[data-print-document]')
+          ?.addEventListener('click', () => printWindow.print())
+        printWindow.document.querySelector('[data-whatsapp-document]')
+          ?.addEventListener('click', () => setShowPhone(true))
+      },
+    })
   }
 
   // ── WhatsApp desde el modal ───────────────────────────────────────────────
@@ -217,12 +226,12 @@ function sendWA(){
   const handlePrint80mm = () => {
     const win = window.open('', '_blank', 'width=380,height=680')
     if (!win) { toast.error('Activa las ventanas emergentes'); return }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    writePrintDocument(win, `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:10px;width:80mm;padding:4mm;color:#000;background:#fff}
 .hr{border:none;border-top:1px dashed #000;margin:2.5mm 0}.row{display:flex;justify-content:space-between}.center{text-align:center}.bold{font-weight:bold}
 .fab{position:fixed;bottom:12px;right:12px;background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700}
 @page{size:80mm auto;margin:0}@media print{.fab{display:none}}</style></head><body>
-${biz.logoUrl ? `<div class="center" style="margin-bottom:2mm"><img src="${biz.logoUrl}" style="max-width:48mm;max-height:16mm;object-fit:contain" onerror="this.style.display='none'"></div>` : ''}
+${biz.logoUrl ? `<div class="center" style="margin-bottom:2mm"><img src="${biz.logoUrl}" style="max-width:48mm;max-height:16mm;object-fit:contain"></div>` : ''}
 <div class="center bold" style="font-size:12px">${(biz.name||'MI NEGOCIO').toUpperCase()}</div>
 ${biz.ruc ? `<div class="center">RUC: ${biz.ruc}</div>` : ''}
 <hr class="hr">
@@ -244,9 +253,13 @@ ${(q.items||[]).map(i => {
 <div class="row bold" style="font-size:12px"><span>TOTAL:</span><span>S/${Number(q.total).toFixed(2)}</span></div>
 <hr class="hr">
 <div class="center" style="font-size:9px">Confirmar citando N°: ${q.number}</div>
-<button class="fab" onclick="window.print()">🖨️ Imprimir 80mm</button>
-</body></html>`)
-    win.document.close()
+<button class="fab" data-print-document>🖨️ Imprimir 80mm</button>
+</body></html>`, {
+      onReady: (printWindow) => {
+        printWindow.document.querySelector('[data-print-document]')
+          ?.addEventListener('click', () => printWindow.print())
+      },
+    })
   }
 
   return (
@@ -555,7 +568,6 @@ function QuotationForm({ quotation, onClose, onSave }) {
   const totalDiscount = items.reduce((a, i) => a + i.quantity * i.unitPrice * (i.discount || 0) / 100, 0)
   const total    = items.reduce((a, i) => a + i.quantity * i.unitPrice * (1 - i.discount / 100), 0)
   const client   = clients.find(c => c.id === clientId)
-  const expiresAt = quotation?.expiresAt || new Date(Date.now() + validDays * 86400000).toISOString()
 
   const handleSave = (status = 'borrador') => {
     if (items.length === 0) { toast.error('Agrega al menos un producto'); return }
@@ -567,7 +579,7 @@ function QuotationForm({ quotation, onClose, onSave }) {
       items,
       note,
       validDays,
-      expiresAt:  new Date(Date.now() + validDays * 86400000).toISOString(),
+      expiresAt:  expirationDateFor(validDays),
       total:      parseFloat(total.toFixed(2)),
       status,
       userId:     currentUser?.id,
@@ -766,7 +778,7 @@ function QuotationForm({ quotation, onClose, onSave }) {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function Quotations({ onNavigate }) {
-  const { products, clients, currentUser, businessConfig } = useStore()
+  const { products, businessConfig } = useStore()
 
   const [quotations, setQuotations] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_quotations') || '[]') } catch { return [] }

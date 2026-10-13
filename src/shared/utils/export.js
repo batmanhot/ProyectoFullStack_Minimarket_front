@@ -10,7 +10,35 @@
  *                  exportToPDFAdvanced() para reportes con múltiples secciones
  */
 
-// ─── EXPORTAR EXCEL (sin cambios — ya funciona) ───────────────────────────────
+import { useStore } from '../../store/index'
+
+const canExport = () => ['admin', 'gerente'].includes(useStore.getState().currentUser?.role)
+const safeCell = (value) => {
+  const text = String(value ?? '')
+  // Evita que una celda se interprete como fórmula al abrirla en Excel.
+  return /^[=+\-@]/.test(text) ? `'${text}` : text
+}
+
+// Datos de clientes, productos y negocio terminan dentro de un documento HTML.
+// Se codifican siempre porque son editables por usuarios.
+export const escapeHtml = (value) => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+
+const safeImageUrl = (value) => {
+  if (!value) return ''
+  try {
+    const url = new URL(value, window.location.origin)
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : ''
+  } catch {
+    return ''
+  }
+}
+
+// ─── EXPORTAR EXCEL ───────────────────────────────────────────────────────────
 function createExcelBlob(data) {
   if (!data?.length) return
 
@@ -18,15 +46,15 @@ function createExcelBlob(data) {
   const isNum = (v) => v !== '' && v !== null && v !== undefined && !isNaN(Number(String(v).replace(/[S/,% ]/g, '')))
 
   const headerRow = keys.map((k) =>
-    `<th style="background:#1e3a5f;color:#fff;font-size:11px;font-weight:bold;padding:7px 10px;text-align:left;border:1px solid #163055;white-space:nowrap">${k}</th>`
+    `<th style="background:#1e3a5f;color:#fff;font-size:11px;font-weight:bold;padding:7px 10px;text-align:left;border:1px solid #163055;white-space:nowrap">${escapeHtml(k)}</th>`
   ).join('')
 
   const dataRows = data.map((row, ri) => {
     const bg    = ri % 2 === 0 ? '#ffffff' : '#f0f4f8'
     const cells = keys.map((k) => {
-      const v   = row[k] ?? ''
+      const v   = safeCell(row[k])
       const num = isNum(v)
-      return `<td style="background:${bg};font-size:11px;padding:5px 10px;border:1px solid #e2e8f0;text-align:${num ? 'right' : 'left'};${num ? 'font-weight:500;color:#1e3a5f' : ''}">${v}</td>`
+      return `<td style="background:${bg};font-size:11px;padding:5px 10px;border:1px solid #e2e8f0;text-align:${num ? 'right' : 'left'};${num ? 'font-weight:500;color:#1e3a5f' : ''}">${escapeHtml(v)}</td>`
     }).join('')
     return `<tr>${cells}</tr>`
   }).join('')
@@ -42,8 +70,9 @@ function createExcelBlob(data) {
 }
 
 export function downloadExcel(data, filename) {
+  if (!canExport()) return false
   const blob = createExcelBlob(data)
-  if (!blob) return
+  if (!blob) return false
 
   const now  = new Date().toLocaleDateString('es-PE').replaceAll('/', '-')
   const url  = URL.createObjectURL(blob)
@@ -51,13 +80,13 @@ export function downloadExcel(data, filename) {
   a.href = url; a.download = `${filename}_${now}.xls`
   document.body.appendChild(a); a.click()
   document.body.removeChild(a); URL.revokeObjectURL(url)
+  return true
 }
 
 export function exportToExcel(data, filename, options = {}) {
-  if (!data?.length) return
+  if (!canExport() || !data?.length) return false
   if (options.preview === false) {
-    downloadExcel(data, filename)
-    return
+    return downloadExcel(data, filename)
   }
 
   window.dispatchEvent(new CustomEvent('excel-preview', {
@@ -67,6 +96,7 @@ export function exportToExcel(data, filename, options = {}) {
       title: options.title || filename,
     },
   }))
+  return true
 }
 
 // ─── EXPORTAR PDF — versión mejorada ─────────────────────────────────────────
@@ -88,9 +118,10 @@ export function exportToPDF(
   userName = '',
   options = {}
 ) {
+  if (!canExport()) return false
   const now         = new Date().toLocaleString('es-PE')
   const nowDate     = new Date().toLocaleDateString('es-PE')
-  const orientation = options.orientation || 'landscape'
+  const orientation = options.orientation === 'portrait' ? 'portrait' : 'landscape'
   const showTotals  = options.showTotals !== false
 
   // ── Detectar columnas numéricas para subtotales ───────────────────────────
@@ -115,33 +146,34 @@ export function exportToPDF(
 
   // ── Filas de la tabla ─────────────────────────────────────────────────────
   const thHtml = headers.map((h, i) =>
-    `<th style="text-align:${numericCols[i] ? 'right' : 'left'}">${h}</th>`
+    `<th style="text-align:${numericCols[i] ? 'right' : 'left'}">${escapeHtml(h)}</th>`
   ).join('')
 
   const tdHtml = rows.map((row, ri) => {
     const bg = ri % 2 === 0 ? '#fff' : '#f8fafc'
     const cells = row.map((cell, ci) =>
-      `<td style="text-align:${numericCols[ci] ? 'right' : 'left'};${numericCols[ci] ? 'font-variant-numeric:tabular-nums' : ''}">${cell ?? '—'}</td>`
+      `<td style="text-align:${numericCols[ci] ? 'right' : 'left'};${numericCols[ci] ? 'font-variant-numeric:tabular-nums' : ''}">${escapeHtml(safeCell(cell))}</td>`
     ).join('')
     return `<tr style="background:${bg}">${cells}</tr>`
   }).join('')
 
   const totalRowHtml = hasTotals
     ? `<tr class="total-row">${colTotals.map((t, i) =>
-        `<td style="text-align:${numericCols[i] ? 'right' : 'left'};font-weight:bold">${t !== null ? t : (i === 0 ? `TOTAL (${rows.length} registros)` : '')}</td>`
+        `<td style="text-align:${numericCols[i] ? 'right' : 'left'};font-weight:bold">${escapeHtml(t !== null ? t : (i === 0 ? `TOTAL (${rows.length} registros)` : ''))}</td>`
       ).join('')}</tr>`
     : ''
 
   // ── Logo del negocio ──────────────────────────────────────────────────────
-  const logoHtml = businessConfig.logoUrl
-    ? `<img src="${businessConfig.logoUrl}" style="height:48px;object-fit:contain;filter:brightness(0) invert(1)" onerror="this.style.display='none'">`
-    : `<div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px">${(businessName || 'MN').substring(0,2).toUpperCase()}</div>`
+  const logoUrl = safeImageUrl(businessConfig.logoUrl)
+  const logoHtml = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" style="height:48px;object-fit:contain;filter:brightness(0) invert(1)">`
+    : `<div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px">${escapeHtml((businessName || 'MN').substring(0,2).toUpperCase())}</div>`
 
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>${title} — ${businessName}</title>
+<title>${escapeHtml(title)} — ${escapeHtml(businessName)}</title>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1a202c; background:#f7fafc; }
@@ -189,17 +221,17 @@ export function exportToPDF(
   <div class="header">
     <div class="header-logo">${logoHtml}</div>
     <div class="header-info">
-      <h1>${title}</h1>
-      <div class="biz">${businessName}</div>
+      <h1>${escapeHtml(title)}</h1>
+      <div class="biz">${escapeHtml(businessName)}</div>
       <div class="meta">
-        ${businessConfig.ruc     ? `<span>RUC: <strong>${businessConfig.ruc}</strong></span>` : ''}
-        ${businessConfig.address ? `<span>📍 ${businessConfig.address}</span>` : ''}
-        ${businessConfig.phone   ? `<span>📞 ${businessConfig.phone}</span>` : ''}
+        ${businessConfig.ruc     ? `<span>RUC: <strong>${escapeHtml(businessConfig.ruc)}</strong></span>` : ''}
+        ${businessConfig.address ? `<span>📍 ${escapeHtml(businessConfig.address)}</span>` : ''}
+        ${businessConfig.phone   ? `<span>📞 ${escapeHtml(businessConfig.phone)}</span>` : ''}
       </div>
     </div>
     <div class="header-right">
       <div>Generado: ${now}</div>
-      ${userName ? `<div>Por: ${userName}</div>` : ''}
+      ${userName ? `<div>Por: ${escapeHtml(userName)}</div>` : ''}
       <div class="badge">📊 ${rows.length} registros</div>
     </div>
   </div>
@@ -208,9 +240,9 @@ export function exportToPDF(
   <div class="content">
     <div class="report-info">
       <span>📅 Fecha: <strong>${nowDate}</strong></span>
-      <span>📋 Reporte: <strong>${title}</strong></span>
+      <span>📋 Reporte: <strong>${escapeHtml(title)}</strong></span>
       <span>📦 Total registros: <strong>${rows.length}</strong></span>
-      ${userName ? `<span>👤 Generado por: <strong>${userName}</strong></span>` : ''}
+      ${userName ? `<span>👤 Generado por: <strong>${escapeHtml(userName)}</strong></span>` : ''}
     </div>
     <table>
       <thead><tr>${thHtml}</tr></thead>
@@ -224,7 +256,7 @@ export function exportToPDF(
   <!-- Footer -->
   <div class="footer">
     <div class="footer-left">
-      <span>Sistema POS · ${businessName}${businessConfig.ruc ? ` · RUC ${businessConfig.ruc}` : ''}</span>
+      <span>Sistema POS · ${escapeHtml(businessName)}${businessConfig.ruc ? ` · RUC ${escapeHtml(businessConfig.ruc)}` : ''}</span>
       <span>Documento generado el ${now}</span>
     </div>
     <span>Pág. 1 de 1</span>
@@ -235,6 +267,7 @@ export function exportToPDF(
 </html>`
 
   window.dispatchEvent(new CustomEvent('pdf-preview', { detail: { html, title } }))
+  return true
 }
 
 /**
@@ -245,6 +278,7 @@ export function exportToPDF(
  * @param {string} userName
  */
 export function exportToPDFAdvanced(title, sections = [], businessConfig = {}, userName = '') {
+  if (!canExport()) return false
   const businessName = businessConfig.name || 'Mi Negocio'
   const now          = new Date().toLocaleString('es-PE')
 
@@ -253,21 +287,21 @@ export function exportToPDFAdvanced(title, sections = [], businessConfig = {}, u
       ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
            ${section.kpis.map((k) =>
              `<div style="background:#f0f5ff;border:1px solid #c3d9ff;border-radius:8px;padding:10px 16px;flex:1;min-width:120px">
-                <div style="font-size:9px;color:#4a6fa5;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${k.label}</div>
-                <div style="font-size:16px;font-weight:800;color:#1e3a5f">${k.value}</div>
+                <div style="font-size:9px;color:#4a6fa5;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${escapeHtml(k.label)}</div>
+                <div style="font-size:16px;font-weight:800;color:#1e3a5f">${escapeHtml(k.value)}</div>
               </div>`
            ).join('')}
          </div>`
       : ''
 
-    const thHtml = section.headers.map((h) => `<th>${h}</th>`).join('')
+    const thHtml = section.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')
     const tdHtml = section.rows.map((row, ri) => {
       const bg = ri % 2 === 0 ? '#fff' : '#f8fafc'
-      return `<tr style="background:${bg}">${row.map((c) => `<td>${c ?? '—'}</td>`).join('')}</tr>`
+      return `<tr style="background:${bg}">${row.map((c) => `<td>${escapeHtml(c ?? '—')}</td>`).join('')}</tr>`
     }).join('')
 
     return `
-      ${section.subtitle ? `<h2 style="font-size:13px;font-weight:700;color:#1e3a5f;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0">${section.subtitle}</h2>` : ''}
+      ${section.subtitle ? `<h2 style="font-size:13px;font-weight:700;color:#1e3a5f;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0">${escapeHtml(section.subtitle)}</h2>` : ''}
       ${kpisHtml}
       <table style="width:100%;border-collapse:collapse;font-size:10.5px;margin-bottom:24px">
         <thead><tr style="background:#1e3a5f">${thHtml}</tr></thead>
@@ -276,7 +310,7 @@ export function exportToPDFAdvanced(title, sections = [], businessConfig = {}, u
   }).join('')
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>${title}</title>
+<title>${escapeHtml(title)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1a202c;background:#f7fafc;}
@@ -293,11 +327,11 @@ export function exportToPDFAdvanced(title, sections = [], businessConfig = {}, u
 </style></head>
 <body><div class="page">
   <div class="header">
-    <div><h1>${title}</h1><p>${businessName}${businessConfig.ruc ? ` · RUC ${businessConfig.ruc}` : ''}</p></div>
-    <div class="header-right"><div>${now}</div>${userName ? `<div>${userName}</div>` : ''}</div>
+    <div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(businessName)}${businessConfig.ruc ? ` · RUC ${escapeHtml(businessConfig.ruc)}` : ''}</p></div>
+    <div class="header-right"><div>${now}</div>${userName ? `<div>${escapeHtml(userName)}</div>` : ''}</div>
   </div>
   <div class="content">${sectionsHtml}</div>
-  <div class="footer"><span>Sistema POS · ${businessName}</span><span>${now}</span></div>
+  <div class="footer"><span>Sistema POS · ${escapeHtml(businessName)}</span><span>${now}</span></div>
 </div>
 </body></html>`
 

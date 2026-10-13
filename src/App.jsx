@@ -16,7 +16,8 @@ import { useServiceWorker } from './shared/hooks/useServiceWorker'
 import { useOfflineSync } from './shared/hooks/useOfflineSync'
 import InstallPWA from './shared/components/InstallPWA'
 import { Wifi, WifiOff, Lock, AlertTriangle, ArrowLeft, PhoneCall } from 'lucide-react'
-import { TenantProvider, useTenantSafe } from './context/TenantContext'
+import { TenantProvider } from './context/TenantContext'
+import { useTenantSafe } from './context/tenantContext.shared'
 import { getStoredAlertThresholds } from './services/tenantService'
 
 // ── Rutas públicas ─────────────────────────────────────────────────────────────
@@ -241,7 +242,7 @@ function TenantApp() {
       duration: 9000,
       style: { background: bg, color, border: `1px solid ${border}`, fontWeight: 600, fontSize: '13px', maxWidth: '340px' },
     })
-  }, [tenantCtx?.loading, tenantCtx?.daysLeft])
+  }, [tenantCtx, tenantCtx?.loading, tenantCtx?.daysLeft])
 
   const handleNavigate = (page) => {
     if (!canAccess(currentUser?.role, page)) { toast.error('Sin permisos para esta sección'); return }

@@ -351,7 +351,7 @@ export default function Landing() {
                 [CreditCard, 'Cobro sin friccion', 'Efectivo, tarjeta, Yape, Plin, credito y pagos mixtos.'],
                 [Package, 'Reposicion inteligente', 'Alertas de stock bajo y productos por vencer para comprar antes de perder ventas.'],
                 [BarChart3, 'Gestion con numeros', 'Margen, ticket promedio, ventas por hora y productos estrella en dashboards simples.'],
-              ].map(([Icon, title, desc]) => (
+              ].map(([, title, desc]) => (
                 <div key={title} className="lp-card-hover" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: 18, background: '#f8fbfd', border: '1px solid #dfe9f2', borderRadius: 18 }}>
                   <div style={{ width: 46, height: 46, borderRadius: 14, background: `${primary}15`, color: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={22} />
@@ -378,7 +378,7 @@ export default function Landing() {
           </div>
 
           <div className="lp-feature-grid" style={{ marginTop: 34 }}>
-            {features.map(({ icon: Icon, title, desc }, index) => (
+            {features.map(({  title, desc }, index) => (
               <article key={`${title}-${index}`} className="lp-card-hover" style={{ background: '#ffffff', border: '1px solid #dfe9f2', borderRadius: 20, padding: 22, minHeight: 176 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 15, background: index % 2 ? '#eef6ff' : `${primary}14`, color: index % 2 ? '#2563eb' : primary, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
                   <Icon size={23} />

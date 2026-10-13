@@ -19,40 +19,37 @@ export function SerialesView({ products }) {
 
   const serieProducts = useMemo(() => { const q = search.toLowerCase(); return products.filter(p => p.stockControl === 'serie' && p.isActive && (!q || p.name.toLowerCase().includes(q) || p.barcode.includes(q))) }, [products, search])
 
-  useEffect(() => { if (!selectedProd && serieProducts.length > 0) setSelectedProd(serieProducts[0]) }, [serieProducts, selectedProd])
+  const activeProduct = serieProducts.find(product => product.id === selectedProd?.id) ?? serieProducts[0] ?? null
 
   // Carga inicial al cambiar de producto
   useEffect(() => {
-    if (!selectedProd) return
-    setLoadingList(true)
-    serialService.getByProduct(selectedProd.id).then(r => { if (r.ok) setSeriales(r.data) }).finally(() => setLoadingList(false))
-  }, [selectedProd])
+    if (!activeProduct) return undefined
+    serialService.getByProduct(activeProduct.id).then(r => { if (r.ok) setSeriales(r.data) })
+    return undefined
+  }, [activeProduct])
 
   // Reacciona cuando el store actualiza los seriales (ej: al completar o anular una venta)
-  const prodActualSeriales = products.find(p => p.id === selectedProd?.id)?.serials
-  useEffect(() => {
-    if (!selectedProd || !prodActualSeriales) return
-    setSeriales(prodActualSeriales)
-  }, [prodActualSeriales])
+  const prodActualSeriales = products.find(p => p.id === activeProduct?.id)?.serials
+  const displayedSeriales = prodActualSeriales ?? seriales
 
   const reloadSeriales = async () => {
-    if (!selectedProd) return
+    if (!activeProduct) return
     setLoadingList(true)
-    const r = await serialService.getByProduct(selectedProd.id)
+    const r = await serialService.getByProduct(activeProduct.id)
     if (r.ok) setSeriales(r.data)
     else toast.error(`Error al recargar seriales: ${r.error}`)
     setLoadingList(false)
   }
 
-  const filtered = useMemo(() => filterStatus === 'todos' ? seriales : seriales.filter(s => s.status === filterStatus), [seriales, filterStatus])
-  const summary  = useMemo(() => ({ disponible: seriales.filter(s => s.status === 'disponible').length, vendido: seriales.filter(s => s.status === 'vendido').length, dado_baja: seriales.filter(s => s.status === 'dado_baja').length, reservado: seriales.filter(s => s.status === 'reservado').length }), [seriales])
+  const filtered = useMemo(() => filterStatus === 'todos' ? displayedSeriales : displayedSeriales.filter(s => s.status === filterStatus), [displayedSeriales, filterStatus])
+  const summary  = useMemo(() => ({ disponible: displayedSeriales.filter(s => s.status === 'disponible').length, vendido: displayedSeriales.filter(s => s.status === 'vendido').length, dado_baja: displayedSeriales.filter(s => s.status === 'dado_baja').length, reservado: displayedSeriales.filter(s => s.status === 'reservado').length }), [displayedSeriales])
 
   const handleBulkSave = async () => {
     const lines = bulkInput.split('\n').map(l => l.trim()).filter(Boolean)
     if (!lines.length) { toast.error('Ingresa al menos un número de serie'); return }
-    if (!selectedProd) return
+    if (!activeProduct) return
     setSavingBulk(true)
-    const r = await serialService.createBatch(selectedProd.id, lines.map(sn => ({ serialNumber: sn, notes: '' })))
+    const r = await serialService.createBatch(activeProduct.id, lines.map(sn => ({ serialNumber: sn, notes: '' })))
     setSavingBulk(false)
     if (r.error) { toast.error(r.error); return }
     toast.success(`${r.data.created} serial(es) registrado(s)`)
@@ -60,13 +57,13 @@ export function SerialesView({ products }) {
   }
 
   const handlePatchStatus = async (serial, newStatus) => {
-    const r = await serialService.patchStatus(selectedProd.id, serial.id, newStatus)
+    const r = await serialService.patchStatus(activeProduct.id, serial.id, newStatus)
     if (r.error) { toast.error(r.error); return }
     toast.success(`Serial marcado como "${newStatus}"`); await reloadSeriales()
   }
 
   const handleDelete = async (serial) => {
-    const r = await serialService.remove(selectedProd.id, serial.id)
+    const r = await serialService.remove(activeProduct.id, serial.id)
     if (r.error) { toast.error(r.error); return }
     toast.success('Serial eliminado'); setConfirmDel(null); await reloadSeriales()
   }
@@ -83,7 +80,7 @@ export function SerialesView({ products }) {
         ) : (
           <div className="space-y-2">
             {serieProducts.map(p => {
-              const isSelected = selectedProd?.id === p.id
+              const isSelected = activeProduct?.id === p.id
               return (
                 <button key={p.id} onClick={() => setSelectedProd(p)} className={`w-full text-left p-3 rounded-xl border transition-all ${isSelected ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-purple-200 dark:hover:border-purple-800'}`}>
                   <div className="flex items-center justify-between">
@@ -99,21 +96,21 @@ export function SerialesView({ products }) {
       </div>
 
       <div className="lg:col-span-2">
-        {!selectedProd ? (
+        {!activeProduct ? (
           <div className="flex items-center justify-center h-64 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl"><div className="text-center"><div className="text-4xl mb-3 opacity-20">🔑</div><p className="text-gray-400 dark:text-slate-500 text-sm">Selecciona un producto para ver sus seriales</p></div></div>
         ) : (
           <div className="space-y-4">
             <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xl shrink-0">🔑</div>
-                <div className="min-w-0"><p className="font-semibold text-gray-800 dark:text-slate-100 truncate">{selectedProd.name}</p><p className="text-xs text-gray-400 dark:text-slate-500 font-mono">{selectedProd.barcode}</p></div>
+                <div className="min-w-0"><p className="font-semibold text-gray-800 dark:text-slate-100 truncate">{activeProduct.name}</p><p className="text-xs text-gray-400 dark:text-slate-500 font-mono">{activeProduct.barcode}</p></div>
               </div>
               <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 shrink-0">+ Registrar seriales</button>
             </div>
 
             <div className="grid grid-cols-4 gap-2">
               {[
-                { key: 'todos',      label: 'Total',         val: seriales.length,    color: 'bg-gray-50 dark:bg-slate-800/60 text-gray-700 dark:text-slate-300' },
+                { key: 'todos',      label: 'Total',         val: displayedSeriales.length,    color: 'bg-gray-50 dark:bg-slate-800/60 text-gray-700 dark:text-slate-300' },
                 { key: 'disponible', label: 'Disponibles',   val: summary.disponible, color: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
                 { key: 'vendido',    label: 'Vendidos',      val: summary.vendido,    color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
                 { key: 'dado_baja',  label: 'Dados de baja', val: summary.dado_baja,  color: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' },

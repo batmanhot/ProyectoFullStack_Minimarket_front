@@ -4,7 +4,7 @@
  * Cubre los 4 tipos de campaña, jerarquía N1→N2→N3,
  * aritmética HALF_UP y vigencia de campañas.
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   isCampaignActive,
   evaluateDiscounts,
@@ -21,7 +21,6 @@ const localDate = (d) => {
   const dd = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${dd}`
 }
-const today = () => localDate(new Date())
 const dayOffset = (days) => {
   const d = new Date()
   d.setDate(d.getDate() + days)

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { brandService } from '../../services/index'
-import { inputCls, labelCls, btnSecondary, btnPrimary, BRAND_COLORS, ColorDot } from './catalog.shared'
+import { inputCls, labelCls, btnSecondary, btnPrimary, BRAND_COLORS } from './catalog.shared'
+import { ColorDot } from './ColorDot'
 import toast from 'react-hot-toast'
 
 export function BrandForm({ brand, onClose }) {

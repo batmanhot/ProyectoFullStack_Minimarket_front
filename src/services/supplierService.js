@@ -1,19 +1,16 @@
-import { api, USE_API, ok, gs, delay } from './_base'
-
-const _tryApi = async (fn) => {
-  try { return await fn() } catch (_) { return null }
-}
+import { api, USE_API, ok, fail, gs, delay } from './_base'
 
 export const supplierService = {
   async getAll(search = '') {
     await delay(180)
     if (USE_API) {
-      const res = await _tryApi(async () => {
+      try {
         const { data } = await api.get('/suppliers', { params: { search } })
         if (!search) gs().setSuppliers(data.data)
         return ok(data.data)
-      })
-      if (res) return res
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al obtener proveedores')
+      }
     }
     let suppliers = gs().suppliers.filter(s => s.isActive !== false)
     if (search) {
@@ -25,15 +22,31 @@ export const supplierService = {
 
   async create(payload) {
     await delay()
+    if (USE_API) {
+      try {
+        const { data } = await api.post('/suppliers', payload)
+        gs().addSupplier(data.data)
+        return ok(data.data)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al crear proveedor')
+      }
+    }
     const supplier = { ...payload, id: crypto.randomUUID(), isActive: true, createdAt: new Date().toISOString() }
-    if (USE_API) await _tryApi(() => api.post('/suppliers', supplier))
     gs().addSupplier(supplier)
     return ok(supplier)
   },
 
   async update(id, payload) {
     await delay()
-    if (USE_API) await _tryApi(() => api.put(`/suppliers/${id}`, payload))
+    if (USE_API) {
+      try {
+        const { data } = await api.put(`/suppliers/${id}`, payload)
+        gs().updateSupplier(id, data.data)
+        return ok(data.data)
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al actualizar proveedor')
+      }
+    }
     gs().updateSupplier(id, payload)
     return ok({ id, ...payload })
   },

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useStore } from '../../store/index'
+
 import { categoryService } from '../../services/index'
 import { formatDate } from '../../shared/utils/helpers'
 import { ImportButton } from '../../shared/components/ui/ExportButtons'
@@ -9,11 +9,11 @@ import { EmptyState } from '../../shared/components/ui/Skeleton'
 import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import { CategoryForm } from './CategoryForm'
-import { ColorDot } from './catalog.shared'
+import { ColorDot } from './ColorDot'
 import toast from 'react-hot-toast'
 
 export function CategoriesView({ categories, products }) {
-  const { deleteCategory } = useStore()
+
   const [search, setSearch]             = useState('')
   const [modal, setModal]               = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)

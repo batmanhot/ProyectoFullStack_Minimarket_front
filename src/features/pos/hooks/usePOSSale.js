@@ -25,6 +25,7 @@ import toast from 'react-hot-toast'
  * @param {number}   deps.igvRate           - Tasa de IGV
  * @param {Object}   deps.appliedTicket     - Ticket de descuento aplicado (si hay)
  * @param {Function} deps.releaseReserve    - Liberar reserva de stock multi-caja
+ * @param {Function} deps.getReserveId      - Obtener la reserva activa del carrito
  * @param {Function} deps.resetDiscount     - Limpiar estado de descuentos
  * @param {Function} deps.broadcast         - Emitir evento a pantalla del cliente
  */
@@ -34,6 +35,7 @@ export function usePOSSale({
   baseImponible, igvCalculado, igvRate,
   appliedTicket,
   releaseReserve,
+  getReserveId,
   resetDiscount,
   broadcast,
 }) {
@@ -78,6 +80,7 @@ export function usePOSSale({
       redeemedPoints,
       tipoComprobante,
       sunatStatus:     tipoComprobante === 'ticket' ? null : 'pendiente',
+      stockReserveId:  getReserveId?.() || null,
     }
 
     const result = await saleService.create(salePayload)
@@ -119,7 +122,7 @@ export function usePOSSale({
   }, [
     appliedTicket, baseImponible, broadcast, currentUser,
     igvCalculado, igvRate, mergedCartItems,
-    redeemDiscountTicket, releaseReserve, resetDiscount,
+    redeemDiscountTicket, releaseReserve, getReserveId, resetDiscount,
     subtotalBruto, totalAPagar, totalDescuentos,
   ])
 

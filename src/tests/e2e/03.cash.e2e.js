@@ -3,18 +3,22 @@
  * Login como Cajero → Cash → Aperturar → Cerrar
  */
 import { test, expect } from '@playwright/test'
-import { loginWithRole, goTo } from './helpers.js'
+import { loginWithRole, goTo, closeActiveCash } from './helpers.js'
 
 test.beforeEach(async ({ page }) => {
   // Limpiar estado de caja anterior
-  await page.goto('http://localhost:3000/app/demo')
+  await page.goto('/app/e2e')
   await page.evaluate(() => {
     Object.keys(localStorage)
       .filter(k => k.includes('demo') || k.includes('minimarket'))
       .forEach(k => localStorage.removeItem(k))
   })
   await loginWithRole(page, 'Administrador')
-  await goTo(page, 'cash')
+  await closeActiveCash(page)
+})
+
+test.afterEach(async ({ page }) => {
+  await closeActiveCash(page)
 })
 
 // ─── Vista principal de Caja ───────────────────────────────────────────────────
@@ -36,33 +40,33 @@ test('Caja — botón "Aperturar caja" visible cuando no hay sesión activa', as
 // ─── Apertura de caja ──────────────────────────────────────────────────────────
 
 test('Caja — formulario de apertura se muestra al hacer click', async ({ page }) => {
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
 
   await expect(page.locator('h2').filter({ hasText: 'Apertura de caja' })).toBeVisible()
-  await expect(page.locator('input[type="number"]').first()).toBeVisible()
+  await expect(page.getByTestId('cash-opening-amount')).toBeVisible()
 })
 
 test('Caja — apertura con monto S/200 por defecto', async ({ page }) => {
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
 
   // El campo tiene el valor por defecto 200
-  const input = page.locator('input[type="number"]').first()
+  const input = page.getByTestId('cash-opening-amount')
   await expect(input).toHaveValue('200')
 })
 
 test('Caja — apertura exitosa con monto personalizado', async ({ page }) => {
   // Navegar al formulario
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
 
   // Cambiar el monto a 500
-  const montoInput = page.locator('input[type="number"]').first()
+  const montoInput = page.getByTestId('cash-opening-amount')
   await montoInput.fill('500')
 
   // Confirmar apertura
-  const submitBtn = page.locator('button').filter({ hasText: 'Aperturar caja' }).last()
+  const submitBtn = page.getByTestId('cash-open-submit')
   await submitBtn.click()
   await page.waitForTimeout(1000)
 
@@ -72,10 +76,10 @@ test('Caja — apertura exitosa con monto personalizado', async ({ page }) => {
 
 test('Caja — después de apertura muestra sesión activa', async ({ page }) => {
   // Abrir caja con el valor por defecto
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
 
-  const submitBtn = page.locator('button').filter({ hasText: 'Aperturar caja' }).last()
+  const submitBtn = page.getByTestId('cash-open-submit')
   await submitBtn.click()
   await page.waitForTimeout(1200)
 
@@ -88,9 +92,9 @@ test('Caja — después de apertura muestra sesión activa', async ({ page }) =>
 
 test('Caja — formulario de cierre se muestra tras apertura', async ({ page }) => {
   // Abrir caja primero
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Aperturar caja' }).last().click()
+  await page.getByTestId('cash-open-submit').press('Enter')
   await page.waitForTimeout(1200)
 
   // Regresar a la vista principal
@@ -103,9 +107,9 @@ test('Caja — formulario de cierre se muestra tras apertura', async ({ page }) 
 
 test('Caja — formulario de cierre muestra campo de monto contado', async ({ page }) => {
   // Abrir caja
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Aperturar caja' }).last().click()
+  await page.getByTestId('cash-open-submit').press('Enter')
   await page.waitForTimeout(1200)
 
   // Volver y abrir formulario de cierre
@@ -122,9 +126,9 @@ test('Caja — formulario de cierre muestra campo de monto contado', async ({ pa
 
 test('Caja — flujo completo: apertura → cierre con S/200 contados', async ({ page }) => {
   // 1. Aperturar caja con S/200
-  await page.getByRole('button', { name: 'Aperturar caja', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Aperturar ahora', exact: true }).click()
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Aperturar caja' }).last().click()
+  await page.getByTestId('cash-open-submit').press('Enter')
   await page.waitForTimeout(1200)
 
   // 2. Volver a la vista de caja
@@ -135,12 +139,12 @@ test('Caja — flujo completo: apertura → cierre con S/200 contados', async ({
   await page.waitForTimeout(400)
 
   // 4. Ingresar monto contado (S/200 = sin diferencia)
-  const countedInput = page.locator('input').filter({ hasNot: page.locator('textarea') }).last()
+  const countedInput = page.getByTestId('cash-counted-amount')
   await countedInput.fill('200')
   await page.waitForTimeout(300)
 
   // 5. Click "Cerrar caja"
-  await page.locator('button').filter({ hasText: 'Cerrar caja' }).first().click()
+  await page.getByTestId('cash-close-submit').press('Enter')
   await page.waitForTimeout(500)
 
   // 6. Confirmar en el modal de confirmación

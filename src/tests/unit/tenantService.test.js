@@ -5,7 +5,7 @@
  *
  * Las funciones API-mode se testean mockeando axios (_base).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // ─── Mock de _base ANTES de importar tenantService ────────────────────────────
 vi.mock('../../services/_base', () => ({

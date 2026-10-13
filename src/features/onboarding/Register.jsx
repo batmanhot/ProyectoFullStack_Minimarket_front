@@ -49,7 +49,6 @@ function PlanStep({ form, setForm }) {
   const cycleDays = BILLING_CYCLES[billingCycle]?.days ?? 30
   const expiryPreview = fmtDate(getAccessExpiry(new Date().toISOString(), billingCycle))
   const totalPrice = getTotalPrice(plan, billingCycle)
-  const monthlyPrice = getPlanPrice(plan, billingCycle)
   const discount = BILLING_CYCLES[billingCycle]?.discountPct ?? 0
   const isFree = PLANS[plan]?.price === 0
 
@@ -185,7 +184,7 @@ export default function Register() {
       if (!form.ownerName.trim())  return 'Ingresa el nombre del dueño / administrador'
       if (!form.ownerEmail.trim() || !form.ownerEmail.includes('@')) return 'Ingresa un email válido'
       if (!form.phone.trim() || form.phone.length < 9) return 'Ingresa un número de celular válido (9 dígitos)'
-      if (form.password.length < 6) return 'La contraseña debe tener al menos 6 caracteres'
+      if (form.password.length < 12) return 'La contraseña debe tener al menos 12 caracteres'
       if (form.password !== form.confirmPassword) return 'Las contraseñas no coinciden'
     }
     return ''
@@ -354,7 +353,7 @@ export default function Register() {
                 value={form.phone} onChange={set('phone')}
                 maxLength={12} />
               <Field label="Contraseña *" icon={Lock} type="password"
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 12 caracteres"
                 value={form.password} onChange={set('password')} />
               <Field label="Confirmar contraseña *" icon={Lock} type="password"
                 placeholder="Repite tu contraseña"

@@ -3,17 +3,24 @@
  * Login → buscar venta → seleccionar ítems → motivo → confirmar
  */
 import { test, expect } from '@playwright/test'
-import { loginWithRole, goTo } from './helpers.js'
+import { loginWithRole, goTo, openCashSession, closeActiveCash, closeSaleReceipt } from './helpers.js'
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('http://localhost:3000/app/demo')
+  await page.goto('/app/e2e')
   await page.evaluate(() => {
     Object.keys(localStorage)
       .filter(k => k.includes('demo') || k.includes('minimarket'))
       .forEach(k => localStorage.removeItem(k))
   })
   await loginWithRole(page, 'Administrador')
+  // Las pruebas de flujo crean una venta antes de emitir la nota de crédito.
+  // El POS exige una caja abierta, igual que en uso real.
+  await openCashSession(page)
   await goTo(page, 'returns')
+})
+
+test.afterEach(async ({ page }) => {
+  await closeActiveCash(page)
 })
 
 // ─── Vista principal ────────────────────────────────────────────────────────────
@@ -53,12 +60,10 @@ test('Devoluciones — filtros "Todas" y "Hoy" visibles en el historial', async 
 
 test('Devoluciones — historial vacío muestra mensaje informativo', async ({ page }) => {
   // Sin NCs aún — debe mostrar el estado vacío
-  const emptyMsg = page.locator('text=Sin notas de crédito')
-  const historyTable = page.locator('table')
-  // Puede estar vacío o con datos del seed
-  const isEmpty = await emptyMsg.isVisible()
-  const hasTable = await historyTable.isVisible()
-  expect(isEmpty || hasTable).toBeTruthy()
+  // La carga del historial es asíncrona: cualquiera de los dos estados terminales es válido.
+  const emptyMsg = page.getByTestId('returns-history-empty')
+  const historyTable = page.getByTestId('returns-history-table')
+  await expect(emptyMsg.or(historyTable)).toBeVisible()
 })
 
 // ─── Búsqueda con venta no existente ───────────────────────────────────────────
@@ -100,9 +105,9 @@ test('Devoluciones — flujo completo: buscar → seleccionar → motivo → con
   // 1. Hacer una venta en el POS primero para tener algo que devolver
   await goTo(page, 'pos')
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  await searchInput.fill('Agua San Luis')
+  await searchInput.fill('Agua Mineral')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Agua San Luis' }).first().click()
+  await page.locator('button').filter({ hasText: 'Agua Mineral' }).first().click()
   await page.waitForTimeout(200)
 
   // Cobrar
@@ -114,9 +119,9 @@ test('Devoluciones — flujo completo: buscar → seleccionar → motivo → con
   await page.waitForTimeout(300)
   await page.locator('button').filter({ hasText: 'Confirmar venta' }).first().click()
   await page.waitForTimeout(1500)
+  await closeSaleReceipt(page)
 
   // Capturar el número de boleta generado (B001-XXXXXX)
-  const ticketText = await page.locator('text=B001').first().innerText().catch(() => null)
 
   // 2. Ir a Devoluciones
   await goTo(page, 'returns')
@@ -165,9 +170,9 @@ test('Devoluciones — encontrar venta muestra paso 2 de ítems', async ({ page 
   // Primero crear una venta mínima
   await goTo(page, 'pos')
   const si = page.locator('input[placeholder*="Buscar por nombre"]')
-  await si.fill('Coca-Cola')
+  await si.fill('Coca Cola')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Coca-Cola' }).first().click()
+  await page.locator('button').filter({ hasText: 'Coca Cola' }).first().click()
   await page.waitForTimeout(200)
   await page.locator('button').filter({ hasText: 'Cobrar' }).first().click()
   await page.waitForTimeout(400)
@@ -177,6 +182,7 @@ test('Devoluciones — encontrar venta muestra paso 2 de ítems', async ({ page 
   await page.waitForTimeout(300)
   await page.locator('button').filter({ hasText: 'Confirmar venta' }).first().click()
   await page.waitForTimeout(1200)
+  await closeSaleReceipt(page)
 
   await goTo(page, 'returns')
 
@@ -199,9 +205,9 @@ test('Devoluciones — encontrar venta muestra paso 2 de ítems', async ({ page 
 test('Devoluciones — botón cancelar devolución regresa al estado inicial', async ({ page }) => {
   await goTo(page, 'pos')
   const si = page.locator('input[placeholder*="Buscar por nombre"]')
-  await si.fill('Inca Kola')
+  await si.fill('Coca Cola')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Inca Kola' }).first().click()
+  await page.locator('button').filter({ hasText: 'Coca Cola' }).first().click()
   await page.waitForTimeout(200)
   await page.locator('button').filter({ hasText: 'Cobrar' }).first().click()
   await page.waitForTimeout(400)
@@ -211,6 +217,7 @@ test('Devoluciones — botón cancelar devolución regresa al estado inicial', a
   await page.waitForTimeout(300)
   await page.locator('button').filter({ hasText: 'Confirmar venta' }).first().click()
   await page.waitForTimeout(1200)
+  await closeSaleReceipt(page)
 
   await goTo(page, 'returns')
   const returnInput = page.locator('input[placeholder*="N° boleta"]')

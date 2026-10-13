@@ -22,49 +22,26 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { formatCurrency } from '../../shared/utils/helpers'
+import { CHANNEL_NAME } from './customerDisplayChannel'
 
 // ─── Canal de comunicación ────────────────────────────────────────────────────
-const CHANNEL_NAME = 'pos_customer_display'
-
 /**
  * broadcastToCustomerDisplay — Emite eventos al canal.
  * Llamar desde POS.jsx cada vez que cambia el carrito.
  */
-export function broadcastToCustomerDisplay(event) {
-  try {
-    if (typeof BroadcastChannel === 'undefined') return
-    const channel = new BroadcastChannel(CHANNEL_NAME)
-    channel.postMessage({ ...event, ts: Date.now() })
-    channel.close()
-  } catch {
-    // BroadcastChannel no disponible en este browser
-  }
-}
 
 /**
  * openCustomerDisplay — Abre la ventana del cliente.
  * Llamar desde un botón en el POS.
  */
-export function openCustomerDisplay() {
-  const url = window.location.pathname.replace(/\/[^/]*$/, '/customer-display')
-  const win = window.open(
-    url,
-    'customer_display',
-    'width=800,height=600,menubar=no,toolbar=no,location=no,status=no'
-  )
-  if (!win) {
-    alert('Activa las ventanas emergentes para abrir la pantalla del cliente')
-  }
-  return win
-}
 
 // ─── COMPONENTE — Pantalla del cliente ───────────────────────────────────────
 export default function CustomerDisplay() {
   const [cart,          setCart]          = useState([])
   const [businessConfig,setBusinessConfig]= useState({})
   const [sale,          setSale]          = useState(null)  // venta completada
-  const [lastEvent,     setLastEvent]     = useState(null)
-  const [connected,     setConnected]     = useState(false)
+  const [,     setLastEvent]     = useState(null)
+  const [connected]                      = useState(() => typeof BroadcastChannel !== 'undefined')
   const channelRef = useRef(null)
 
   useEffect(() => {
@@ -73,12 +50,10 @@ export default function CustomerDisplay() {
 
     try {
       channelRef.current = new BroadcastChannel(CHANNEL_NAME)
-      setConnected(true)
-
       // Pedir el estado actual al POS en cuanto el canal esté listo.
       // Si el POS está abierto en otra ventana, responderá con CART_UPDATE.
       setTimeout(() => {
-        try { channelRef.current?.postMessage({ type: 'REQUEST_STATE', ts: Date.now() }) } catch {}
+        try { channelRef.current?.postMessage({ type: 'REQUEST_STATE', ts: Date.now() }) } catch { /* La ventana secundaria puede haberse cerrado. */ }
       }, 400)
 
       channelRef.current.onmessage = (evt) => {
@@ -109,7 +84,7 @@ export default function CustomerDisplay() {
         }
       }
     } catch {
-      setConnected(false)
+      // El navegador no permite la comunicación entre ventanas en este contexto.
     }
 
     return () => {

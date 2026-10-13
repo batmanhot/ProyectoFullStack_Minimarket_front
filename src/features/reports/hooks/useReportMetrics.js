@@ -76,7 +76,7 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
       igv:            parseFloat(igv.toFixed(2)),
       totalDescuentos: parseFloat(totalDescuentos.toFixed(2)),
     }
-  }, [filteredSales, products])
+  }, [filteredSales, products, costMethod])
 
   // ── 3. Por método de pago ──────────────────────────────────────────────────
   const byPayment = useMemo(() => {
@@ -157,7 +157,7 @@ export function useReportMetrics({ sales, products, categories, returns = [], ra
       lista:               lista.sort((a, b) => (b.priceBuy * b.stock) - (a.priceBuy * a.stock)),
       capitalInmovilizado: parseFloat(capitalInmovilizado.toFixed(2)),
     }
-  }, [sales, products])
+  }, [sales, products, costMethod])
 
   // ── 8. Métricas de devoluciones del período ────────────────────────────────
   const returnMetrics = useMemo(() => {

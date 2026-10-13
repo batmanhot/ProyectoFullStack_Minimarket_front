@@ -104,7 +104,7 @@ function allocateFromBatches(sortedBatches, quantityNeeded) {
  *     desde saleService, después de confirmar la venta.
  *   - Este motor solo decrementa el contador de stock y genera el movimiento.
  */
-export function allocateStock({ product, quantity, invoiceNumber, userId, selectedSerial }) {
+export function allocateStock({ product, quantity, invoiceNumber, selectedSerial }) {
   const control   = product.stockControl || STOCK_CONTROL.SIMPLE
   const available = calcStockDisponible(product)
 
@@ -212,7 +212,7 @@ export function allocateStock({ product, quantity, invoiceNumber, userId, select
 }
 
 // ─── MOTOR DE MERMA ───────────────────────────────────────────────────────────
-export function allocateMerma({ product, quantity, reason, batchId, userId }) {
+export function allocateMerma({ product, quantity, reason, batchId }) {
   const control = product.stockControl || STOCK_CONTROL.SIMPLE
 
   if (control === STOCK_CONTROL.SIMPLE || control === STOCK_CONTROL.SERIE) {

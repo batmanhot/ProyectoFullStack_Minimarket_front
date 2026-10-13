@@ -3,11 +3,16 @@
  * Login → buscar producto → agregar al carrito → cobrar → confirmar
  */
 import { test, expect } from '@playwright/test'
-import { loginWithRole, goTo } from './helpers.js'
+import { loginWithRole, goTo, openCashSession, closeActiveCash } from './helpers.js'
 
 test.beforeEach(async ({ page }) => {
   await loginWithRole(page, 'Administrador')
+  await openCashSession(page)
   await goTo(page, 'pos')
+})
+
+test.afterEach(async ({ page }) => {
+  await closeActiveCash(page)
 })
 
 // ─── Buscador de productos ─────────────────────────────────────────────────────
@@ -19,14 +24,14 @@ test('POS — buscador muestra resultados al escribir', async ({ page }) => {
   await searchInput.fill('Arroz')
   await page.waitForTimeout(300) // debounce de 150ms
 
-  // Deben aparecer resultados (el seed tiene "Arroz Costeño Extra 5kg")
+  // Deben aparecer resultados (el tenant E2E tiene "Arroz Extra 1kg")
   await expect(page.locator('button').filter({ hasText: 'Arroz' }).first()).toBeVisible()
 })
 
 test('POS — búsqueda por código de barras encuentra el producto', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  // Barcode del Arroz Costeño: 7751010012459
-  await searchInput.fill('7751010012459')
+  // Barcode del Arroz Extra 1kg de la semilla E2E
+  await searchInput.fill('7750075000003')
   await page.waitForTimeout(300)
 
   await expect(page.locator('button').filter({ hasText: 'Arroz' }).first()).toBeVisible()
@@ -45,30 +50,30 @@ test('POS — búsqueda sin coincidencias no muestra resultados', async ({ page 
 
 test('POS — agregar producto al carrito', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  await searchInput.fill('Inca Kola')
+  await searchInput.fill('Coca Cola')
   await page.waitForTimeout(300)
 
   // Click en el primer resultado
-  await page.locator('button').filter({ hasText: 'Inca Kola' }).first().click()
+  await page.locator('button').filter({ hasText: 'Coca Cola' }).first().click()
   await page.waitForTimeout(300)
 
   // El carrito debe mostrar el producto
-  await expect(page.locator('text=Inca Kola').first()).toBeVisible()
+  await expect(page.locator('text=Coca Cola').first()).toBeVisible()
 })
 
 test('POS — el carrito acumula cantidad al agregar el mismo producto dos veces', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
 
   // Primera adición
-  await searchInput.fill('Inca Kola 500')
+  await searchInput.fill('Coca Cola 1.5L')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Inca Kola 500ml' }).first().click()
+  await page.locator('button').filter({ hasText: 'Coca Cola 1.5L' }).first().click()
   await page.waitForTimeout(200)
 
   // Segunda adición
-  await searchInput.fill('Inca Kola 500')
+  await searchInput.fill('Coca Cola 1.5L')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Inca Kola 500ml' }).first().click()
+  await page.locator('button').filter({ hasText: 'Coca Cola 1.5L' }).first().click()
   await page.waitForTimeout(200)
 
   // Debe mostrar cantidad 2
@@ -82,13 +87,13 @@ test('POS — carrito vacío muestra mensaje de inicio', async ({ page }) => {
 
 test('POS — se puede eliminar un producto del carrito', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  await searchInput.fill('Azúcar')
+  await searchInput.fill('Agua Mineral')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Azúcar' }).first().click()
+  await page.locator('button').filter({ hasText: 'Agua Mineral' }).first().click()
   await page.waitForTimeout(200)
 
   // Verificar que el producto está en el carrito
-  await expect(page.locator('text=Azúcar').first()).toBeVisible()
+  await expect(page.locator('text=Agua Mineral').first()).toBeVisible()
 
   // Click en el botón eliminar (la X de la fila)
   await page.locator('[title="Eliminar"]').first().click()
@@ -103,9 +108,9 @@ test('POS — se puede eliminar un producto del carrito', async ({ page }) => {
 test('POS — botón Cobrar abre el panel de pago', async ({ page }) => {
   // Agregar un producto primero
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  await searchInput.fill('Coca-Cola')
+  await searchInput.fill('Coca Cola')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Coca-Cola' }).first().click()
+  await page.locator('button').filter({ hasText: 'Coca Cola' }).first().click()
   await page.waitForTimeout(200)
 
   // Click en Cobrar
@@ -119,9 +124,9 @@ test('POS — botón Cobrar abre el panel de pago', async ({ page }) => {
 test('POS — venta completa: buscar → carrito → cobrar exacto → confirmar', async ({ page }) => {
   // 1. Agregar producto
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  await searchInput.fill('Agua San Luis 625')
+  await searchInput.fill('Agua Mineral 500ml')
   await page.waitForTimeout(300)
-  await page.locator('button').filter({ hasText: 'Agua San Luis 625ml' }).first().click()
+  await page.locator('button').filter({ hasText: 'Agua Mineral 500ml' }).first().click()
   await page.waitForTimeout(200)
 
   // 2. Abrir panel de pago
@@ -144,9 +149,7 @@ test('POS — venta completa: buscar → carrito → cobrar exacto → confirmar
   await page.waitForTimeout(1000)
 
   // 6. Ticket de venta debe mostrarse
-  await expect(
-    page.locator('text=completada').or(page.locator('text=Ticket').or(page.locator('text=B001')))
-  ).toBeVisible()
+  await expect(page.getByText('TICKET DE VENTA', { exact: true })).toBeVisible()
 })
 
 // ─── Atajos de teclado ─────────────────────────────────────────────────────────

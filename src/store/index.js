@@ -7,14 +7,18 @@
 
 import { create }                      from 'zustand'
 import { persist, subscribeWithSelector } from 'zustand/middleware'
-import { getInitialDemoState, SEED_VARIANTS } from '../data/seedData'
+import { getInitialDemoState, getInitialEmptyState, SEED_VARIANTS } from '../data/seedData'
 import { isCampaignActive }             from '../shared/utils/discountEngine'
 import { STORAGE_KEYS }                 from '../config/storageKeys'
+import { APP_CONFIG }                   from '../config/app'
 
 const _getTenantSlug = () =>
   window.location.pathname.match(/\/app\/([^/]+)/)?.[1] ?? 'demo'
 
 const _STORE_KEY = `${STORAGE_KEYS.storePrefix}${_getTenantSlug()}`
+const _initialState = APP_CONFIG.isDemoOrDevelopment
+  ? getInitialDemoState()
+  : getInitialEmptyState()
 
 import { createAuditSlice }           from './slices/auditSlice'
 import { createAuthSlice }            from './slices/authSlice'
@@ -33,7 +37,7 @@ export const useStore = create(
     persist(
       (set, get) => ({
 
-        ...getInitialDemoState(),
+        ..._initialState,
 
         ...createAuditSlice(set, get),
         ...createAuthSlice(set, get),
@@ -78,7 +82,6 @@ export const useStore = create(
 
           const igvRate = parseFloat(systemConfig?.igvRate ?? 0.18)
           const adjustedSales = seed.sales.map(sale => {
-            if (Math.abs(igvRate - 0.18) < 0.001) return sale
             const igv  = parseFloat((sale.total / (1 + igvRate) * igvRate).toFixed(2))
             const base = parseFloat((sale.total - igv).toFixed(2))
             return { ...sale, igv, baseImponible: base, igvRate }
@@ -134,6 +137,23 @@ export const useStore = create(
 
       {
         name: _STORE_KEY,
+        version: 2,
+        migrate: (persisted, version) => {
+          // Al pasar a un build productivo, retirar únicamente los registros
+          // con IDs de fixtures demo antiguos. Los IDs reales son UUIDs.
+          if (APP_CONFIG.isDemoOrDevelopment || version >= 2) return persisted
+          const isDemoId = (value) => /^(prd|cat|brn|sup|cli|usr)-/i.test(String(value?.id || ''))
+          return {
+            ...persisted,
+            products:   (persisted.products   || []).filter(item => !isDemoId(item)),
+            categories: (persisted.categories || []).filter(item => !isDemoId(item)),
+            brands:     (persisted.brands     || []).filter(item => !isDemoId(item)),
+            suppliers:  (persisted.suppliers  || []).filter(item => !isDemoId(item)),
+            clients:    (persisted.clients    || []).filter(item => !isDemoId(item)),
+            users:      (persisted.users      || []).filter(item => !isDemoId(item)),
+            sales:      (persisted.sales      || []).filter(item => !isDemoId(item)),
+          }
+        },
         partialize: (s) => ({
           products:          s.products,
           productVariants:   s.productVariants,

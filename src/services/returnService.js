@@ -1,5 +1,7 @@
 import { useStore } from '../store/index'
 import { api, USE_API, ok, fail, gs, delay } from './_base'
+import { productService } from './productService'
+import { clientService } from './clientService'
 
 export const returnService = {
   async create(payload) {
@@ -15,7 +17,10 @@ export const returnService = {
     if (USE_API) {
       if (navigator.onLine) {
         try {
-          await api.post('/returns', payload)
+          const { data } = await api.post('/returns', payload)
+          await Promise.all([productService.getAll(), clientService.getAll()])
+          gs().addReturn(data.data)
+          return ok(data.data)
         } catch (err) {
           return fail(err.response?.data?.message || err.message || 'Error al registrar la devolución')
         }
@@ -128,7 +133,10 @@ export const returnService = {
     if (USE_API) {
       if (navigator.onLine) {
         try {
-          await api.patch(`/returns/${id}/anular`, { motivo, userId })
+          const { data } = await api.patch(`/returns/${id}/anular`, { motivo, userId })
+          await Promise.all([productService.getAll(), clientService.getAll()])
+          gs().anularReturn(id, motivo)
+          return ok(data.data)
         } catch (err) {
           return fail(err.response?.data?.message || err.message || 'Error al anular la devolución')
         }

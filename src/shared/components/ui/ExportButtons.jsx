@@ -8,6 +8,10 @@
  *   <PDFButton   onClick={handleExportPDF} />
  */
 
+import { useStore } from '../../../store/index'
+
+const canExport = (role) => role === 'admin' || role === 'gerente'
+
 const ICON_EXCEL = (
   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -28,6 +32,8 @@ const ICON_PDF = (
 )
 
 export function ExcelButton({ onClick, label = 'Excel', className = '' }) {
+  const role = useStore(s => s.currentUser?.role)
+  if (!canExport(role)) return null
   return (
     <button
       onClick={onClick}
@@ -61,6 +67,8 @@ export function ImportButton({ onClick, label = 'Importar', className = '' }) {
 }
 
 export function PDFButton({ onClick, label = 'PDF', className = '' }) {
+  const role = useStore(s => s.currentUser?.role)
+  if (!canExport(role)) return null
   return (
     <button
       onClick={onClick}

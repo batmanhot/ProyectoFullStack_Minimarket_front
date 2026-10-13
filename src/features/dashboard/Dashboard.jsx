@@ -17,7 +17,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useStore }          from '../../store/index'
 import { dashboardService }  from '../../services/index'
 import { USE_API }           from '../../services/_base'
-import { formatCurrency, formatDateTime } from '../../shared/utils/helpers'
+import { formatCurrency } from '../../shared/utils/helpers'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
@@ -106,7 +106,8 @@ function SectionTitle({ children }) {
 }
 
 // ─── VISTA CAJERO ─────────────────────────────────────────────────────────────
-function DashboardCajero({ currentUser, sales, activeCashSession, products }) {
+function DashboardCajero({ currentUser, sales, activeCashSession }) {
+  const [currentTime] = useState(Date.now)
   const turnoSales = useMemo(() => {
     if (!activeCashSession) return []
     return sales.filter(s =>
@@ -123,7 +124,7 @@ function DashboardCajero({ currentUser, sales, activeCashSession, products }) {
 
   const horaInicio  = activeCashSession ? new Date(activeCashSession.openedAt) : null
   const duracion    = horaInicio
-    ? Math.floor((Date.now() - horaInicio) / 60000)
+    ? Math.floor((currentTime - horaInicio) / 60000)
     : 0
 
   return (
@@ -203,7 +204,7 @@ function DashboardCajero({ currentUser, sales, activeCashSession, products }) {
 }
 
 // ─── VISTA SUPERVISOR ─────────────────────────────────────────────────────────
-function DashboardSupervisor({ sales, products, categories, returns, currentUser, users }) {
+function DashboardSupervisor({ sales, products, returns }) {
   const todayRange = useMemo(() => getRange('today'), [])
   const todaySales = useMemo(() => filterSales(sales, todayRange), [sales, todayRange])
 
@@ -609,7 +610,7 @@ function WidgetEmbudo({ returns = [], currSales, currTotal, currRange }) {
 }
 
 // ─── VISTA ADMIN / GERENTE ────────────────────────────────────────────────────
-function DashboardEjecutivo({ sales, products, categories, returns, clients, mermaRecords }) {
+function DashboardEjecutivo({ sales, products, returns, clients, mermaRecords }) {
   const [range, setRange] = useState('month')
 
   const currRange = useMemo(() => getRange(range), [range])
@@ -886,7 +887,7 @@ export default function Dashboard() {
     mermaRecords,
     activeCashSession, currentUser, users,
   } = useStore()
-  const [apiKPIs, setApiKPIs] = useState(null)
+  const [, setApiKPIs] = useState(null)
 
   useEffect(() => {
     if (USE_API) dashboardService.getKPIs().then(res => { if (res.ok) setApiKPIs(res.data) })

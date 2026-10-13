@@ -2,7 +2,7 @@
  * Tests: config/plans.js
  * Cubre precios, fechas de acceso, estados y permisos de plan.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 import {
   BONUS_DAYS,

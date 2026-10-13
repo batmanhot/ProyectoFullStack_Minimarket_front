@@ -2,7 +2,7 @@
  * Tests unitarios: authSlice
  * Usa una fábrica de store mínima que simula set/get de Zustand.
  */
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect } from 'vitest'
 import { createAuthSlice } from '../../store/slices/authSlice'
 
 // ─── Fábrica de store ─────────────────────────────────────────────────────────

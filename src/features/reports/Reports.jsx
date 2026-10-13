@@ -18,13 +18,13 @@ import {
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
+import { formatCurrency, formatDate } from '../../shared/utils/helpers'
 import { downloadExcel, exportToExcel, exportToPDF }  from '../../shared/utils/export'
 import { ExcelButton, PDFButton }                       from '../../shared/components/ui/ExportButtons'
 import { useReportMetrics }                            from './hooks/useReportMetrics'
 import Modal                                            from '../../shared/components/ui/Modal'
 import toast                                           from 'react-hot-toast'
-import { useTenantSafe }                               from '../../context/TenantContext'
+import { useTenantSafe }                               from '../../context/tenantContext.shared'
 import { canUsePlan, PLANS, PLAN_ORDER }               from '../../config/plans'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -1034,7 +1034,7 @@ export default function Reports() {
           )
         }
 
-        const { rows, totalValue, totalSKUs, sinCosto, catMap } = inventarioValorizado
+        const { rows, totalValue, totalSKUs, sinCosto } = inventarioValorizado
         const handleExportInvVal = () => {
           exportToExcel(
             rows.map(r => ({

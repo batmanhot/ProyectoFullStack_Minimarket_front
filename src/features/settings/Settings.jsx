@@ -1,11 +1,18 @@
 import { useState, useRef } from 'react'
 import { useStore } from '../../store/index'
-import { useTenantSafe } from '../../context/TenantContext'
+import { useTenantSafe } from '../../context/tenantContext.shared'
 import { SECTORS } from '../../config/app'
 import { STORAGE_KEYS } from '../../config/storageKeys'
 import { locationService, notificationService } from '../../services/index'
 import { USE_API } from '../../services/_base'
 import toast from 'react-hot-toast'
+
+const DEMO_CREDENTIALS = [
+  [import.meta.env.VITE_DEMO_ADMIN_USER, import.meta.env.VITE_DEMO_ADMIN_PASSWORD],
+  [import.meta.env.VITE_DEMO_CASHIER_USER, import.meta.env.VITE_DEMO_CASHIER_PASSWORD],
+  ['supervisor', import.meta.env.VITE_DEMO_SUPERVISOR_PASSWORD],
+  ['gerente', import.meta.env.VITE_DEMO_MANAGER_PASSWORD],
+].filter(([username, password]) => username && password)
 
 // ─── Primitivos UI ───────────────────────────────────────────────────────────
 
@@ -346,6 +353,10 @@ function LocationsPanel() {
 }
 
 // ─── Panel de Notificaciones por Email ───────────────────────────────────────
+function Spinner() {
+  return <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+}
+
 function NotificationsPanel() {
   const { businessConfig } = useStore()
   const [emailTo,     setEmailTo]     = useState(businessConfig?.email || '')
@@ -377,8 +388,6 @@ function NotificationsPanel() {
     else if (!r.data?.sent) { setLastResult('Sin alertas activas en este momento — el resumen no se envía si no hay alertas.'); toast('ℹ️ Sin alertas activas') }
     else { setLastResult(`Resumen enviado a ${r.data.to} · ${r.data.alertCount} alerta(s).`); toast.success(`📊 Resumen enviado — ${r.data.alertCount} alerta(s)`) }
   }
-
-  const Spinner = () => <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
 
   return (
     <div className="space-y-5">
@@ -704,11 +713,11 @@ function POSTab({ sys, setSys }) {
         <Field label="Modo demo activo" sub="Muestra accesos rápidos por rol en la pantalla de login — desactiva en producción">
           <Toggle value={sys.demoMode !== false} onChange={v => setSys({...sys, demoMode: v})}/>
         </Field>
-        {sys.demoMode !== false && (
+        {sys.demoMode !== false && DEMO_CREDENTIALS.length > 0 && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-xs text-blue-700 dark:text-blue-400">
             <p className="font-semibold mb-2">Credenciales del demo:</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[['admin','admin123'],['cajero1','cajero123'],['cajero2','cajero123'],['supervisor','super123'],['gerente','gerente123']].map(([u,p]) => (
+              {DEMO_CREDENTIALS.map(([u,p]) => (
                 <div key={u} className="bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-blue-100 dark:border-blue-900">
                   <span className="font-mono font-bold">{u}</span><span className="text-blue-400 mx-1">/</span><span className="font-mono">{p}</span>
                 </div>

@@ -76,8 +76,8 @@ export const userSchema = z.object({
   confirmPassword: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.password) {
-    if (data.password.length < 6) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Mínimo 6 caracteres' })
+    if (data.password.length < 12) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Mínimo 12 caracteres' })
     }
     if (data.password !== data.confirmPassword) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['confirmPassword'], message: 'Las contraseñas no coinciden' })

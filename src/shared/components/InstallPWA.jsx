@@ -5,22 +5,14 @@ import { Download, X, Smartphone, Monitor } from 'lucide-react'
 export default function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
-  const [isIOS, setIsIOS] = useState(false)
-  const [isStandalone, setIsStandalone] = useState(false)
+  const [isIOS] = useState(() => /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
+  const [isStandalone] = useState(() => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || document.referrer.includes('android-app://'))
 
   useEffect(() => {
     // Detectar iOS
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-    setIsIOS(ios)
-
     // Detectar si ya está instalado
-    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
-                       window.navigator.standalone ||
-                       document.referrer.includes('android-app://')
-    setIsStandalone(standalone)
-
     // Si ya está instalado, no mostrar nada
-    if (standalone) {
+    if (isStandalone) {
       return
     }
 
@@ -50,7 +42,7 @@ export default function InstallPWA() {
       window.removeEventListener('beforeinstallprompt', handler)
       clearTimeout(promptTimer)
     }
-  }, [])
+  }, [isStandalone])
 
   const handleInstall = async () => {
     if (!deferredPrompt) {

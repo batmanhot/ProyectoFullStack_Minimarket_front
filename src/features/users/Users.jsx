@@ -6,13 +6,13 @@ import { useState, useMemo, useEffect } from 'react'
 import { useStore }           from '../../store/index'
 import { userService }        from '../../services/index'
 import { USE_API }            from '../../services/_base'
-import { useForm }            from 'react-hook-form'
+import { useForm, useWatch }  from 'react-hook-form'
 import { zodResolver }        from '@hookform/resolvers/zod'
 import { userSchema }         from '../../shared/schemas/index'
 import { formatDate }         from '../../shared/utils/helpers'
 import { ROLES }              from '../../config/app'
 import { PLANS }              from '../../config/plans'
-import { useTenantSafe }      from '../../context/TenantContext'
+import { useTenantSafe }      from '../../context/tenantContext.shared'
 import { RoleBadge }          from '../../shared/components/ui/Badge'
 import Modal                  from '../../shared/components/ui/Modal'
 import ConfirmModal           from '../../shared/components/ui/ConfirmModal'
@@ -58,22 +58,22 @@ const RC = {
 
 // ─── Formulario de usuario ────────────────────────────────────────────────────
 function UserForm({ user, onClose, availableRoles }) {
-  const { addUser, updateUser, users } = useStore()
+
   const [changePassword, setChangePassword] = useState(!user)
 
   // Rol por defecto: el primero disponible en el plan (o cajero si está disponible)
   const defaultRole = availableRoles.includes('cajero') ? 'cajero'
     : availableRoles[availableRoles.length - 1] ?? 'cajero'
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
     resolver: zodResolver(userSchema),
     defaultValues: user || { role: defaultRole, isActive: true },
   })
-  const selectedRole = watch('role')
+  const selectedRole = useWatch({ control, name: 'role' })
   const rolePages    = ROLES[selectedRole]?.pages || []
 
   const onSubmit = async (data) => {
-    const { confirmPassword, ...rest } = data
+    const {  ...rest } = data
 
     if (user) {
       const updates = { ...rest }
@@ -145,7 +145,7 @@ function UserForm({ user, onClose, availableRoles }) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">Contraseña *</label>
-            <input {...register('password')} type="password" placeholder="Mínimo 6 caracteres" autoComplete="new-password"
+            <input {...register('password')} type="password" placeholder="Mínimo 12 caracteres" autoComplete="new-password"
               className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"/>
             {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
           </div>
@@ -193,7 +193,7 @@ function UserForm({ user, onClose, availableRoles }) {
 // ─── Editor de permisos por rol ───────────────────────────────────────────────
 function RolesPermissionsEditor() {
   const [localRoles, setLocalRoles] = useState(() => {
-    try { const s = localStorage.getItem('pos_role_overrides'); if (s) return JSON.parse(s) } catch {}
+    try { const s = localStorage.getItem('pos_role_overrides'); if (s) return JSON.parse(s) } catch { /* Datos locales inválidos: usar configuración por defecto. */ }
     return Object.fromEntries(Object.entries(ROLES).map(([k,v]) => [k, { ...v, pages: [...v.pages] }]))
   })
 
@@ -321,7 +321,7 @@ function RolesPermissionsEditor() {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function Users() {
-  const { users, sales, updateUser, activeCashSession } = useStore()
+  const { users, sales, activeCashSession } = useStore()
   const [modal,      setModal]      = useState(null)
 
   useEffect(() => { if (USE_API) userService.getAll() }, [])

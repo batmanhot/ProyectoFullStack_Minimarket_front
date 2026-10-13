@@ -126,7 +126,10 @@ export default function Comprobantes() {
 
   const dq = useDebounce(search, 150)
 
-  useEffect(() => { setPage(1) }, [filterStatus, filterTipo, dateFrom, dateTo, dq])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPage(1), 0)
+    return () => window.clearTimeout(timer)
+  }, [filterStatus, filterTipo, dateFrom, dateTo, dq])
 
   // Normalizar NC para que tengan la misma forma que las ventas en la tabla
   const normalizedNCs = useMemo(() =>

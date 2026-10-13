@@ -2,7 +2,7 @@
  * Tests unitarios: configSlice
  * Usa la misma fábrica set/get que authSlice.test.js
  */
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect } from 'vitest'
 import { createConfigSlice } from '../../store/slices/configSlice'
 
 // ─── Fábrica de store ─────────────────────────────────────────────────────────

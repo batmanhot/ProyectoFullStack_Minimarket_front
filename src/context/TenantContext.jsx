@@ -1,10 +1,9 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { tenantService } from '../services/tenantService'
 import { isPlanActive, trialDaysLeft, getAccessStatus } from '../config/plans'
 import { useStore } from '../store/index'
-
-const TenantContext = createContext(null)
+import { TenantContext } from './tenantContext.shared'
 
 /**
  * Proveedor de contexto de tenant.
@@ -23,18 +22,22 @@ const TenantContext = createContext(null)
 export function TenantProvider({ children }) {
   const { tenantSlug } = useParams()
   const [tenant, setTenant]   = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => Boolean(tenantSlug))
   const [error, setError]     = useState(null)
   const updateBusinessConfig  = useStore(s => s.updateBusinessConfig)
+  const currentUser           = useStore(s => s.currentUser)
 
   useEffect(() => {
-    if (!tenantSlug) { setLoading(false); return }
+    if (!tenantSlug) return undefined
 
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    tenantService.getBySlug(tenantSlug).then((result) => {
+    const isAuthenticatedTenant = currentUser?.tenantId && currentUser.tenantSlug === tenantSlug
+    const tenantRequest = isAuthenticatedTenant
+      ? tenantService.getCurrent()
+      : tenantService.getBySlug(tenantSlug)
+
+    tenantRequest.then((result) => {
       if (cancelled) return
       if (result.data) {
         setTenant(result.data)
@@ -55,7 +58,7 @@ export function TenantProvider({ children }) {
     })
 
     return () => { cancelled = true }
-  }, [tenantSlug, updateBusinessConfig])
+  }, [tenantSlug, currentUser?.tenantId, currentUser?.tenantSlug, updateBusinessConfig])
 
   const plan         = tenant?.plan ?? 'trial'
   const planActive   = isPlanActive(plan, tenant?.accessExpiresAt)
@@ -70,13 +73,3 @@ export function TenantProvider({ children }) {
     </TenantContext.Provider>
   )
 }
-
-/** Hook con validación — úsalo dentro de TenantProvider */
-export const useTenant = () => {
-  const ctx = useContext(TenantContext)
-  if (!ctx) throw new Error('useTenant debe usarse dentro de <TenantProvider>')
-  return ctx
-}
-
-/** Hook seguro — devuelve null si está fuera del provider (para componentes compartidos) */
-export const useTenantSafe = () => useContext(TenantContext)

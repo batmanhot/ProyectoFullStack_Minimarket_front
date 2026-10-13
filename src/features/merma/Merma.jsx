@@ -44,7 +44,7 @@ const MERMA_STATUS = {
 
 // ─── Formulario de registro de merma ─────────────────────────────────────────
 function MermaForm({ onClose }) {
-  const { products, suppliers, currentUser, updateProduct, addStockMovement, addMermaRecord } = useStore()
+  const { products, currentUser, updateProduct, addStockMovement, addMermaRecord } = useStore()
   const [productId,  setProductId]  = useState('')
   const [batchId,    setBatchId]    = useState('')
   const [quantity,   setQuantity]   = useState(1)
@@ -247,7 +247,7 @@ function MermaForm({ onClose }) {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function Merma() {
-  const { mermaRecords = [], suppliers, updateMermaRecord, currentUser } = useStore()
+  const { mermaRecords = [], updateMermaRecord } = useStore()
   const [search,      setSearch]      = useState('')
   const [statusFilter,setStatusFilter]= useState('todas')
   const [modal,       setModal]       = useState(null)
@@ -349,7 +349,6 @@ export default function Merma() {
               <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
                 {filtered.map(r => {
                   const st = MERMA_STATUS[r.status] || MERMA_STATUS.en_merma
-                  const rm = MERMA_REASONS.find(x => r.reason?.includes(x.label))
                   return (
                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors">
                       <td className="px-4 py-3">

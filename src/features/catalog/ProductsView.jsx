@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useStore } from '../../store/index'
+
 import { productService } from '../../services/index'
 import { formatCurrency } from '../../shared/utils/helpers'
 import { exportToExcel } from '../../shared/utils/export'
@@ -13,11 +13,11 @@ import Modal from '../../shared/components/ui/Modal'
 import ConfirmModal from '../../shared/components/ui/ConfirmModal'
 import { ProductForm } from './ProductForm'
 import { PriceLabelsModal } from './PriceLabels'
-import { ColorDot } from './catalog.shared'
+import { ColorDot } from './ColorDot'
 import toast from 'react-hot-toast'
 
 export function ProductsView({ products, categories, brands, suppliers, businessConfig, addAuditLog }) {
-  const { deleteProduct } = useStore()
+
   const { maxProducts }   = usePlanLimits()
   const atProductLimit    = maxProducts !== null && products.length >= maxProducts
   const [search, setSearch]             = useState('')
@@ -113,7 +113,7 @@ export function ProductsView({ products, categories, brands, suppliers, business
                     <td className="px-3 py-3 text-center"><StockBadge product={p}/></td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setModal({ type: 'form', data: p })} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                        <button onClick={() => setModal({ type: 'form', data: p })} aria-label={`Editar ${p.name}`} title="Editar" className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
                         <button onClick={() => setLabelsModal([p])} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg"><span className="text-xs">🏷️</span></button>
                         {p.isActive && <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg></button>}
                       </div>

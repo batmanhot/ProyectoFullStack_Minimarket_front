@@ -27,7 +27,6 @@ import TemplatesModal        from './components/TemplatesModal'
 export default function Discounts() {
   const {
     discountCampaigns = [], categories, products,
-    updateDiscountCampaign, deleteDiscountCampaign,
   } = useStore()
 
   useEffect(() => { if (USE_API) discountCampaignService.getAll() }, [])

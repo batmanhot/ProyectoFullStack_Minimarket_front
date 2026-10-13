@@ -108,9 +108,7 @@ export const productService = {
         gs().updateProduct(id, product)
         return ok(product)
       } catch (err) {
-        if (err.response?.status !== 404) {
-          return fail(err.response?.data?.message || err.message || 'Error al actualizar el producto')
-        }
+        return fail(err.response?.data?.message || err.message || 'Error al actualizar el producto')
       }
     }
     gs().updateProduct(id, payload)

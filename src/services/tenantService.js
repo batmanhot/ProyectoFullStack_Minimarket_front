@@ -28,7 +28,7 @@ const _load = (key) => {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null } catch { return null }
 }
 const _save = (key, data) => {
-  try { localStorage.setItem(key, JSON.stringify(data)) } catch {}
+  try { localStorage.setItem(key, JSON.stringify(data)) } catch { /* Persistencia local opcional. */ }
 }
 
 // ─── Fechas demo ──────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ const DEFAULT_TENANTS = {
     businessName: 'Bodega Demo', sector: 'bodega',
     ruc: '20000000001',
     ownerName: 'Administrador Demo', ownerEmail: 'demo@minimarket.app',
-    phone: '999 000 001', ownerPassword: 'demo1234',
+    phone: '999 000 001', ownerPassword: import.meta.env.VITE_DEMO_ADMIN_PASSWORD,
     plan: 'pro', billingCycle: 'monthly',
     accessStartDate: START_DEMO,
     accessExpiresAt: getAccessExpiry(START_DEMO, 'monthly'),
@@ -213,9 +213,19 @@ export const tenantService = {
         return ok(data.data)
       })
       if (res) return res
+      return fail('No se pudo obtener la información del negocio')
     }
     const tenant = _tenants[slug] ?? _tenants.demo
     return ok(tenant)
+  },
+
+  async getCurrent() {
+    if (!USE_API) return fail('La ficha autenticada del negocio requiere conexión')
+    const res = await _tryApi(async () => {
+      const { data } = await api.get('/tenants/current')
+      return ok(data.data)
+    })
+    return res ?? fail('No se pudo obtener la configuración del negocio')
   },
 
   // ── Registro self-service ───────────────────────────────────────────────────
@@ -228,6 +238,7 @@ export const tenantService = {
         return ok(data.data)
       })
       if (res) return res
+      return fail('No se pudo registrar el negocio')
     }
 
     const slug            = makeSlug(businessName)
@@ -271,6 +282,7 @@ export const tenantService = {
         return ok(data.data.available)
       })
       if (res) return res
+      return fail('No se pudo verificar la disponibilidad del nombre')
     }
     return ok(!(slug in _tenants))
   },
@@ -283,6 +295,7 @@ export const tenantService = {
         return ok(data.data)
       })
       if (res) return res
+      return fail('No se pudo actualizar la configuración del negocio')
     }
     const tenant = Object.values(_tenants).find(t => t.id === tenantId)
     if (tenant) { Object.assign(tenant, config); _flush() }

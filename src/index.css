@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 mantiene la configuración existente mediante @config. */
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 @layer base {
   * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }

@@ -13,7 +13,7 @@
  *   null         → acceso completo
  */
 
-import { useTenantSafe }         from '../../context/TenantContext'
+import { useTenantSafe }         from '../../context/tenantContext.shared'
 import { useStore }              from '../../store/index'
 import { canUsePlan, PLANS, getMinPlanForFeature } from '../../config/plans'
 import { ROLES }                 from '../../config/app'

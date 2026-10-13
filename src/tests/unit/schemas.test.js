@@ -137,8 +137,8 @@ describe('userSchema', () => {
     fullName:        'Juan Administrador',
     email:           'juan@test.com',
     role:            'cajero',
-    password:        'secreto123',
-    confirmPassword: 'secreto123',
+    password:        'secreto-seguro-123',
+    confirmPassword: 'secreto-seguro-123',
   }
 
   it('acepta un usuario válido', () => {

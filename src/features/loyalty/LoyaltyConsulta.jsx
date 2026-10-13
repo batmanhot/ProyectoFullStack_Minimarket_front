@@ -12,7 +12,7 @@
 
 import { useState, useMemo, useRef } from 'react'
 import { useStore }                  from '../../store/index'
-import { formatCurrency, formatDate, formatDateTime } from '../../shared/utils/helpers'
+import { formatCurrency, formatDate } from '../../shared/utils/helpers'
 import {
   buildLoyaltySummary,
   getClientLevel,

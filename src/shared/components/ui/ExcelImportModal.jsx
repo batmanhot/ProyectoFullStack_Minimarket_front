@@ -5,10 +5,17 @@
  * Flujo: Cargar archivo → Revisar/Validar → Importar → Resultado
  */
 import { useState, useRef, useCallback } from 'react'
-import * as XLSX from 'xlsx'
 import { useStore } from '../../../store/index'
-import { productService, supplierService, clientService } from '../../../services/index'
+import { productService, supplierService, clientService, categoryService, brandService } from '../../../services/index'
 import toast from 'react-hot-toast'
+
+// Solo se permite cargar tablas maestras. Operaciones, caja, ventas, compras,
+// auditoría y usuarios nunca se importan desde archivos.
+export const IMPORTABLE_MASTER_ENTITIES = new Set([
+  'products', 'categories', 'brands', 'suppliers', 'clients',
+])
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024
+const MAX_IMPORT_ROWS = 2_000
 
 // ── Paleta de colores para categorías/marcas creadas automáticamente ──────────
 const AUTO_COLORS = [
@@ -147,29 +154,24 @@ const ENTITY_CONFIG = {
   },
 }
 
-// ── Descarga la plantilla Excel para la entidad ───────────────────────────────
+// CSV evita procesar formatos Excel complejos y elimina la dependencia xlsx,
+// que no cuenta con una corrección disponible para sus vulnerabilidades.
+const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
+
+// ── Descarga una plantilla CSV para la entidad ────────────────────────────────
 function downloadTemplate(entityType) {
   const cfg = ENTITY_CONFIG[entityType]
-  const wb  = XLSX.utils.book_new()
-  // Cabeceras + 2 filas de muestra
-  const ws  = XLSX.utils.aoa_to_sheet([cfg.templateHeaders, ...cfg.sampleRows])
-  // Ancho automático de columnas
-  ws['!cols'] = cfg.templateHeaders.map(() => ({ wch: 22 }))
-  XLSX.utils.book_append_sheet(wb, ws, 'Datos')
-  // Hoja de instrucciones
-  const inst = XLSX.utils.aoa_to_sheet([
-    [`Plantilla de importación — ${cfg.label}`],
-    [''],
-    ['INSTRUCCIONES:'],
-    ['1. No elimines la primera fila (encabezados).'],
-    ['2. Las columnas marcadas con * son obligatorias.'],
-    ['3. No modifiques los nombres de los encabezados.'],
-    ['4. Guarda el archivo como .xlsx antes de importar.'],
-    ['5. Las filas en blanco serán ignoradas.'],
-  ])
-  inst['!cols'] = [{ wch: 60 }]
-  XLSX.utils.book_append_sheet(wb, inst, 'Instrucciones')
-  XLSX.writeFile(wb, `plantilla_${entityType}.xlsx`)
+  const csv = [cfg.templateHeaders, ...cfg.sampleRows]
+    .map(row => row.map(csvCell).join(','))
+    .join('\r\n')
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `plantilla_${entityType}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 // ── Mapea cabeceras del Excel a campos de la entidad ─────────────────────────
@@ -180,30 +182,42 @@ function mapHeaders(rawHeaders, aliases) {
   })
 }
 
-// ── Parsea el archivo Excel/CSV y retorna filas ───────────────────────────────
-async function parseFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result)
-        const wb   = XLSX.read(data, { type: 'array', cellDates: true })
-        const ws   = wb.Sheets[wb.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-        resolve(rows.filter(r => r.some(c => String(c).trim() !== '')))
-      } catch (err) {
-        reject(new Error('No se pudo leer el archivo. Asegúrate de que sea un Excel válido.'))
-      }
+// ── Parsea CSV RFC 4180, incluyendo comas, saltos de línea y comillas ────────
+function parseCsv(text) {
+  const rows = []
+  let row = []
+  let cell = ''
+  let quoted = false
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]
+    if (char === '"') {
+      if (quoted && text[i + 1] === '"') { cell += '"'; i += 1 } else quoted = !quoted
+    } else if (char === ',' && !quoted) {
+      row.push(cell); cell = ''
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && text[i + 1] === '\n') i += 1
+      row.push(cell); cell = ''
+      if (row.some(value => String(value).trim() !== '')) rows.push(row)
+      row = []
+    } else {
+      cell += char
     }
-    reader.onerror = () => reject(new Error('Error al leer el archivo'))
-    reader.readAsArrayBuffer(file)
-  })
+  }
+  if (quoted) throw new Error('El CSV tiene comillas sin cerrar')
+  row.push(cell)
+  if (row.some(value => String(value).trim() !== '')) rows.push(row)
+  return rows
+}
+
+// ── Parsea el archivo CSV y retorna filas ─────────────────────────────────────
+async function parseFile(file) {
+  const rows = parseCsv(await file.text())
+  if (rows.length > MAX_IMPORT_ROWS + 1) throw new Error(`El archivo supera el límite de ${MAX_IMPORT_ROWS} filas`)
+  return rows
 }
 
 // ── Transforma y valida filas según la entidad ────────────────────────────────
 function processRows(rawRows, fieldMap, entityType, store) {
-  const cfg = ENTITY_CONFIG[entityType]
-
   return rawRows.map((raw, idx) => {
     const mapped = {}
     fieldMap.forEach((field, colIdx) => {
@@ -300,10 +314,12 @@ function processRows(rawRows, fieldMap, entityType, store) {
 // COMPONENTE PRINCIPAL
 // ═════════════════════════════════════════════════════════════════════════════
 export default function ExcelImportModal({ entityType, onClose }) {
+  const isImportableEntity = IMPORTABLE_MASTER_ENTITIES.has(entityType)
   const store = useStore()
-  const { addCategory, addBrand, addSupplier, addClient, addAuditLog } = store
+  const { addAuditLog } = store
 
-  const cfg = ENTITY_CONFIG[entityType]
+  // El fallback permite declarar todos los hooks antes de la salida temprana.
+  const cfg = ENTITY_CONFIG[entityType] ?? ENTITY_CONFIG.products
 
   // step: 'upload' | 'preview' | 'importing' | 'done'
   const [step,       setStep]       = useState('upload')
@@ -320,9 +336,12 @@ export default function ExcelImportModal({ entityType, onClose }) {
   // ── Carga y procesa el archivo ─────────────────────────────────────────────
   const handleFile = useCallback(async (file) => {
     if (!file) return
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      toast.error('El archivo supera el límite permitido de 5 MB'); return
+    }
     const ext = file.name.split('.').pop().toLowerCase()
-    if (!['xlsx','xls','csv'].includes(ext)) {
-      toast.error('Formato no soportado. Usa .xlsx, .xls o .csv'); return
+    if (ext !== 'csv' || file.type && !['text/csv', 'application/csv', 'text/plain', 'application/vnd.ms-excel'].includes(file.type)) {
+      toast.error('Formato no soportado. Usa únicamente archivos CSV'); return
     }
     setFileName(file.name)
     try {
@@ -348,6 +367,8 @@ export default function ExcelImportModal({ entityType, onClose }) {
     if (file) handleFile(file)
   }
 
+  if (!isImportableEntity) return null
+
   // ── Importa las filas válidas ──────────────────────────────────────────────
   const handleImport = async () => {
     const validRows = rows.filter(r => r.errors.length === 0)
@@ -365,18 +386,20 @@ export default function ExcelImportModal({ entityType, onClose }) {
       const catNamesNeeded  = [...new Set(validRows.map(r => r.entity.catName).filter(Boolean))]
       const supNamesNeeded  = [...new Set(validRows.map(r => r.entity.supName).filter(Boolean))]
 
-      catNamesNeeded.forEach((catName, i) => {
+      for (const [i, catName] of catNamesNeeded.entries()) {
         const exists = freshState.categories.find(c => norm(c.name) === norm(catName))
         if (!exists) {
-          addCategory({ id: crypto.randomUUID(), name: catName, description: '', color: autoColor(i), isActive: true, createdAt: new Date().toISOString() })
+          const result = await categoryService.create({ name: catName, description: '', color: autoColor(i), isActive: true })
+          if (!result.ok) errorList.push({ rowIndex: 0, message: `Categoría '${catName}': ${result.error}` })
         }
-      })
-      supNamesNeeded.forEach((supName) => {
+      }
+      for (const supName of supNamesNeeded) {
         const exists = freshState.suppliers.find(s => norm(s.name) === norm(supName))
         if (!exists) {
-          addSupplier?.({ id: crypto.randomUUID(), name: supName, isActive: true, createdAt: new Date().toISOString() })
+          const result = await supplierService.create({ name: supName, isActive: true })
+          if (!result.ok) errorList.push({ rowIndex: 0, message: `Proveedor '${supName}': ${result.error}` })
         }
-      })
+      }
     }
 
     for (let i = 0; i < validRows.length; i++) {
@@ -405,20 +428,12 @@ export default function ExcelImportModal({ entityType, onClose }) {
           if (r.error) throw new Error(r.error)
 
         } else if (entityType === 'categories') {
-          addCategory({
-            id: crypto.randomUUID(), name: entity.name,
-            description: entity.desc,
-            color: entity.color || autoColor(i),
-            isActive: true, createdAt: new Date().toISOString(),
-          })
+          const r = await categoryService.create({ name: entity.name, description: entity.desc, color: entity.color || autoColor(i), isActive: true })
+          if (!r.ok) throw new Error(r.error)
 
         } else if (entityType === 'brands') {
-          addBrand?.({
-            id: crypto.randomUUID(), name: entity.name,
-            description: entity.desc,
-            color: entity.color || autoColor(i),
-            isActive: true, createdAt: new Date().toISOString(),
-          })
+          const r = await brandService.create({ name: entity.name, description: entity.desc, color: entity.color || autoColor(i), isActive: true })
+          if (!r.ok) throw new Error(r.error)
 
         } else if (entityType === 'suppliers') {
           const r = await supplierService.create(entity)
@@ -478,7 +493,7 @@ export default function ExcelImportModal({ entityType, onClose }) {
               <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100">
                 Importar {cfg.label}
               </h2>
-              <p className="text-xs text-gray-400 dark:text-slate-500">desde archivo Excel</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">desde archivo CSV</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-400 transition-colors">
@@ -524,7 +539,7 @@ export default function ExcelImportModal({ entityType, onClose }) {
                 }`}>
                 <input
                   ref={fileRef} type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".csv,text/csv"
                   className="hidden"
                   onChange={(e) => handleFile(e.target.files[0])}/>
                 <div className="text-4xl mb-3">📂</div>
@@ -532,7 +547,7 @@ export default function ExcelImportModal({ entityType, onClose }) {
                   Arrastra tu archivo aquí o <span className="text-blue-600 dark:text-blue-400">haz clic para seleccionar</span>
                 </p>
                 <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
-                  Formatos aceptados: .xlsx, .xls, .csv
+                  Tablas maestras permitidas: productos, categorías, marcas, proveedores y clientes. Formato CSV; máximo 5 MB y 2,000 filas.
                 </p>
               </div>
 

@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
 import { loginWithRole, goTo } from './helpers.js'
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('http://localhost:3000/app/demo')
+  await page.goto('/app/e2e')
   await page.evaluate(() => {
     Object.keys(localStorage)
       .filter(k => k.includes('demo') || k.includes('minimarket'))
@@ -55,10 +55,10 @@ test('Catálogo — buscador filtra productos por nombre', async ({ page }) => {
 
 test('Catálogo — buscador por código de barras funciona', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="Buscar por nombre"]')
-  await searchInput.fill('7751010012459')
+  await searchInput.fill('7750075000003')
   await page.waitForTimeout(300)
 
-  // Debe mostrar el Arroz Costeño o "no hay productos"
+  // Debe mostrar el Arroz Extra de la semilla E2E o "no hay productos"
   const hasResults = await page.locator('tbody tr').count() > 0
   const emptyMsg = await page.locator('text=No hay productos').isVisible()
   expect(hasResults || emptyMsg).toBeTruthy()
@@ -101,7 +101,7 @@ test('Catálogo — botón "Nuevo producto" abre el formulario', async ({ page }
 
   // Modal de creación debe aparecer
   await expect(
-    page.locator('text=Nuevo producto').or(page.locator('[placeholder="Nombre del producto"]'))
+    page.getByRole('heading', { name: 'Nuevo producto', exact: true })
   ).toBeVisible()
 })
 
@@ -109,69 +109,37 @@ test('Catálogo — botón "Nuevo producto" abre el formulario', async ({ page }
 
 test('Catálogo — crear producto con datos mínimos', async ({ page }) => {
   await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click()
-  await page.waitForTimeout(400)
+  const suffix = Date.now()
+  const productName = `Producto E2E ${suffix}`
 
-  // Llenar el formulario
-  const nombreInput = page.locator('input').filter({ hasNot: page.locator('[type="date"]') }).first()
-  // Buscar el input de nombre específicamente
-  const allInputs = page.locator('input:not([type="hidden"]):not([type="number"]):not([type="date"])')
-  await allInputs.first().fill('Producto Test E2E')
-  await page.waitForTimeout(200)
+  await page.getByTestId('product-name').fill(productName)
+  await page.getByTestId('product-barcode').fill(`E2E-${suffix}`)
+  await page.getByTestId('product-category').selectOption({ index: 1 })
+  await page.getByTestId('product-supplier').selectOption({ index: 1 })
+  await page.getByTestId('product-price-buy').fill('5')
+  await page.getByTestId('product-price-sell').fill('8')
 
-  // Código de barras
-  const barcodeInput = page.locator('input').nth(1)
-  await barcodeInput.fill('TEST-E2E-001')
-  await page.waitForTimeout(200)
-
-  // Seleccionar categoría (primer option disponible)
-  const catSelect = page.locator('select').nth(0)
-  const catOptions = await catSelect.locator('option').count()
-  if (catOptions > 1) {
-    await catSelect.selectOption({ index: 1 })
-  }
-
-  // Seleccionar proveedor
-  const supSelect = page.locator('select').nth(1)
-  const supOptions = await supSelect.locator('option').count()
-  if (supOptions > 1) {
-    await supSelect.selectOption({ index: 1 })
-  }
-
-  // Precio compra
-  const priceBuyInput = page.locator('input[type="number"]').first()
-  await priceBuyInput.fill('5')
-
-  // Precio venta
-  const priceSellInput = page.locator('input[type="number"]').nth(1)
-  await priceSellInput.fill('8')
-
-  // Guardar
-  await page.locator('button').filter({ hasText: 'Crear producto' }).first().click()
-  await page.waitForTimeout(800)
-
-  // Toast de éxito
-  await expect(
-    page.locator('text=Producto creado').or(page.locator('text=actualizado'))
-  ).toBeVisible({ timeout: 4000 })
+  await page.getByRole('button', { name: 'Crear producto', exact: true }).click()
+  await expect(page.getByText(productName, { exact: true })).toBeVisible()
 })
 
 // ─── Edición de producto ─────────────────────────────────────────────────────────
 
 test('Catálogo — botón editar abre el formulario de edición', async ({ page }) => {
   // Hacer click en el primer botón de editar (title="Editar")
-  const editBtn = page.locator('button[title="Editar"]').first()
+  const editBtn = page.getByRole('button', { name: /^Editar / }).first()
   await expect(editBtn).toBeVisible()
   await editBtn.click()
   await page.waitForTimeout(400)
 
   // Modal de edición debe aparecer
   await expect(
-    page.locator('text=Editar producto').or(page.locator('button').filter({ hasText: 'Guardar cambios' }))
+    page.getByRole('heading', { name: 'Editar producto', exact: true })
   ).toBeVisible()
 })
 
 test('Catálogo — cerrar modal de edición con botón Cancelar', async ({ page }) => {
-  await page.locator('button[title="Editar"]').first().click()
+  await page.getByRole('button', { name: /^Editar / }).first().click()
   await page.waitForTimeout(400)
 
   await page.getByRole('button', { name: 'Cancelar', exact: true }).first().click()

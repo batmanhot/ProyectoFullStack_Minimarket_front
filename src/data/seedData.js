@@ -100,12 +100,20 @@ export const SEED_CLIENTS = [
 ]
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
+// Las contraseñas demo se cargan desde .env.development y nunca deben quedar
+// como literales dentro del artefacto de producción.
+const DEMO_PASSWORDS = {
+  admin:      import.meta.env.VITE_DEMO_ADMIN_PASSWORD,
+  cashier:    import.meta.env.VITE_DEMO_CASHIER_PASSWORD,
+  supervisor: import.meta.env.VITE_DEMO_SUPERVISOR_PASSWORD,
+  manager:    import.meta.env.VITE_DEMO_MANAGER_PASSWORD,
+}
 export const SEED_USERS = [
-  { id: 'usr-001', username: 'admin',      password: 'admin123',  fullName: 'Administrador General',   email: 'admin@negocio.pe',      role: 'admin',      isActive: true, createdAt: subtractDays(120) },
-  { id: 'usr-002', username: 'cajero1',    password: 'cajero123', fullName: 'Rosa Sánchez López',       email: 'rsanchez@negocio.pe',   role: 'cajero',     isActive: true, createdAt: subtractDays(90)  },
-  { id: 'usr-003', username: 'cajero2',    password: 'cajero123', fullName: 'Jorge Torres Huanca',      email: 'jtorres@negocio.pe',    role: 'cajero',     isActive: true, createdAt: subtractDays(60)  },
-  { id: 'usr-004', username: 'supervisor', password: 'super123',  fullName: 'Patricia Mendoza Gil',     email: 'pmendoza@negocio.pe',   role: 'supervisor', isActive: true, createdAt: subtractDays(100) },
-  { id: 'usr-005', username: 'gerente',    password: 'gerente123',fullName: 'Carlos Rimac Paredes',     email: 'crimac@negocio.pe',     role: 'gerente',    isActive: true, createdAt: subtractDays(120) },
+  { id: 'usr-001', username: 'admin',      password: DEMO_PASSWORDS.admin,      fullName: 'Administrador General',   email: 'admin@negocio.pe',      role: 'admin',      isActive: true, createdAt: subtractDays(120) },
+  { id: 'usr-002', username: 'cajero1',    password: DEMO_PASSWORDS.cashier,    fullName: 'Rosa Sánchez López',       email: 'rsanchez@negocio.pe',   role: 'cajero',     isActive: true, createdAt: subtractDays(90)  },
+  { id: 'usr-003', username: 'cajero2',    password: DEMO_PASSWORDS.cashier,    fullName: 'Jorge Torres Huanca',      email: 'jtorres@negocio.pe',    role: 'cajero',     isActive: true, createdAt: subtractDays(60)  },
+  { id: 'usr-004', username: 'supervisor', password: DEMO_PASSWORDS.supervisor, fullName: 'Patricia Mendoza Gil',     email: 'pmendoza@negocio.pe',   role: 'supervisor', isActive: true, createdAt: subtractDays(100) },
+  { id: 'usr-005', username: 'gerente',    password: DEMO_PASSWORDS.manager,    fullName: 'Carlos Rimac Paredes',     email: 'crimac@negocio.pe',     role: 'gerente',    isActive: true, createdAt: subtractDays(120) },
 ]
 
 // ─── GENERADOR DE VENTAS HISTÓRICAS RICAS (30 días) ──────────────────────────
@@ -116,9 +124,6 @@ function generateRichSales() {
   const methods   = ['efectivo','efectivo','efectivo','yape','yape','tarjeta','credito']
   const clientIds = ['cli-001','cli-002','cli-003','cli-004','cli-005','cli-006','cli-007', null, null, null]
   const userIds   = ['usr-001','usr-001','usr-001','usr-002']
-
-  // Campañas de descuento activas en el seed
-  const campaignIds = ['camp-001','camp-002', null, null, null]
 
   // Productos más vendidos (para que el top productos se vea bien)
   const popularProducts = [
@@ -283,6 +288,21 @@ export function getInitialDemoState() {
       NC001: (byPrefix['NC001'] || 0) + 1,
     },
     nextInvoice: Math.max(0, ...Object.values(byPrefix)) + 1,
+  }
+}
+
+// Estado vacío para compilaciones de producción. Los datos demo no se cargan
+// en memoria cuando APP_MODE no es development/demo.
+export function getInitialEmptyState() {
+  return {
+    suppliers: [], categories: [], brands: [], products: [], clients: [], users: [], sales: [],
+    cashSessions: [], activeCashSession: null, cart: [], currentUser: null,
+    stockMovements: [], purchases: [],
+    businessConfig: {
+      name: '', ruc: '', address: '', phone: '', email: '', logoUrl: '', sector: 'bodega', igvRate: 0.18,
+    },
+    invoiceCounters: { T001: 1, B001: 1, F001: 1, NC001: 1 },
+    nextInvoice: 1,
   }
 }
 

@@ -2,35 +2,32 @@ import { useEffect, useState, useRef } from 'react'
 
 export default function PDFPreviewHost() {
   const [preview, setPreview] = useState(null)
-  const [blobUrl, setBlobUrl] = useState(null)
   const iframeRef = useRef(null)
 
   useEffect(() => {
     const handle = (e) => {
       const { html = '', title = 'Reporte PDF' } = e.detail || {}
-      setPreview({ html, title })
+      if (!html) return
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      setPreview({ html, title, blobUrl: URL.createObjectURL(blob) })
     }
     window.addEventListener('pdf-preview', handle)
     return () => window.removeEventListener('pdf-preview', handle)
   }, [])
 
-  useEffect(() => {
-    if (!preview?.html) { setBlobUrl(null); return }
-    const blob = new Blob([preview.html], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    setBlobUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [preview])
+  useEffect(() => () => {
+    if (preview?.blobUrl) URL.revokeObjectURL(preview.blobUrl)
+  }, [preview?.blobUrl])
 
-  if (!preview || !blobUrl) return null
+  if (!preview?.blobUrl) return null
 
-  const handleClose = () => { setPreview(null); setBlobUrl(null) }
+  const handleClose = () => setPreview(null)
 
   const handlePrint = () => iframeRef.current?.contentWindow?.print()
 
   const handleDownload = () => {
     const a = document.createElement('a')
-    a.href = blobUrl
+    a.href = preview.blobUrl
     a.download = `${preview.title}_${new Date().toLocaleDateString('es-PE').replaceAll('/', '-')}.html`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
@@ -85,8 +82,10 @@ export default function PDFPreviewHost() {
         {/* PDF iframe */}
         <iframe
           ref={iframeRef}
-          src={blobUrl}
+          src={preview.blobUrl}
           title={preview.title}
+          sandbox="allow-modals"
+          referrerPolicy="no-referrer"
           className="flex-1 w-full border-0 bg-gray-100"
         />
       </div>

@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore, selectLowStockProducts } from '../../store/index'
 import { USE_API } from '../../services/_base'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import Stocktaking from './Stocktaking'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { stockAdjustSchema } from '../../shared/schemas/index'
 import { productService } from '../../services/index'
-import { formatCurrency, formatDate, formatDateTime, isLowStock, isOutOfStock, isExpired, isNearExpiry, stockDaysLeft, getUnitCost } from '../../shared/utils/helpers'
+import { formatCurrency, formatDateTime, isLowStock, isOutOfStock, isExpired, isNearExpiry, stockDaysLeft, getUnitCost } from '../../shared/utils/helpers'
 import { exportToExcel, exportToPDF } from '../../shared/utils/export'
 import { ExcelButton, PDFButton } from '../../shared/components/ui/ExportButtons'
 import { useDebounce } from '../../shared/hooks/useDebounce'
@@ -17,10 +17,10 @@ import toast from 'react-hot-toast'
 
 // ── Ajuste de stock ────────────────────────────────────────────────────────────
 function StockAdjustForm({ product, currentUser, onClose }) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
     resolver: zodResolver(stockAdjustSchema), defaultValues: { type: 'entrada' },
   })
-  const type = watch('type')
+  const type = useWatch({ control, name: 'type' })
 
   const onSubmit = async (data) => {
     const result = await productService.adjustStock(product.id, data.quantity, data.type, data.reason, currentUser?.id)
@@ -72,28 +72,28 @@ function StockAdjustForm({ product, currentUser, onClose }) {
 }
 
 // ── Kardex por producto — con valorización ────────────────────────────────────
-function ProductKardex({ product, movements, onClose, systemConfig }) {
+function ProductKardex({ product, movements, systemConfig }) {
   const costMethod = systemConfig?.costMethod || 'peps'
   const refCost = getUnitCost(product, product.priceSell || 0, costMethod)
   const productMovements = movements
     .filter(m => m.productId === product.id)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
 
-  let saldoStock = 0
-  let saldoValor = 0
-  const movimientosValorizados = productMovements.map(m => {
+  const { movimientosValorizados } = productMovements.reduce((acc, m) => {
     const esEntrada  = m.type === 'entrada'
     const unitCost   = m.unitCost ?? product.priceBuy ?? 0
     const totalValue = m.totalValue ?? parseFloat((unitCost * m.quantity).toFixed(2))
-    saldoStock += esEntrada ? m.quantity : -m.quantity
-    saldoValor += esEntrada ? totalValue : -totalValue
-    return {
+    acc.saldoStock += esEntrada ? m.quantity : -m.quantity
+    acc.saldoValor += esEntrada ? totalValue : -totalValue
+    acc.movimientosValorizados.push({
       ...m, unitCost, totalValue,
-      saldoStock: parseFloat(saldoStock.toFixed(2)),
-      saldoValor: parseFloat(saldoValor.toFixed(2)),
+      saldoStock: parseFloat(acc.saldoStock.toFixed(2)),
+      saldoValor: parseFloat(acc.saldoValor.toFixed(2)),
       esEntrada,
-    }
-  }).reverse()
+    })
+    return acc
+  }, { saldoStock: 0, saldoValor: 0, movimientosValorizados: [] })
+  movimientosValorizados.reverse()
 
   const totales = productMovements.reduce((acc, m) => {
     const v = m.totalValue ?? (m.unitCost ?? product.priceBuy ?? 0) * m.quantity
@@ -296,7 +296,7 @@ function ProductKardex({ product, movements, onClose, systemConfig }) {
 
 // ── Página principal ───────────────────────────────────────────────────────────
 export default function Inventory() {
-  const { products, categories, suppliers, stockMovements, currentUser, businessConfig, systemConfig, addAuditLog, locations } = useStore()
+  const { products, categories, stockMovements, currentUser, businessConfig, systemConfig, addAuditLog, locations } = useStore()
   const [search, setSearch]       = useState('')
   const [categoryFilter, setCatF] = useState('')
   const [tab, setTab]             = useState('products')

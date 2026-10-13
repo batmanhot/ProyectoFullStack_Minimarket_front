@@ -5,11 +5,10 @@ import {
   tenantService, DEFAULT_PLAN_LIMITS, DEFAULT_ALERT_THRESHOLDS,
 } from '../../services/tenantService'
 import { api } from '../../services/_base'
-import { STORAGE_KEYS } from '../../config/storageKeys'
 import {
   PLANS, PLAN_ORDER, BILLING_CYCLES, CYCLE_ORDER,
   getAccessExpiry, daysUntilExpiry, getAccessStatus, ACCESS_STATUS_CONFIG,
-  BONUS_DAYS, getPlanPrice, getTotalPrice,
+  BONUS_DAYS, getTotalPrice,
 } from '../../config/plans'
 import { SECTORS } from '../../config/app'
 import { useTheme } from '../../shared/hooks/useTheme'
@@ -21,10 +20,6 @@ import {
   CreditCard, Building2, BarChart3, FileText, Link2, Palette,
 } from 'lucide-react'
 
-// ─── Credenciales dev ─────────────────────────────────────────────────────────
-const SA_EMAIL = 'admin@sistema.pe'
-const SA_PASS  = 'sistema2024'
-
 // ─── Keys de localStorage adicionales ────────────────────────────────────────
 const PAYMENTS_KEY     = 'mm_sa_payments_v1'
 const FEATURED_KEY     = 'mm_sa_featured_plan'
@@ -32,7 +27,7 @@ const INACTIVE_KEY      = 'mm_sa_inactive_plans'
 const PLAN_FEATURES_KEY = 'mm_sa_plan_features_v1'
 
 const loadLocal = (key, def) => { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def } catch { return def } }
-const saveLocal = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
+const saveLocal = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* El almacenamiento local puede no estar disponible. */ } }
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -225,7 +220,7 @@ function SABtn({ children, onClick, variant = 'primary', disabled, icon: Icon, s
   )
 }
 
-function StatCard({ icon: Icon, label, value, sub, color }) {
+function StatCard({  label, value, sub, color }) {
   const D = useD()
   return (
     <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: '12px', padding: '18px 20px' }}>
@@ -265,8 +260,6 @@ function LoginFormV2({ onLogin }) {
       if (data?.user?.role !== 'superadmin') {
         setError('Acceso restringido a superadmin'); setLoading(false); return
       }
-      // Guardar JWT para que _base.js lo incluya en todas las llamadas /api/admin/*
-      localStorage.setItem(STORAGE_KEYS.authToken, data.token)
       onLogin()
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Credenciales incorrectas'
@@ -337,7 +330,7 @@ function LoginFormV2({ onLogin }) {
 
         {/* ── Features ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '24px' }}>
-          {FEATURES.map(({ icon: Icon, text }) => (
+          {FEATURES.map(({  text }) => (
             <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '10px', background: 'rgba(6,182,212,0.05)', border: '1px solid rgba(6,182,212,0.1)' }}>
               <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(6,182,212,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon size={14} color={D.accent} />
@@ -410,7 +403,7 @@ const THEME_OPTIONS = [
   { value: 'nature',   icon: '🍃',  label: 'Naturaleza' },
 ]
 
-function SASidebar({ activeTab, onTabChange, onLogout, theme, onThemeToggle, onThemeSet, brandName = 'StockPro' }) {
+function SASidebar({ activeTab, onTabChange, onLogout, theme, onThemeSet, brandName = 'StockPro' }) {
   const D = useD()
   const [collapsed, setCollapsed] = useState(false)
   const [showTheme, setShowTheme] = useState(false)
@@ -459,7 +452,7 @@ function SASidebar({ activeTab, onTabChange, onLogout, theme, onThemeToggle, onT
 
       {/* Nav items */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '4px 6px' }}>
-        {TAB_NAV.map(({ id, icon: Icon, label }) => {
+        {TAB_NAV.map(({ id, label }) => {
           const isActive = activeTab === id
           return (
             <button
@@ -597,7 +590,7 @@ function TenantFormModal({ tenant, onClose, onDone }) {
         </div>
         {!isEdit && (
           <FRow label="Contraseña inicial *">
-            <input type="password" value={form.ownerPassword} onChange={set('ownerPassword')} required style={inp} placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+            <input type="password" value={form.ownerPassword} onChange={set('ownerPassword')} required style={inp} placeholder="Mínimo 12 caracteres" autoComplete="new-password" />
           </FRow>
         )}
         {tenant?.slug && (
@@ -660,7 +653,7 @@ function RenewModal({ tenant, onClose, onDone }) {
   const inp = makeInp(D)
   const [plan, setPlan]   = useState(tenant.plan)
   const [cycle, setCycle] = useState(tenant.billingCycle ?? 'monthly')
-  const [mode, setMode]   = useState('today')
+  const [mode]   = useState('today')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -750,7 +743,6 @@ function TenantsTab({ onStatsRefresh }) {
     if (r.data) {
       const all = r.data
       setTenants(all)
-      const now = new Date()
       setStats({
         total:    all.length,
         active:   all.filter(t => getAccessStatus(t.accessExpiresAt, t.isActive) === 'active').length,
@@ -762,7 +754,7 @@ function TenantsTab({ onStatsRefresh }) {
     setLoading(false)
   }, [search])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { void Promise.resolve().then(load) }, [load])
 
   const filtered = tenants.filter(t => {
     if (filterStatus) { const s = getAccessStatus(t.accessExpiresAt, t.isActive); if (s !== filterStatus) return false }
@@ -1439,7 +1431,7 @@ function RenovationsTab() {
     if (r2.data) setTenants(r2.data)
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { void Promise.resolve().then(load) }, [])
 
   // Merge renewals with payment metadata
   const rows = renewals.map(r => {
@@ -1651,7 +1643,7 @@ function LimitsTab() {
     setLimits(p => ({ ...p, [selPlan]: { ...p[selPlan], [field]: val } }))
   }
 
-  const numInput = (field, label, icon = null) => (
+  const numInput = (field, label) => (
     <FRow label={label}>
       <input
         type="number" min={-1}
@@ -1932,7 +1924,7 @@ function LoginEventsView({ tenants, D, inp }) {
     if (r.data) setEvents(r.data)
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { void Promise.resolve().then(load) }, [])
 
   const filtered = events.filter(ev => {
     if (filterBiz && ev.tenantId !== filterBiz) return false
@@ -2051,7 +2043,7 @@ function AccessPeriodsView({ tenants, D, inp }) {
     if (r.data) setAccesses(r.data)
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { void Promise.resolve().then(load) }, [])
 
   const filtered = accesses.filter(a => {
     if (filterBiz && a.tenantId !== filterBiz) return false
@@ -2312,7 +2304,7 @@ function LandingTab({ onBrandUpdate }) {
 
       {/* Sub-tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', borderBottom: `1px solid ${D.border}`, paddingBottom: '0' }}>
-        {LANDING_SUBTABS.map(({ id, label, icon: Icon }) => (
+        {LANDING_SUBTABS.map(({ id, label }) => (
           <button key={id} onClick={() => setSub(id)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px', borderRadius: '8px 8px 0 0', border: 'none', background: sub === id ? D.card : 'transparent', color: sub === id ? D.accent : D.t3, cursor: 'pointer', fontSize: '13px', fontWeight: sub === id ? 700 : 500, borderBottom: sub === id ? `2px solid ${D.accent}` : '2px solid transparent', marginBottom: '-1px' }}>
             <Icon size={14} /> {label}
           </button>
@@ -2607,7 +2599,7 @@ export default function SuperAdmin() {
   // Carga el brandName guardado al iniciar sesión
   useEffect(() => {
     if (auth) {
-      loadStats()
+      void Promise.resolve().then(loadStats)
       tenantService.getSiteSettings().then(r => {
         if (r.data?.brandName?.trim()) setBrandName(r.data.brandName.trim())
       })
@@ -2615,9 +2607,9 @@ export default function SuperAdmin() {
   }, [auth, loadStats])
 
   const handleLogin = () => { sessionStorage.setItem('sa_auth', '1'); setAuth(true) }
-  const handleLogout = () => {
+  const handleLogout = async () => {
     sessionStorage.removeItem('sa_auth')
-    localStorage.removeItem(STORAGE_KEYS.authToken)
+    await api.post('/auth/logout').catch(() => {})
     setAuth(false)
   }
 

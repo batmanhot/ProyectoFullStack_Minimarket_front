@@ -14,6 +14,7 @@
 
 import { useMemo } from 'react'
 import { formatCurrency, formatDateTime, formatDate } from '../../../shared/utils/helpers'
+import { writePrintDocument } from '../../../shared/utils/print'
 import { PAYMENT_METHODS } from '../../../config/app'
 
 // ─── Generador HTML 80mm ──────────────────────────────────────────────────────
@@ -163,9 +164,7 @@ export default function TurnReport({ session, sales, returns = [], businessConfi
     const html = buildTurnHTML({ session, sales, returns, businessConfig })
     const win  = window.open('', '_blank', 'width=380,height=750')
     if (!win) { alert('Activa las ventanas emergentes para imprimir'); return }
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => { win.focus(); win.print() }, 400)
+    writePrintDocument(win, html, { autoPrint: true })
   }
 
   return (

@@ -16,6 +16,8 @@ import { useStockReserve } from './hooks/useStockReserve'
 import { serialService }   from '../../services/index'
 import { usePOSDiscount }  from './hooks/usePOSDiscount'
 import { usePOSSale }      from './hooks/usePOSSale'
+import { productService, clientService } from '../../services/index'
+import { USE_API } from '../../services/_base'
 const HeldCartsPanel = lazy(() => import('./components/HeldCartsPanel'))
 import { usePOSTotals } from './hooks/usePOSTotals'
 
@@ -33,7 +35,9 @@ function playBeep({ freq = 1800, duration = 0.08, volume = 0.35 } = {}) {
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + duration)
     osc.onended = () => ctx.close()
-  } catch (_) {}
+  } catch {
+    // El bloqueo de pantalla secundaria no debe impedir operar el POS.
+  }
 }
 
 function VariantSelectorModal({ product, variants, onSelect, onClose }) {
@@ -84,20 +88,28 @@ function VariantSelectorModal({ product, variants, onSelect, onClose }) {
 
 export default function POS({ onNavigate }) {
   const {
-    products, productVariants, cart, clients, currentUser, activeCashSession, systemConfig, businessConfig,
+    products, productVariants, cart, clients, activeCashSession, businessConfig,
     addToCart, updateCartItem, removeFromCart, clearCart, restoreCart,
   } = useStore()
 
   const cartCount = useStore(selectCartCount)
 
+  // Con API, el store puede contener la semilla visual mientras se hidrata.
+  // POS no debe vender ni buscar datos de otro tenant: al abrirse sincroniza
+  // catálogo y clientes usando el token del usuario autenticado.
+  useEffect(() => {
+    if (!USE_API) return
+    void Promise.all([productService.getAll(), clientService.getAll()])
+  }, [])
+
   const [search, setSearch]                         = useState('')
   const [showResults, setShowResults]               = useState(false)
   const [variantSelectProduct, _setVariantSelectProduct] = useState(null)
   const variantSelectProductRef = useRef(null)
-  const setVariantSelectProduct = (p) => {
+  const setVariantSelectProduct = useCallback((p) => {
     variantSelectProductRef.current = p
     _setVariantSelectProduct(p)
-  }
+  }, [])
   const [serialSelectProduct, setSerialSelectProduct] = useState(null)
   const [serialSelectList,    setSerialSelectList]    = useState([])
   const [serialSelectLoading, setSerialSelectLoading] = useState(false)
@@ -107,7 +119,7 @@ export default function POS({ onNavigate }) {
 
   const { heldCarts, holdCart, recoverCart, discardHold, canHold } = useCartHold()
   // Reserva multi-caja: bloquea stock virtualmente mientras el cajero arma la venta
-  const { releaseReserve, stockConflicts, hasConflicts } = useStockReserve(cart)
+  const { releaseReserve, getReserveId, stockConflicts, hasConflicts } = useStockReserve(cart)
   const [showHeldCarts, setShowHeldCarts] = useState(false)
 
   const handleHoldCart = () => {
@@ -134,7 +146,7 @@ export default function POS({ onNavigate }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showPayment, setShowPayment]     = useState(false)
   const showPaymentRef = useRef(false)
-  showPaymentRef.current = showPayment
+  useEffect(() => { showPaymentRef.current = showPayment }, [showPayment])
   const [showHistory, setShowHistory] = useState(false)
 
   const searchRef  = useRef()
@@ -179,7 +191,7 @@ export default function POS({ onNavigate }) {
   const { processing, completedSale, showTicket, handleCompleteSale, closeTicket } = usePOSSale({
     mergedCartItems, subtotalBruto, totalDescuentos, totalAPagar,
     baseImponible, igvCalculado, igvRate,
-    appliedTicket, releaseReserve, resetDiscount, broadcast,
+    appliedTicket, releaseReserve, getReserveId, resetDiscount, broadcast,
   })
 
   const activeProducts = products.filter(p => p.isActive)
@@ -202,11 +214,11 @@ export default function POS({ onNavigate }) {
       })()
     : []
 
-  const [saleNote, setSaleNote] = useState('')
-  useEffect(() => {
+  const [saleNote, setSaleNote] = useState(() => {
     const pending = localStorage.getItem('pos_pending_note')
-    if (pending) { localStorage.removeItem('pos_pending_note'); setSaleNote(pending) }
-  }, [])
+    if (pending) localStorage.removeItem('pos_pending_note')
+    return pending || ''
+  })
 
   const { sales } = useStore()
   const sessionSales = activeCashSession
@@ -232,7 +244,7 @@ export default function POS({ onNavigate }) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [cart.length, activeCashSession, hasConflicts])
+  }, [cart.length, activeCashSession, hasConflicts, setVariantSelectProduct])
 
   useEffect(() => {
     broadcast('CART_UPDATE', { cart: buildCartForDisplay(mergedCartItems, products), businessConfig })
@@ -285,7 +297,7 @@ export default function POS({ onNavigate }) {
     playBeep()
     searchRef.current?.focus()
     toast.success(`${product.name} · ${serial.serialNumber} agregado`, { duration: 1500, icon: '🔑' })
-  }, [serialSelectProduct, addToCart]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [serialSelectProduct, addToCart])
 
   const handleSelectVariant = useCallback((variant) => {
     const product = variantSelectProductRef.current
@@ -298,7 +310,7 @@ export default function POS({ onNavigate }) {
     playBeep()
     searchRef.current?.focus()
     toast.success(`${enriched.name} agregado`, { duration: 1200, icon: '✓' })
-  }, [addToCart]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addToCart, setVariantSelectProduct])
 
   const handleUpdateQty = (key, newQty) => {
     const item    = cart.find(i => i._key === key)
@@ -317,7 +329,7 @@ export default function POS({ onNavigate }) {
       setSearch(''); setShowResults(false)
       setSelectedClientId(null); setSaleNote('')
     }
-  }, [handleCompleteSale, saleNote])
+  }, [handleCompleteSale, saleNote, setShowPayment, setVariantSelectProduct, setSearch, setShowResults, setSelectedClientId, setSaleNote])
 
   if (!activeCashSession) {
     return <EmptyState icon="🔐" title="Caja no abierta" message="Debes aperturar la caja antes de realizar ventas." action={{ label: 'Ir a Caja', onClick: () => onNavigate?.('cash') }}/>

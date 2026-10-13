@@ -152,7 +152,7 @@ export const exportCSV = (data, filename) => {
 }
 
 // ─── KPIs DASHBOARD ───────────────────────────────────────────────────────────
-export const calcDashboardKPIs = (sales, products, stockMovements) => {
+export const calcDashboardKPIs = (sales, products) => {
   const completed = sales.filter(s => s.status === 'completada')
   const todaySales = completed.filter(s => isToday(s.createdAt))
   const weekSales  = completed.filter(s => isThisWeek(s.createdAt))

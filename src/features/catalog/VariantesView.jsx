@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useStore } from '../../store/index'
 import { VariantManager } from './VariantManager'
 
@@ -7,8 +7,7 @@ export function VariantesView({ products }) {
   const [search, setSearch] = useState('')
   const [selectedProductId, setSelectedProductId] = useState(null)
   const variantProducts = useMemo(() => { const q = search.toLowerCase(); return products.filter(p => p.isActive && p.hasVariants && (!q || p.name.toLowerCase().includes(q) || p.barcode.includes(q))) }, [products, search])
-  useEffect(() => { if (!selectedProductId && variantProducts.length > 0) setSelectedProductId(variantProducts[0].id) }, [variantProducts, selectedProductId])
-  const selectedProduct = products.find(p => p.id === selectedProductId)
+  const selectedProduct = variantProducts.find(p => p.id === selectedProductId) ?? variantProducts[0] ?? null
 
   return (
     <div className="flex gap-4 min-h-[520px]">
@@ -18,7 +17,7 @@ export function VariantesView({ products }) {
           {variantProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-6 text-center text-gray-400 dark:text-slate-500"><span className="text-3xl mb-2">🎨</span><p className="text-xs">{search ? 'Sin resultados' : 'Ningún producto tiene variantes activas. Activa la opción en el formulario del producto.'}</p></div>
           ) : variantProducts.map(p => {
-            const count = productVariants.filter(v => v.productId === p.id).length; const isSelected = p.id === selectedProductId
+            const count = productVariants.filter(v => v.productId === p.id).length; const isSelected = p.id === selectedProduct?.id
             return (
               <button key={p.id} onClick={() => setSelectedProductId(p.id)} className={`w-full text-left px-3 py-2.5 border-b border-gray-50 dark:border-slate-700/50 transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/30 border-l-2 border-l-purple-500' : 'hover:bg-gray-50 dark:hover:bg-slate-700/40 border-l-2 border-l-transparent'}`}>
                 <p className={`text-sm font-medium truncate ${isSelected ? 'text-purple-700 dark:text-purple-300' : 'text-gray-800 dark:text-slate-100'}`}>{p.name}</p>

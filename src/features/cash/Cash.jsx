@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store/index'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { openCashSchema, closeCashSchema } from '../../shared/schemas/index'
 import { cashService } from '../../services/index'
@@ -25,11 +25,11 @@ function OpenForm({ currentUser, onBack }) {
       <button onClick={onBack} className="text-sm text-blue-600 hover:underline mb-4">← Volver</button>
       <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold text-gray-800 dark:text-slate-100">Apertura de caja</h2>
-        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto inicial (S/) *</label><input type="number" step="1" min="0" {...register('openingAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.openingAmount && <p className="text-xs text-red-500 mt-1">{errors.openingAmount.message}</p>}</div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto inicial (S/) *</label><input type="number" step="1" min="0" aria-label="Monto inicial" data-testid="cash-opening-amount" {...register('openingAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>{errors.openingAmount && <p className="text-xs text-red-500 mt-1">{errors.openingAmount.message}</p>}</div>
         <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Notas</label><textarea {...register('notes')} rows={2} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/></div>
         <div className="flex gap-3">
           <button onClick={onBack} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
-          <button onClick={handleSubmit(onSubmit)} disabled={loading} className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">{loading ? 'Aperturando...' : 'Aperturar caja'}</button>
+          <button onClick={handleSubmit(onSubmit)} disabled={loading} data-testid="cash-open-submit" className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">{loading ? 'Aperturando...' : 'Aperturar caja'}</button>
         </div>
       </div>
     </div>
@@ -37,10 +37,10 @@ function OpenForm({ currentUser, onBack }) {
 }
 
 function CloseForm({ session, sessionTotals, sessionSales, sessionDebtPayments, onBack }) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({ resolver: zodResolver(closeCashSchema) })
+  const { register, handleSubmit, control, formState: { errors } } = useForm({ resolver: zodResolver(closeCashSchema) })
   const [loading, setLoading] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  const counted        = parseFloat(watch('countedAmount') || 0)
+  const counted        = parseFloat(useWatch({ control, name: 'countedAmount' }) || 0)
   const cashTotal      = sessionTotals.byMethod?.efectivo || 0
   const debtCash       = (sessionDebtPayments || []).filter(p => p.method === 'efectivo').reduce((a, p) => a + (p.amount || 0), 0)
   const totalDebt      = (sessionDebtPayments || []).reduce((a, p) => a + (p.amount || 0), 0)
@@ -96,7 +96,7 @@ function CloseForm({ session, sessionTotals, sessionSales, sessionDebtPayments, 
             {debtCash > 0 ? ` + cobros deuda efectivo (${formatCurrency(debtCash)})` : ''}
           </p>
         </div>
-        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto contado físicamente (S/) *</label><input type="number" step="1" min="0" {...register('countedAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00"/>{errors.countedAmount && <p className="text-xs text-red-500 mt-1">{errors.countedAmount.message}</p>}</div>
+        <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Monto contado físicamente (S/) *</label><input type="number" step="1" min="0" aria-label="Monto contado" data-testid="cash-counted-amount" {...register('countedAmount')} className="w-full px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00"/>{errors.countedAmount && <p className="text-xs text-red-500 mt-1">{errors.countedAmount.message}</p>}</div>
         {counted > 0 && (
           <div className={`rounded-lg p-3 text-sm font-medium flex justify-between ${Math.abs(difference) < 0.01 ? 'bg-green-50 text-green-700' : difference > 0 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
             <span>{difference > 0 ? 'Sobrante' : difference < 0 ? 'Faltante' : '✓ Sin diferencia'}</span>
@@ -106,7 +106,7 @@ function CloseForm({ session, sessionTotals, sessionSales, sessionDebtPayments, 
         <div><label className="block text-xs font-medium text-gray-600 dark:text-slate-300 mb-1">Observaciones</label><textarea {...register('notes')} rows={2} className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/></div>
         <div className="flex gap-3">
           <button onClick={onBack} className="flex-1 py-2.5 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg text-sm hover:bg-gray-50 dark:bg-slate-800/50 dark:hover:bg-slate-700">Cancelar</button>
-          <button onClick={handleSubmit(d => setConfirm(d))} disabled={loading} className="flex-1 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-50">Cerrar caja</button>
+          <button onClick={handleSubmit(d => setConfirm(d))} disabled={loading} data-testid="cash-close-submit" className="flex-1 py-2.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 disabled:opacity-50">Cerrar caja</button>
         </div>
       </div>
       {confirm && <ConfirmModal title="¿Confirmas el cierre de caja?" message="Esta acción no se puede deshacer. El turno quedará registrado." confirmLabel="Sí, cerrar caja" variant="danger" onConfirm={() => doClose(confirm)} onCancel={() => setConfirm(null)}/>}
@@ -115,7 +115,7 @@ function CloseForm({ session, sessionTotals, sessionSales, sessionDebtPayments, 
 }
 
 // Vista detalle de un cierre histórico
-function SessionDetail({ session, onClose }) {
+function SessionDetail({ session }) {
   const byMethod = session.byMethod || {}
   return (
     <div className="space-y-4">
@@ -155,8 +155,15 @@ export default function Cash() {
   const { activeCashSession, cashSessions, sales, debtPayments, currentUser } = useStore()
   const [view, setView] = useState('main')
   const [detailSession, setDetailSession] = useState(null)
+  const [isSyncing, setIsSyncing] = useState(true)
 
-  useEffect(() => { cashService.syncStatus() }, [])
+  useEffect(() => {
+    let mounted = true
+    cashService.syncStatus().finally(() => {
+      if (mounted) setIsSyncing(false)
+    })
+    return () => { mounted = false }
+  }, [])
 
   const sessionSales = useMemo(() => {
     if (!activeCashSession) return []
@@ -174,6 +181,11 @@ export default function Cash() {
     sessionSales.forEach(s => { s.payments?.forEach(p => { byMethod[p.method] = formatNumber((byMethod[p.method] || 0) + p.amount) }) })
     return { total, byMethod }
   }, [sessionSales])
+
+  // El estado de caja vive en el servidor. No se debe mostrar una acción de
+  // apertura/cierre hasta terminar de sincronizarlo, porque una sesión activa
+  // de otro navegador puede no estar aún en el store local.
+  if (isSyncing) return <div className="p-6 text-sm text-gray-500" data-testid="cash-status-sync">Actualizando estado de caja…</div>
 
   if (view === 'open')  return <OpenForm currentUser={currentUser} onBack={() => setView('main')}/>
   if (view === 'close' && activeCashSession) return <CloseForm session={activeCashSession} sessionTotals={sessionTotals} sessionSales={sessionSales} sessionDebtPayments={sessionDebtPayments} onBack={() => setView('main')}/>

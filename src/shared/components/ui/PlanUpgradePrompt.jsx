@@ -33,7 +33,6 @@ export default function PlanUpgradePrompt({ page, reason, currentPlan, minPlan }
   const targetPlan   = minPlan && PLANS[minPlan]
   const currPlanCfg  = PLANS[currentPlan] ?? PLANS.trial
   const moduleName   = MODULE_LABELS[page] ?? page
-  const colors       = PLAN_COLORS[minPlan] ?? PLAN_COLORS.pro
 
   // Planes que sí incluyen el módulo (para mostrar comparativa)
   const plansWithFeature = PLAN_ORDER

@@ -1,12 +1,27 @@
+const appMode = import.meta.env.VITE_APP_MODE || import.meta.env.MODE || (import.meta.env.DEV ? 'development' : 'production')
+const useApi = import.meta.env.VITE_USE_API === 'true'
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+
+if (appMode === 'production') {
+  if (!useApi) {
+    throw new Error('VITE_USE_API=true es obligatorio en producción')
+  }
+  const parsedApiUrl = new URL(apiUrl)
+  if (parsedApiUrl.protocol !== 'https:') {
+    throw new Error('VITE_API_URL debe usar HTTPS en producción')
+  }
+}
+
 export const APP_CONFIG = {
+  appMode,
+  isDemoOrDevelopment: ['demo', 'development'].includes(appMode),
   name: import.meta.env.VITE_COMPANY_NAME || 'Mi Negocio',
   ruc: import.meta.env.VITE_COMPANY_RUC || '20000000000',
   address: import.meta.env.VITE_COMPANY_ADDRESS || 'Av. Principal 123',
   phone: import.meta.env.VITE_COMPANY_PHONE || '01-000-0000',
   currency: 'PEN', locale: 'es-PE', igvRate: 0.18,
-  useApi:      import.meta.env.VITE_USE_API      === 'true',
-  useFactuApi: import.meta.env.VITE_USE_FACTUAPI === 'true',
-  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  useApi,
+  apiUrl,
 }
 
 export const ROLES = {

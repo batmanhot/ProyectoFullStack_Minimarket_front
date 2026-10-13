@@ -34,7 +34,6 @@ export default defineConfig({
     hmr: {
       protocol: 'ws',
       host:     'localhost',
-      port:     3000,
     },
   },
   build: {
@@ -51,7 +50,8 @@ export default defineConfig({
       }
     },
     chunkSizeWarningLimit: 650,
-    sourcemap: true,
+    // No exponer código fuente ni rutas internas en el artefacto público.
+    sourcemap: false,
   },
 
   // PWA - no cachear el SW

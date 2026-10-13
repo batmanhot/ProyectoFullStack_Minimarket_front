@@ -7,8 +7,10 @@ import {
   buildEarnTransaction,
   buildRedeemTransaction,
 } from '../shared/utils/LoyaltyEngine'
-import { api, USE_API, USE_FACTUAPI, ok, fail, gs, delay } from './_base'
+import { api, USE_API, ok, fail, gs, delay } from './_base'
 import { serialService } from './serialService'
+import { productService } from './productService'
+import { clientService } from './clientService'
 
 export const saleService = {
   async getAll(filters = {}) {
@@ -66,31 +68,9 @@ export const saleService = {
           const expandedPayload = { ...payload, items: cleanItems }
           const { data } = await api.post('/sales', expandedPayload)
           const sale = data.data
-          // Reflejar stock localmente para productos no-serie
-          for (const item of expandedItems) {
-            if (item.selectedSerial) continue
-            const st   = useStore.getState()
-            const prod = st.products.find(p => p.id === item.productId)
-            if (prod) st.updateProduct(item.productId, { stock: Math.max(0, (prod.stock || 0) - item.quantity) })
-          }
-          // Marcar seriales vendidos — UNA SOLA VEZ aquí
-          for (const item of expandedItems) {
-            if (item.selectedSerial) {
-              await serialService.markSold(item.productId, item.selectedSerial, sale.id, payload.invoiceNumber)
-            }
-          }
-          // Recalcular stock de bundles
-          for (const item of enrichedItems) {
-            if (!item.isBundle) continue
-            const st = useStore.getState()
-            const bp = st.products.find(p => p.id === item.productId)
-            if (!bp?.components?.length) continue
-            const newStock = Math.floor(Math.min(...bp.components.map(comp => {
-              const cp = st.products.find(p => p.id === comp.productId)
-              return cp && comp.quantity > 0 ? Math.floor((cp.stock || 0) / comp.quantity) : 0
-            })))
-            st.updateProduct(item.productId, { stock: newStock })
-          }
+          // La BD es la fuente de verdad. No se calculan descuentos de stock en
+          // el navegador porque una caja concurrente puede haberlo modificado.
+          await Promise.all([productService.getAll(), clientService.getAll()])
           useStore.getState().addSale(sale)
           useStore.getState().clearCart()
           return ok(sale)
@@ -98,6 +78,9 @@ export const saleService = {
           return fail(err.response?.data?.message || err.message || 'Error al registrar la venta')
         }
       }
+      // El identificador se crea antes de encolar: permite al backend detectar
+      // reintentos de la misma venta y evita ventas duplicadas al reconectar.
+      payload = { ...payload, id: payload.id || crypto.randomUUID() }
       useStore.getState().enqueueOfflineOp({ type: 'sale.create', endpoint: '/sales', method: 'POST', payload: { ...payload, items: [...enrichedItems, ...expandedItems] } })
     }
 
@@ -225,7 +208,7 @@ export const saleService = {
       return { clientName: c.name, clientDocument: `${c.documentType} ${c.documentNumber}` }
     })()
 
-    let sale = { ...payload, ...saleClientEnrich, id: crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
+    let sale = { ...payload, ...saleClientEnrich, id: payload.id || crypto.randomUUID(), status: 'completada', createdAt: new Date().toISOString() }
 
     // Programa de Puntos
     if (payload.clientId) {
@@ -260,25 +243,6 @@ export const saleService = {
       }
     }
 
-    if (USE_FACTUAPI && sale.tipoComprobante !== 'ticket') {
-      try {
-        const { data: apiData } = await api.post('/sales', sale)
-        const r = apiData?.data ?? {}
-        sale = {
-          ...sale,
-          comprobanteId:     r.comprobanteId     ?? null,
-          comprobanteNumero: r.comprobanteNumero ?? null,
-          invoiceNumber:     r.invoiceNumber     ?? sale.invoiceNumber,
-          factuApiResult:    r.factuApiResult    ?? null,
-          sunatStatus:       r.comprobanteId ? 'emitido' : 'error',
-          comprobanteError:  r.comprobanteError  ?? null,
-        }
-      } catch (err) {
-        console.error('[saleService] Error al enviar a backend SUNAT:', err)
-        sale = { ...sale, sunatStatus: 'error', comprobanteError: err.message }
-      }
-    }
-
     useStore.getState().addSale(sale)
     useStore.getState().clearCart()
     return ok(sale)
@@ -290,16 +254,7 @@ export const saleService = {
       if (navigator.onLine) {
         try {
           const { data } = await api.patch(`/sales/${id}/cancel`, { reason, userId })
-          // Restaurar seriales al anular en modo API
-          const state = gs()
-          const sale  = state.sales.find(s => s.id === id)
-          if (sale?.items) {
-            for (const item of sale.items) {
-              if (item.stockControlUsed === 'serie' && item.batchAllocations?.[0]?.batchNumber) {
-                await serialService.markAvailable(item.productId, item.batchAllocations[0].batchNumber)
-              }
-            }
-          }
+          await Promise.all([productService.getAll(), clientService.getAll()])
           useStore.getState().updateSale(id, { status: 'cancelada', cancelReason: reason, cancelledAt: new Date().toISOString() })
           return ok(data.data)
         } catch (err) {

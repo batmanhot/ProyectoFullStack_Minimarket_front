@@ -15,7 +15,7 @@
  * 10. Desglose de vuelto con denominaciones (calcBilletes)
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { PAYMENT_METHODS, BILLETES_PEN } from '../../../config/app'
 import { formatCurrency, calcBilletes } from '../../../shared/utils/helpers'
 import toast from 'react-hot-toast'
@@ -93,12 +93,11 @@ export default function PaymentPanel({
 
   // Precargar monto pendiente cuando se cambia de método
   useEffect(() => {
-    if (remaining > 0) {
-      setCurrentAmount(remaining.toFixed(2))
-      setTimeout(() => amountRef.current?.select(), 50)
-    } else {
-      setCurrentAmount('')
-    }
+    const timer = window.setTimeout(() => {
+      setCurrentAmount(remaining > 0 ? remaining.toFixed(2) : '')
+      amountRef.current?.select()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [currentMethod, remaining])
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
@@ -144,7 +143,7 @@ export default function PaymentPanel({
 
   const handleQuick = (v) => setCurrentAmount(v.toFixed(2))
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (!isComplete) { toast.error(`Falta ${formatCurrency(remaining)} por cobrar`); return }
     // Factura requiere cliente con RUC
     if (tipoComprobante === 'factura') {
@@ -164,13 +163,13 @@ export default function PaymentPanel({
       return
     }
     onConfirm({ payments, clientId, change, loyaltyDiscount, redeemedPoints, tipoComprobante })
-  }
+  }, [isComplete, remaining, tipoComprobante, selectedClient, isZeroTotal, onConfirm, payments, clientId, change, loyaltyDiscount, redeemedPoints])
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') addPayment() }
 
   // F8 → Confirmar venta (cuando el panel de pago está abierto)
   const confirmRef = useRef(null)
-  confirmRef.current = handleConfirm
+  useEffect(() => { confirmRef.current = handleConfirm }, [handleConfirm])
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'F8') { e.preventDefault(); confirmRef.current() }

@@ -3,7 +3,7 @@
  * Cubre las 4 estrategias de stock (simple, fefo, fifo, serie),
  * merma, alertas automáticas y constantes de configuración.
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   STOCK_CONTROL,
   SECTOR_STOCK_DEFAULTS,

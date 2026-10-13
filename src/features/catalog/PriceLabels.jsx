@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react'
 import JsBarcode from 'jsbarcode'
-import toast from 'react-hot-toast'
 
 function renderBarcodeSVG(value) {
   try {
@@ -24,14 +23,6 @@ function buildLabelHTML(products, businessConfig) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiquetas de precio</title>
 <style>* { margin:0; padding:0; box-sizing:border-box; } body { font-family:'Courier New',monospace; background:#fff; } .grid { display:flex; flex-wrap:wrap; gap:4px; padding:8px; } .label { width:56mm; border:1px solid #ccc; border-radius:3px; padding:4px 6px; text-align:center; page-break-inside:avoid; } .biz { font-size:7px; color:#555; margin-bottom:1px; } .name { font-size:9px; font-weight:bold; margin-bottom:2px; min-height:20px; display:flex; align-items:center; justify-content:center; } .price { font-size:20px; font-weight:900; margin:3px 0; color:#000; } .bc { width:100%; height:30px; } .sku { font-size:7px; color:#777; margin-top:1px; } .fab { position:fixed; bottom:16px; right:16px; background:#2563eb; color:#fff; border:none; padding:10px 20px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:700; } @media print { .fab { display:none } @page { size:A4; margin:5mm; } }</style></head>
 <body><div class="grid">${labels}</div><button class="fab" onclick="window.print()">🖨️ Imprimir etiquetas</button></body></html>`
-}
-
-export function printPriceLabels(products, businessConfig) {
-  if (!products?.length) { toast.error('No hay productos para imprimir'); return }
-  const win = window.open('', '_blank', 'width=950,height=720,menubar=yes,scrollbars=yes')
-  if (!win) { toast.error('Activa las ventanas emergentes para imprimir etiquetas'); return }
-  win.document.write(buildLabelHTML(products, businessConfig))
-  win.document.close()
 }
 
 export function PriceLabelsModal({ products, businessConfig, onClose }) {

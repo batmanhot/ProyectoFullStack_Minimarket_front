@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { categoryService } from '../../services/index'
-import { inputCls, labelCls, btnSecondary, btnPrimary, CATEGORY_COLORS, ColorDot } from './catalog.shared'
+import { inputCls, labelCls, btnSecondary, btnPrimary, CATEGORY_COLORS } from './catalog.shared'
+import { ColorDot } from './ColorDot'
 import toast from 'react-hot-toast'
 
 export function CategoryForm({ category, onClose }) {

@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { useStore } from '../../../store/index'
 import { formatCurrency, formatDateTime } from '../../../shared/utils/helpers'
+import { writePrintDocument } from '../../../shared/utils/print'
 import { PAYMENT_METHODS } from '../../../config/app'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
@@ -181,7 +182,7 @@ export default function SaleTicket({ sale, onClose }) {
   const igv           = sale.igv ?? parseFloat((sale.total - baseImponible).toFixed(2))
   const subtotalBruto = sale.subtotalBruto ?? sale.total
   const descuentos    = sale.totalDescuentos ?? sale.discount ?? 0
-  const groupSummary  = sale.groupSummary || []
+  const groupSummary  = useMemo(() => sale.groupSummary || [], [sale.groupSummary])
 
   const isTicket   = sale.tipoComprobante === 'ticket'
   const isFactura  = sale.tipoComprobante === 'factura'
@@ -268,9 +269,7 @@ export default function SaleTicket({ sale, onClose }) {
     const html = buildTicketHTML(sale, businessConfig, storeProducts)
     const win  = window.open('', '_blank', 'width=380,height=700,left=100,top=50')
     if (!win) { alert('Activa las ventanas emergentes para imprimir'); return }
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => { win.focus(); win.print() }, 400)
+    writePrintDocument(win, html, { autoPrint: true })
   }, [sale, businessConfig, storeProducts])
 
   // ── RENDER ─────────────────────────────────────────────────────────────────

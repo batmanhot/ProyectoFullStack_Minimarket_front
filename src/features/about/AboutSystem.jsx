@@ -1,4 +1,4 @@
-import { useTenantSafe } from '../../context/TenantContext'
+import { useTenantSafe } from '../../context/tenantContext.shared'
 import { useStore }       from '../../store/index'
 import { PLANS, PLAN_ORDER } from '../../config/plans'
 import { ROLES }          from '../../config/app'

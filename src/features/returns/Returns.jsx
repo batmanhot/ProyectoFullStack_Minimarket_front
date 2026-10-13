@@ -40,6 +40,7 @@ const REASON_COLORS = {
 }
 
 const HALF_UP = (n) => Math.floor(Number(n) * 100 + 0.5) / 100
+const RETURNABLE_STATUSES = new Set(['completada', 'dev-parcial', 'devolucion'])
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function calcItemNetUnitPrice(item) {
@@ -193,7 +194,6 @@ export default function Returns() {
 
   // Ventas recientes con comprobante emitido (para búsqueda rápida)
   // Incluye 'devolucion' para permitir consultar comprobantes ya devueltos
-  const RETURNABLE_STATUSES = new Set(['completada', 'dev-parcial', 'devolucion'])
   const recentSales = useMemo(() =>
     [...sales]
       .filter(s => RETURNABLE_STATUSES.has(s.status))
@@ -1173,7 +1173,7 @@ export default function Returns() {
           </div>
 
           {returnHistory.length === 0 ? (
-            <div className="py-20 text-center">
+            <div data-testid="returns-history-empty" className="py-20 text-center">
               <div className="text-5xl opacity-10 mb-4">📋</div>
               <p className="text-gray-400 dark:text-slate-500 text-sm font-medium">
                 Sin notas de crédito {historyFilter === 'today' ? 'hoy' : 'registradas'}
@@ -1182,7 +1182,7 @@ export default function Returns() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table data-testid="returns-history-table" className="w-full">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-slate-700/40 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
                     <th className="px-6 py-3.5 text-left">NC N°</th>

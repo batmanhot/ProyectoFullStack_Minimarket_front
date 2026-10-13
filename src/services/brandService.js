@@ -1,17 +1,16 @@
 import { api, USE_API, ok, fail, gs, delay } from './_base'
 
-const _try = async (fn) => { try { return await fn() } catch (_) { return null } }
-
 export const brandService = {
   async getAll(search = '') {
     await delay(100)
     if (USE_API) {
-      const res = await _try(async () => {
+      try {
         const { data } = await api.get('/brands', { params: search ? { search } : {} })
         if (!search) gs().setBrands(data.data)
         return ok(data.data, data.meta?.total)
-      })
-      if (res) return res
+      } catch (err) {
+        return fail(err.response?.data?.error || err.message || 'Error al obtener marcas')
+      }
     }
     let brands = (gs().brands || []).filter(b => b.isActive !== false)
     if (search) brands = brands.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))

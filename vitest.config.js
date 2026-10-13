@@ -16,7 +16,15 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      include: ['src/**/*.{js,jsx}'],
+      // La UI se valida por flujos E2E. La puerta de cobertura unitaria mide
+      // exclusivamente la lógica de negocio y persistencia local, donde una
+      // regresión sí debe impedir la integración continua.
+      include: [
+        'src/shared/utils/{helpers,LoyaltyEngine,discountEngine,inventoryEngine}.js',
+        'src/shared/schemas/index.js',
+        'src/services/{saleService,returnService,serialService}.js',
+        'src/store/slices/{salesSlice,catalogSlice}.js',
+      ],
       exclude: [
         'src/tests/**',
         'src/data/**',

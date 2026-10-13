@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../../store/index'
 import { authService } from '../../services/index'
-import { ROLES } from '../../config/app'
+import { APP_CONFIG, ROLES } from '../../config/app'
 import { PLANS } from '../../config/plans'
-import { useTenantSafe } from '../../context/TenantContext'
+import { useTenantSafe } from '../../context/tenantContext.shared'
 import logo from '../../assets/logo.webp'
 import toast from 'react-hot-toast'
 
@@ -46,7 +46,11 @@ export default function Login() {
   const DEMO_ROLES = ALL_DEMO_ROLES.filter(r => availableRoles.includes(r.role))
 
   const isDemo     = tenantSlug === 'demo'
-  const isRealTenant = !isDemo
+  const isE2ETenant = import.meta.env.VITE_E2E === 'true' && tenantSlug === 'e2e'
+  const isRealTenant = !isDemo && !isE2ETenant
+  // El acceso rápido solo existe en el tenant demo y en entornos no productivos.
+  // Nunca debe exponer credenciales de demostración en una compilación productiva.
+  const quickAccessEnabled = APP_CONFIG.isDemoOrDevelopment && demoMode && (isDemo || isE2ETenant)
 
   const [loading, setLoading]       = useState(false)
   const [username, setUsername]     = useState('')
@@ -597,16 +601,11 @@ export default function Login() {
                   🏪 Accede a tu negocio — {businessName || tenantSlug}
                 </span>
                 Ingresa con el usuario y contraseña que configuraste al registrarte.
-                {demoMode && (
-                  <span style={{ display: 'block', marginTop: '4px', color: 'rgba(196,181,253,0.70)' }}>
-                    ¿Explorando? Los botones de acceso rápido también están disponibles abajo.
-                  </span>
-                )}
               </div>
             )}
 
             {/* ── ACCESO RÁPIDO — sección demo (solo en modo demo) ─────── */}
-            {demoMode && (
+            {quickAccessEnabled && (
               <div className="demo-section">
                 <div className="quick-label">
                   <p className="quick-label-text">Acceso rápido — Demo</p>
@@ -654,7 +653,7 @@ export default function Login() {
 
             {/* ── LOGIN MANUAL — sección principal ─────────────────────── */}
             <div className="login-section">
-              {demoMode && (
+              {quickAccessEnabled && (
                 <div className="divider">
                   <div className="divider-line"/>
                   <span className="divider-text">
@@ -663,7 +662,7 @@ export default function Login() {
                   <div className="divider-line"/>
                 </div>
               )}
-              {!demoMode && (
+              {!quickAccessEnabled && (
                 <p style={{ fontSize:'13px', fontWeight:600, color:'rgba(255,255,255,0.55)', margin:'0 0 12px' }}>
                   Ingresa tus credenciales para acceder
                 </p>
@@ -722,9 +721,9 @@ export default function Login() {
               </form>
 
               {/* Hint de credenciales — solo demo */}
-              {demoMode && isDemo && (
+              {quickAccessEnabled && (
                 <p style={{ fontSize:'10px', color:'rgba(255,255,255,0.22)', textAlign:'center', marginTop:'8px', lineHeight:1.5 }}>
-                  Demo: <span style={{ color:'rgba(56,189,248,0.60)' }}>admin / admin123 · cajero1 / cajero123</span>
+                  Demo: <span style={{ color:'rgba(56,189,248,0.60)' }}>{import.meta.env.VITE_DEMO_ADMIN_USER} / {import.meta.env.VITE_DEMO_ADMIN_PASSWORD} · {import.meta.env.VITE_DEMO_CASHIER_USER} / {import.meta.env.VITE_DEMO_CASHIER_PASSWORD}</span>
                 </p>
               )}
 

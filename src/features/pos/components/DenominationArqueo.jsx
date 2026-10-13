@@ -13,6 +13,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { formatCurrency, formatDateTime } from '../../../shared/utils/helpers'
+import { writePrintDocument } from '../../../shared/utils/print'
 
 // ─── Denominaciones peruanas ──────────────────────────────────────────────────
 const BILLETES = [
@@ -127,22 +128,22 @@ export default function DenominationArqueo({
 
   const handleChange = useCallback((valor, qty) => {
     const v = Math.max(0, parseInt(qty) || 0)
-    setQuantities((prev) => ({ ...prev, [valor]: v }))
-    // Notificar al padre con el nuevo total
-    const newTotal = ALL_DENOMS.reduce((acc, d) => {
-      const q = d.valor === valor ? v : (parseInt(prev[d.valor] || 0))
-      return parseFloat((acc + q * d.valor).toFixed(2))
-    }, 0)
-    onCountedChange?.(newTotal)
+    setQuantities((prev) => {
+      const next = { ...prev, [valor]: v }
+      const newTotal = ALL_DENOMS.reduce((acc, d) => {
+        const q = parseInt(next[d.valor] || 0)
+        return parseFloat((acc + q * d.valor).toFixed(2))
+      }, 0)
+      onCountedChange?.(newTotal)
+      return next
+    })
   }, [onCountedChange])
 
   const handlePrint = () => {
     const html = buildArqueoHTML({ quantities, totalContado, expected, difference, session, businessConfig, userName })
     const win  = window.open('', '_blank', 'width=380,height=700')
     if (!win) { alert('Activa las ventanas emergentes para imprimir'); return }
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => { win.focus(); win.print() }, 400)
+    writePrintDocument(win, html, { autoPrint: true })
   }
 
   const denomsToShow = showAll ? ALL_DENOMS : BILLETES

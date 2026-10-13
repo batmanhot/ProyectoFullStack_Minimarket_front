@@ -1,5 +1,5 @@
 // src/shared/hooks/useServiceWorker.js
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
 export const useServiceWorker = () => {
@@ -7,23 +7,7 @@ export const useServiceWorker = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [updateAvailable, setUpdateAvailable] = useState(false)
 
-  useEffect(() => {
-    // Verificar si el navegador soporta Service Workers
-    if (!('serviceWorker' in navigator)) {
-      console.warn('⚠️ Service Workers no soportados en este navegador')
-      return
-    }
-
-    registerServiceWorker()
-    setupOnlineOfflineListeners()
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
-
-  const requestNotificationPermission = async () => {
+  const requestNotificationPermission = useCallback(async () => {
     if (!('Notification' in window)) {
       console.warn('[SW] Notificaciones no soportadas en este navegador')
       return null
@@ -50,9 +34,9 @@ export const useServiceWorker = () => {
       console.error('[SW] Error solicitando permiso de notificaciones:', error)
       return null
     }
-  }
+  }, [])
 
-  const registerServiceWorker = async () => {
+  const registerServiceWorker = useCallback(async () => {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', {
         scope: '/'
@@ -120,28 +104,23 @@ export const useServiceWorker = () => {
     } catch (error) {
       console.error('❌ Error registrando Service Worker:', error)
     }
-  }
+  }, [requestNotificationPermission])
 
-  const handleOnline = () => {
+  const handleOnline = useCallback(() => {
     setIsOnline(true)
     toast.success('Conexión restaurada', { 
       icon: '🌐',
       duration: 3000 
     })
-  }
+  }, [])
 
-  const handleOffline = () => {
+  const handleOffline = useCallback(() => {
     setIsOnline(false)
     toast.error('Sin conexión. Trabajando offline', { 
       icon: '📡',
       duration: 5000 
     })
-  }
-
-  const setupOnlineOfflineListeners = () => {
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-  }
+  }, [])
 
   const updateServiceWorker = () => {
     if (registration && registration.waiting) {
@@ -155,6 +134,19 @@ export const useServiceWorker = () => {
       console.log('Service Worker desregistrado')
     }
   }
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined
+
+    void Promise.resolve().then(registerServiceWorker)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [handleOffline, handleOnline, registerServiceWorker])
 
   return {
     registration,

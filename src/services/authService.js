@@ -1,5 +1,4 @@
 import { api, USE_API, ok, fail, gs, delay } from './_base'
-import { STORAGE_KEYS } from '../config/storageKeys'
 import { tenantService } from './tenantService'
 
 export const authService = {
@@ -14,14 +13,24 @@ export const authService = {
   async login(role, tenantSlug = 'demo') {
     await delay(350)
     if (USE_API) {
-      // En modo API los botones rápidos usan las credenciales del seed
+      // El tenant efímero E2E se habilita únicamente en el proceso que
+      // Playwright inicia con VITE_E2E=true. Nunca existe en un build normal.
+      const isE2ETenant = import.meta.env.VITE_E2E === 'true' && tenantSlug === 'e2e'
+      if (tenantSlug !== 'demo' && !isE2ETenant) {
+        return fail('El acceso rápido solo está disponible para el entorno demo')
+      }
+      // Las credenciales demo se inyectan solo en .env.development. No deben
+      // existir como literales en el bundle de producción.
       const DEMO_CREDS = {
-        admin:      { username: 'admin@demo.com', password: 'admin123'   },
-        gerente:    { username: 'gerente',         password: 'gerente123' },
-        supervisor: { username: 'cajero',          password: 'cajero123'  },
-        cajero:     { username: 'cajero',          password: 'cajero123'  },
+        admin:      { username: import.meta.env.VITE_DEMO_ADMIN_USER,   password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD },
+        gerente:    { username: import.meta.env.VITE_DEMO_MANAGER_USER, password: import.meta.env.VITE_DEMO_MANAGER_PASSWORD },
+        supervisor: { username: import.meta.env.VITE_DEMO_CASHIER_USER, password: import.meta.env.VITE_DEMO_CASHIER_PASSWORD },
+        cajero:     { username: import.meta.env.VITE_DEMO_CASHIER_USER, password: import.meta.env.VITE_DEMO_CASHIER_PASSWORD },
       }
       const creds = DEMO_CREDS[role] ?? DEMO_CREDS.cajero
+      if (!creds.username || !creds.password) {
+        return fail('Las credenciales demo no están configuradas para este entorno')
+      }
       return this.loginWithCredentials(creds.username, creds.password, tenantSlug)
     }
     const user = gs().users.find(u => u.role === role && u.isActive)
@@ -49,7 +58,6 @@ export const authService = {
     if (USE_API) {
       try {
         const { data } = await api.post('/auth/login', { username, password, tenantSlug })
-        localStorage.setItem(STORAGE_KEYS.authToken, data.token)
         return ok(data.user)
       } catch (err) {
         return fail(err.response?.data?.message || err.message || 'No se pudo conectar con el servidor')
@@ -69,7 +77,6 @@ export const authService = {
   },
 
   async logout() {
-    localStorage.removeItem(STORAGE_KEYS.authToken)
     if (USE_API) await api.post('/auth/logout').catch(() => {})
     return ok(null)
   },

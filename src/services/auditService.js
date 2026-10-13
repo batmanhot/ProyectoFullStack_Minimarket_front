@@ -20,9 +20,18 @@ export const auditService = {
 
   async log(action, entity, entityId = '', detail = '') {
     if (USE_API) {
+      // La auditoría es complementaria: sin una sesión autenticada no debe
+      // generar un 401 que afecte el flujo principal (por ejemplo, el login).
+      if (!gs().currentUser) return
       try {
-        await api.post('/audit', { action, entity, entityId: String(entityId), detail })
-      } catch (_) {}
+        await api.post(
+          '/audit',
+          { action, entity, entityId: String(entityId), detail },
+          { skipSessionInvalidation: true },
+        )
+      } catch {
+        // La auditoría auxiliar no debe interrumpir la operación principal.
+      }
     }
   },
 }
